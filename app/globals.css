@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+:root {
+  --writing-header: #1a4d2e;
+  --writing-header-hover: #2d6a4a;
+  --writing-bg: #f8f6f1;
+  --writing-sidebar: #f5f0e6;
+  --writing-border: #e5dfd4;
+  --writing-card: #faf8f5;
+  --writing-success: #2d7d46;
+  --writing-error: #c53030;
+}
+
+body {
+  background: var(--writing-bg);
+  color: #2c2c2c;
+  min-height: 100vh;
+  font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
+}
