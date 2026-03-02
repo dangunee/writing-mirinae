@@ -207,16 +207,17 @@ function saveAssignments(assignments: Assignment[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(assignments));
 }
 
-type TabId = "experience" | "writing" | "topik";
+type TabId = "course" | "submit" | "topik";
 
 const TABS: { id: TabId; label: string }[] = [
-  { id: "experience", label: "体験例" },
-  { id: "writing", label: "作文トレーニング" },
-  { id: "topik", label: "TOPIK作文トレーニング" },
+  { id: "course", label: "作文トレーニング" },
+  { id: "submit", label: "課題提出" },
+  { id: "topik", label: "TOPIK作文トレ" },
 ];
 
 export default function WritingPage() {
-  const [activeTab, setActiveTab] = useState<TabId>("writing");
+  const [activeTab, setActiveTab] = useState<TabId>("course");
+  const [exampleTab, setExampleTab] = useState<number>(0);
   const [assignments, setAssignments] = useState<Assignment[]>(MOCK_ASSIGNMENTS);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
@@ -359,296 +360,525 @@ export default function WritingPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#f8f6f1]">
-      {/* Header */}
-      <header className="bg-[#1a4d2e] text-white py-4 md:py-6 px-4 md:px-6 shadow-lg">
-        <div className="max-w-4xl mx-auto text-center">
-          <h1 className="text-xl md:text-3xl font-bold tracking-wide">writing.mirinae.jp</h1>
-          <p className="text-xs md:text-base mt-1 opacity-90">ミリネ韓国語教室・作文トレーニング</p>
-        </div>
+    <div>
+      {/* SITE HEADER */}
+      <header className="site-header">
+        <a href="#" className="logo">
+          ミリネ韓国語教室 <span>オンライン講座</span>
+        </a>
       </header>
 
-      <div className="flex flex-1 justify-center">
-        <div className="flex flex-1 flex-col md:flex-row max-w-4xl w-full">
-        {/* Sidebar - hidden on mobile, shown on desktop */}
-        <aside
-          className={`hidden md:flex ${
-            sidebarCollapsed ? "md:w-16" : "md:w-56"
-          } shrink-0 bg-[#f5f0e6] border-r border-[#e5dfd4] transition-all duration-300 flex-col`}
-        >
-          <div className="p-4">
-            <button
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="w-full flex items-center justify-center p-2 rounded-lg hover:bg-[#ebe5da] transition-colors"
-              aria-label={sidebarCollapsed ? "사이드바 펼치기" : "사이드바 접기"}
-            >
-              <span className={`text-gray-500 transition-transform ${sidebarCollapsed ? "rotate-180" : ""}`}>◀</span>
-            </button>
-          </div>
-          {!sidebarCollapsed && (
-            <div className="px-4 pb-6">
+      {/* TAB NAV */}
+      <nav className="tab-nav">
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            className={`tab-btn ${activeTab === tab.id ? "active" : ""}`}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </nav>
+
+      {/* COURSE (LANDING) TAB */}
+      {activeTab === "course" && (
+        <div className="layout">
+          <main className="main">
+            {/* HERO CARD */}
+            <div className="hero-card">
+              <div className="hero-eyebrow">メール添削コース</div>
+              <h1>メールで作文トレーニング</h1>
+              <p className="sub">300〜500字作文　添削 ＋ ネイティブ比較文 ＋ 模範文 まで届く！</p>
+
+              {/* pencil SVG deco */}
+              <svg className="pencil-deco" width="90" height="90" viewBox="0 0 90 90" fill="none">
+                <rect x="38" y="4" width="14" height="64" rx="5" fill="white" />
+                <rect x="38" y="4" width="14" height="14" rx="5" fill="rgba(255,255,255,0.5)" />
+                <polygon points="38,68 52,68 45,84" fill="rgba(255,220,180,0.8)" />
+                <rect x="38" y="62" width="14" height="8" fill="rgba(255,160,160,0.6)" />
+              </svg>
+            </div>
+
+            {/* FEATURES */}
+            <div className="sec-label">このコースの特徴</div>
+            <div className="features">
+              <div className="feature-card">
+                <div className="feature-num">1</div>
+                <div className="feature-text">
+                  自分の書いた文章を<strong>自然な韓国語に直して</strong>もらえます
+                </div>
+              </div>
+              <div className="feature-card">
+                <div className="feature-num">2</div>
+                <div className="feature-text">
+                  表現力をアップさせるために、<strong>毎週違うテーマ</strong>での作文にチャレンジできます
+                </div>
+              </div>
+              <div className="feature-card">
+                <div className="feature-num">3</div>
+                <div className="feature-text">
+                  課題は、さらに<strong>厳選された文型を必ず使用</strong>するよう出題します
+                </div>
+              </div>
+              <div className="feature-card">
+                <div className="feature-num">4</div>
+                <div className="feature-text">
+                  ネイティブの添削とあわせて送付される<strong>模範作文を比較</strong>し、文型・表現・読解力が同時に向上します
+                </div>
+              </div>
+            </div>
+
+            {/* DETAILS */}
+            <div className="details-section">
+              <div className="sec-label">講座詳細</div>
+              <div className="details-grid">
+                <div className="detail-row">
+                  <div className="detail-key">特徴</div>
+                  <div className="detail-val">
+                    毎週テーマで作文にチャレンジ。ネイティブ添削＋模範文で表現力UP。TOPIK対策にも最適。
+                  </div>
+                </div>
+                <div className="detail-row">
+                  <div className="detail-key">対象</div>
+                  <div className="detail-val">
+                    初、中、上級<span className="highlight">レベル区別なし</span>
+                  </div>
+                </div>
+                <div className="detail-row">
+                  <div className="detail-key">目標</div>
+                  <div className="detail-val">
+                    語彙・文型を増やし、自然な韓国語の表現を身につける
+                  </div>
+                </div>
+                <div className="detail-row">
+                  <div className="detail-key">授業の流れ</div>
+                  <div className="detail-val">
+                    <div className="flow-row">
+                      <span className="flow-pill">📬 金曜 テーマ送付</span>
+                      <span className="flow-arrow">→</span>
+                      <span className="flow-pill">✏️ 月曜夜9時までに提出</span>
+                      <span className="flow-arrow">→</span>
+                      <span className="flow-pill">📝 添削返送</span>
+                    </div>
+                    <div style={{ marginTop: 8, fontSize: 12, color: "var(--gray)" }}>
+                      送付先：
+                      <a href="mailto:sakubun@kaonnuri.com">sakubun@kaonnuri.com</a>
+                    </div>
+                  </div>
+                </div>
+                <div className="detail-row">
+                  <div className="detail-key">日程</div>
+                  <div className="detail-val">
+                    4月4日（金）から <span className="highlight">10週間</span>
+                  </div>
+                </div>
+                <div className="detail-row">
+                  <div className="detail-key">教室</div>
+                  <div className="detail-val">オンライン（メール）</div>
+                </div>
+                <div className="detail-row">
+                  <div className="detail-key">募集期間</div>
+                  <div className="detail-val">〜 2026年4月3日（木）</div>
+                </div>
+                <div className="detail-row">
+                  <div className="detail-key">テキスト</div>
+                  <div className="detail-val">ミリネ独自テキスト（PDF）※事前にメールでお送りします</div>
+                </div>
+              </div>
+            </div>
+
+            {/* EXAMPLE */}
+            <div className="example-section">
+              <div className="sec-label">体験例</div>
+              <div className="example-card">
+                <div className="example-tabs">
+                  <button
+                    className={`ex-tab ${exampleTab === 0 ? "active" : ""}`}
+                    onClick={() => setExampleTab(0)}
+                  >
+                    ① 学習者の作文
+                  </button>
+                  <button
+                    className={`ex-tab ${exampleTab === 1 ? "active" : ""}`}
+                    onClick={() => setExampleTab(1)}
+                  >
+                    ② 添削後
+                  </button>
+                  <button
+                    className={`ex-tab ${exampleTab === 2 ? "active" : ""}`}
+                    onClick={() => setExampleTab(2)}
+                  >
+                    ③ ネイティブ比較文
+                  </button>
+                </div>
+
+                <div className={`ex-panel ${exampleTab === 0 ? "active" : ""}`} id="ex0">
+                  <div className="ex-label">THEME — 「最近ハマっていること」</div>
+                  <div className="ex-text">
+                    저는 요즘 한국 드라마를 보는 것을 좋아합니다. 매일 밤에 보고 있습니다. 드라마를 보면서 한국어를 공부합니다.
+                    재미있습니다.
+                  </div>
+                  <div style={{ marginTop: 12, fontSize: 12, color: "var(--gray)" }}>※ 학습자 작성 예시</div>
+                </div>
+
+                <div className={`ex-panel ${exampleTab === 1 ? "active" : ""}`} id="ex1">
+                  <div className="ex-label">CORRECTION — 添削済み</div>
+                  <div className="ex-text corrected">
+                    저는 요즘 한국 드라마에 <span className="correction-mark">빠져 있어요</span>. 매일 밤{" "}
+                    <span className="correction-mark">챙겨 보고 있는데</span>, 드라마를 보면서 자연스럽게 한국어 표현을 익힐 수 있어서{" "}
+                    <span className="correction-mark">일석이조예요</span>.
+                  </div>
+                  <div style={{ marginTop: 12, fontSize: 12, color: "var(--sage)", padding: "0 4px" }}>
+                    ✦ 「빠져 있다」「일석이조」など自然な表現に修正しました
+                  </div>
+                </div>
+
+                <div className={`ex-panel ${exampleTab === 2 ? "active" : ""}`} id="ex2">
+                  <div className="ex-label">NATIVE MODEL — ネイティブ模範文</div>
+                  <div className="native-text">
+                    <div className="native-label">✦ NATIVE VERSION</div>
+                    요즘 한국 드라마에 완전히 빠져서 허우적대고 있어요. 하루라도 안 보면 허전할 정도예요. 드라마를 통해 생생한 표현들을
+                    자연스럽게 익힐 수 있어서 공부도 되고 재미도 있으니 일석이조죠!
+                  </div>
+                  <div style={{ marginTop: 12, fontSize: 12, color: "var(--gray)" }}>
+                    ※ 比較することで、語彙・表現・文体の幅が広がります
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* CTA */}
+            <div className="cta-row">
+              <button className="btn-apply">このコースに申し込む →</button>
+              <button className="btn-ghost">お問い合わせ</button>
+            </div>
+          </main>
+
+          {/* SIDEBAR */}
+          <aside className="sidebar">
+            <div className="sidebar-card">
+              <div className="sidebar-title">ログイン・マイページ</div>
+              <button className="mypage-btn">マイページへ</button>
+              <div className="auth-row">
+                <a href="#">ログイン中</a>
+                <span>·</span>
+                <a href="#">ログアウト</a>
+              </div>
+            </div>
+
+            <div className="sidebar-card">
+              <div className="sidebar-title">メニュー</div>
+              <ul className="nav-list">
+                <li>
+                  <a href="#">
+                    <span className="nav-dot" />
+                    クイズ
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="active">
+                    <span className="nav-dot" />
+                    音読トレ
+                  </a>
+                </li>
+                <li>
+                  <a href="#">
+                    <span className="nav-dot" />
+                    ホームページ
+                  </a>
+                </li>
+                <li>
+                  <a href="#">
+                    <span className="nav-dot" />
+                    個人レッスン
+                  </a>
+                </li>
+                <li>
+                  <a href="#">
+                    <span className="nav-dot" />
+                    短期個人
+                  </a>
+                </li>
+                <li>
+                  <a href="#">
+                    <span className="nav-dot" />
+                    発音講座
+                  </a>
+                </li>
+                <li>
+                  <a href="#">
+                    <span className="nav-dot" />
+                    会話クラス
+                  </a>
+                </li>
+                <li>
+                  <a href="#">
+                    <span className="nav-dot" />
+                    音読クラス
+                  </a>
+                </li>
+                <li>
+                  <a href="#">
+                    <span className="nav-dot" />
+                    集中講座
+                  </a>
+                </li>
+                <li>
+                  <a href="#">
+                    <span className="nav-dot" />
+                    申し込み
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </aside>
+        </div>
+      )}
+
+      {/* SUBMIT TAB (existing assignment UI) */}
+      {activeTab === "submit" && (
+        <div className="layout">
+          <main className="main">
+            {/* Mobile: Submit card */}
+            <div className="md:hidden mb-4">
               <div className="bg-white rounded-xl border border-[#e5dfd4] shadow-sm p-4">
-                <h2 className="font-semibold text-gray-800 mb-3 text-sm">과제 제출</h2>
+                <h2 className="font-semibold text-gray-800 mb-2 text-sm">課題提出</h2>
                 <button
                   onClick={handleSubmitClick}
-                  className="w-full py-3 px-4 bg-[#1a4d2e] hover:bg-[#2d6a4a] text-white font-medium rounded-lg transition-colors shadow-md hover:shadow-lg active:scale-[0.98]"
+                  className="w-full py-3 px-4 bg-[#1a4d2e] hover:bg-[#2d6a4a] text-white font-medium rounded-lg"
                 >
                   과제 제출 버튼
                 </button>
               </div>
             </div>
-          )}
-        </aside>
 
-        {/* Main Content */}
-        <main className="flex-1 min-w-0 flex flex-col overflow-hidden">
-          {/* Tabs - 메인 영역 안에 배치 (사이드바 위로 가지 않음) */}
-          <div className="bg-white border-b border-[#e5dfd4] shadow-sm shrink-0">
-            <nav className="flex gap-4 sm:gap-8 overflow-x-auto px-4 md:px-6 py-2">
-              {TABS.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`py-3 px-2 font-medium text-sm whitespace-nowrap border-b-2 transition-colors ${
-                    activeTab === tab.id
-                      ? "border-[#1a4d2e] text-[#1a4d2e]"
-                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </nav>
-          </div>
-
-          <div className="flex-1 overflow-auto p-4 md:p-6 pb-24 md:pb-6">
-          {/* 体験例 Tab */}
-          {activeTab === "experience" && (
-            <div className="max-w-2xl">
-              <h2 className="text-lg md:text-xl font-bold text-gray-800 mb-4">体験例</h2>
-              <div className="bg-white rounded-xl border border-[#e5dfd4] shadow-sm p-6">
-                <p className="text-gray-600">体験例のコンテンツはこちらに表示されます。</p>
-                <p className="text-gray-500 text-sm mt-2">準備中です。</p>
-              </div>
-            </div>
-          )}
-
-          {/* 作文トレーニング Tab */}
-          {activeTab === "writing" && (
-            <>
-              {/* Mobile: Submit card */}
-              <div className="md:hidden mb-4">
-                <div className="bg-white rounded-xl border border-[#e5dfd4] shadow-sm p-4">
-                  <h2 className="font-semibold text-gray-800 mb-2 text-sm">과제 제출</h2>
-                  <button
-                    onClick={handleSubmitClick}
-                    className="w-full py-3 px-4 bg-[#1a4d2e] hover:bg-[#2d6a4a] text-white font-medium rounded-lg"
-                  >
-                    과제 제출 버튼
-                  </button>
+            {/* 과제 예시 게시판 (10개) - 풀다운 */}
+            <div className="mb-6 md:mb-8">
+              <h2 className="text-lg md:text-xl font-bold text-gray-800 mb-4">과제 예시 게시판</h2>
+              <div className="bg-white rounded-xl border border-[#e5dfd4] shadow-sm overflow-hidden">
+                <div className="px-4 md:px-5 py-3 bg-[#faf8f5] border-b border-[#e5dfd4] font-semibold text-gray-800 text-sm md:text-base">
+                  과제 예시 (10개)
                 </div>
-              </div>
-
-              {/* 과제 예시 게시판 (10개) - 풀다운 */}
-              <div className="mb-6 md:mb-8">
-                <h2 className="text-lg md:text-xl font-bold text-gray-800 mb-4">과제 예시 게시판</h2>
-                <div className="bg-white rounded-xl border border-[#e5dfd4] shadow-sm overflow-hidden">
-                  <div className="px-4 md:px-5 py-3 bg-[#faf8f5] border-b border-[#e5dfd4] font-semibold text-gray-800 text-sm md:text-base">
-                    과제 예시 (10개)
-                  </div>
-                  <div className="divide-y divide-[#e5dfd4]">
-                    {ASSIGNMENT_EXAMPLES.map((ex) => (
-                      <div key={ex.id} className="">
-                        <button
-                          type="button"
-                          onClick={() => setExpandedExampleId(expandedExampleId === ex.id ? null : ex.id)}
-                          className="w-full px-4 md:px-5 py-3 hover:bg-[#faf8f5] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-left"
-                        >
-                          <div className="flex items-center gap-3">
-                            <span className="text-gray-500 text-xs w-4 inline-block">
-                              {expandedExampleId === ex.id ? "▼" : "▶"}
-                            </span>
-                            <span className="font-medium text-gray-800">{ex.title}</span>
-                          </div>
-                          <p className="text-gray-600 text-sm pl-9 sm:pl-0 sm:max-w-md">{ex.topic}</p>
-                        </button>
-                        {expandedExampleId === ex.id && ex.modelContent && (
-                          <div className="px-4 md:px-5 pb-4 pt-0 border-t border-[#e5dfd4] bg-[#fafbfc]">
-                            <div className="mt-3 flex flex-col sm:flex-row gap-3">
-                              <div className="flex-1 p-4 rounded-xl bg-white border border-[#e5dfd4] text-sm space-y-4">
-                                {ex.modelContent.courseInfo && (
-                                  <p className="text-gray-600 font-medium">
-                                    {ex.modelContent.courseInfo}：　テーマ： {ex.modelContent.theme}
-                                  </p>
-                                )}
-                                {!ex.modelContent.courseInfo && (
-                                  <p className="text-gray-600 font-medium">テーマ：{ex.modelContent.theme}</p>
-                                )}
-                                <p className="text-gray-800 leading-relaxed">{ex.modelContent.question}</p>
-                                {ex.modelContent.grammarNote && (
-                                  <p className="text-gray-600 font-medium">{ex.modelContent.grammarNote}</p>
-                                )}
-                                <div className="space-y-2 pt-2">
-                                  {ex.modelContent.patterns.map((p, i) => (
-                                    <div key={i} className="text-gray-700">
-                                      <p className="font-medium text-gray-800">○ {p.pattern}</p>
-                                      <p className="text-gray-600 pl-2">{p.example}</p>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                              <div className="sm:shrink-0 flex sm:flex-col justify-end">
-                                <button
-                                  onClick={handleExampleSubmitClick}
-                                  className="w-full sm:w-auto px-5 py-3 bg-[#1a4d2e] hover:bg-[#2d6a4a] text-white font-medium rounded-xl shadow-md whitespace-nowrap"
-                                >
-                                  과제 제출
-                                </button>
+                <div className="divide-y divide-[#e5dfd4]">
+                  {ASSIGNMENT_EXAMPLES.map((ex) => (
+                    <div key={ex.id}>
+                      <button
+                        type="button"
+                        onClick={() => setExpandedExampleId(expandedExampleId === ex.id ? null : ex.id)}
+                        className="w-full px-4 md:px-5 py-3 hover:bg-[#faf8f5] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-left"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-gray-500 text-xs w-4 inline-block">
+                            {expandedExampleId === ex.id ? "▼" : "▶"}
+                          </span>
+                          <span className="font-medium text-gray-800">{ex.title}</span>
+                        </div>
+                        <p className="text-gray-600 text-sm pl-9 sm:pl-0 sm:max-w-md">{ex.topic}</p>
+                      </button>
+                      {expandedExampleId === ex.id && ex.modelContent && (
+                        <div className="px-4 md:px-5 pb-4 pt-0 border-t border-[#e5dfd4] bg-[#fafbfc]">
+                          <div className="mt-3 flex flex-col sm:flex-row gap-3">
+                            <div className="flex-1 p-4 rounded-xl bg-white border border-[#e5dfd4] text-sm space-y-4">
+                              {ex.modelContent.courseInfo && (
+                                <p className="text-gray-600 font-medium">
+                                  {ex.modelContent.courseInfo}：　テーマ： {ex.modelContent.theme}
+                                </p>
+                              )}
+                              {!ex.modelContent.courseInfo && (
+                                <p className="text-gray-600 font-medium">テーマ：{ex.modelContent.theme}</p>
+                              )}
+                              <p className="text-gray-800 leading-relaxed">{ex.modelContent.question}</p>
+                              {ex.modelContent.grammarNote && (
+                                <p className="text-gray-600 font-medium">{ex.modelContent.grammarNote}</p>
+                              )}
+                              <div className="space-y-2 pt-2">
+                                {ex.modelContent.patterns.map((p, i) => (
+                                  <div key={i} className="text-gray-700">
+                                    <p className="font-medium text-gray-800">○ {p.pattern}</p>
+                                    <p className="text-gray-600 pl-2">{p.example}</p>
+                                  </div>
+                                ))}
                               </div>
                             </div>
+                            <div className="sm:shrink-0 flex sm:flex-col justify-end">
+                              <button
+                                onClick={handleExampleSubmitClick}
+                                className="w-full sm:w-auto px-5 py-3 bg-[#1a4d2e] hover:bg-[#2d6a4a] text-white font-medium rounded-xl shadow-md whitespace-nowrap"
+                              >
+                                과제 제출
+                              </button>
+                            </div>
                           </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <h2 className="text-lg md:text-xl font-bold text-gray-800 mb-4 md:mb-6">게시글 리스트</h2>
-
-              <div className="space-y-4 md:space-y-6">
-            {sortedDateRanges.map((dateRange) => (
-              <div
-                key={dateRange}
-                className="bg-white rounded-xl border border-[#e5dfd4] shadow-sm overflow-hidden"
-              >
-                <div className="px-4 md:px-5 py-3 bg-[#faf8f5] border-b border-[#e5dfd4] font-semibold text-gray-800 text-sm md:text-base">
-                  {dateRange}
-                </div>
-                {/* Desktop: Table */}
-                <div className="hidden md:block overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="bg-[#f5f0e6] text-gray-700 text-sm">
-                        <th className="text-left py-3 px-4 font-medium">과제</th>
-                        <th className="text-left py-3 px-4 font-medium">과제 제출</th>
-                        <th className="text-left py-3 px-4 font-medium">첨삭</th>
-                        <th className="text-left py-3 px-4 font-medium">학생 보기</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {groupedByDate[dateRange].map((a) => (
-                        <tr key={a.id} className="border-t border-[#e5dfd4] hover:bg-[#faf8f5]">
-                          <td className="py-3 px-4">
-                            <span className="font-medium text-gray-800">{a.title}</span>
-                          </td>
-                          <td className="py-3 px-4">
-                            {a.status === "미제출" ? (
-                              <button
-                                onClick={() => handleSubmitAssignment(a)}
-                                className="text-[#c53030] hover:text-[#9b2c2c] font-medium underline"
-                              >
-                                미제출
-                              </button>
-                            ) : (
-                              <span className="text-[#2d7d46] font-medium">{a.status}</span>
-                            )}
-                          </td>
-                          <td className="py-3 px-4">
-                            {a.correction === "-" ? (
-                              <span className="text-gray-400">-</span>
-                            ) : a.status === "첨삭완료" ? (
-                              <button
-                                onClick={() => handleOpenFeedback(a)}
-                                className="text-[#1a4d2e] hover:underline font-medium"
-                              >
-                                확인
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => handleOpenFeedback(a)}
-                                className="text-[#1a4d2e] hover:underline"
-                              >
-                                {a.correction}
-                              </button>
-                            )}
-                          </td>
-                          <td className="py-3 px-4">
-                            {a.content ? (
-                              <button
-                                onClick={() => handleViewStudent(a)}
-                                className="text-[#1a4d2e] hover:underline"
-                              >
-                                학생 보기
-                              </button>
-                            ) : (
-                              <span className="text-gray-400">-</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {/* Mobile: Card layout */}
-                <div className="md:hidden divide-y divide-[#e5dfd4]">
-                  {groupedByDate[dateRange].map((a) => (
-                    <div key={a.id} className="p-4 space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="font-medium text-gray-800">{a.title}</span>
-                        {a.status === "미제출" ? (
-                          <button
-                            onClick={() => handleSubmitAssignment(a)}
-                            className="text-sm text-[#c53030] font-medium underline"
-                          >
-                            미제출
-                          </button>
-                        ) : (
-                          <span className="text-sm text-[#2d7d46] font-medium">{a.status}</span>
-                        )}
-                      </div>
-                      <div className="flex flex-wrap gap-3 text-sm">
-                        {a.content && (
-                          <button
-                            onClick={() => handleOpenFeedback(a)}
-                            className="text-[#1a4d2e] hover:underline"
-                          >
-                            {a.correction === "-" ? "첨삭하기" : "첨삭 확인"}
-                          </button>
-                        )}
-                        {a.content && (
-                          <button
-                            onClick={() => handleViewStudent(a)}
-                            className="text-[#1a4d2e] hover:underline"
-                          >
-                            학생 보기
-                          </button>
-                        )}
-                        {!a.content && <span className="text-gray-400">첨삭: -</span>}
-                      </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
               </div>
-            ))}
-          </div>
-            </>
-          )}
+            </div>
 
-          {/* TOPIK作文トレーニング Tab */}
-          {activeTab === "topik" && (
-            <div className="max-w-2xl">
-              <h2 className="text-lg md:text-xl font-bold text-gray-800 mb-4">TOPIK作文トレーニング</h2>
-              <div className="bg-white rounded-xl border border-[#e5dfd4] shadow-sm p-6">
-                <p className="text-gray-600">TOPIK作文トレーニングのコンテンツはこちらに表示されます。</p>
-                <p className="text-gray-500 text-sm mt-2">準備中です。</p>
+            <h2 className="text-lg md:text-xl font-bold text-gray-800 mb-4 md:mb-6">게시글 리스트</h2>
+
+            <div className="space-y-4 md:space-y-6">
+              {sortedDateRanges.map((dateRange) => (
+                <div key={dateRange} className="bg-white rounded-xl border border-[#e5dfd4] shadow-sm overflow-hidden">
+                  <div className="px-4 md:px-5 py-3 bg-[#faf8f5] border-b border-[#e5dfd4] font-semibold text-gray-800 text-sm md:text-base">
+                    {dateRange}
+                  </div>
+                  {/* Desktop: Table */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="bg-[#f5f0e6] text-gray-700 text-sm">
+                          <th className="text-left py-3 px-4 font-medium">과제</th>
+                          <th className="text-left py-3 px-4 font-medium">과제 제출</th>
+                          <th className="text-left py-3 px-4 font-medium">첨삭</th>
+                          <th className="text-left py-3 px-4 font-medium">학생 보기</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {groupedByDate[dateRange].map((a) => (
+                          <tr key={a.id} className="border-t border-[#e5dfd4] hover:bg-[#faf8f5]">
+                            <td className="py-3 px-4">
+                              <span className="font-medium text-gray-800">{a.title}</span>
+                            </td>
+                            <td className="py-3 px-4">
+                              {a.status === "미제출" ? (
+                                <button
+                                  onClick={() => handleSubmitAssignment(a)}
+                                  className="text-[#c53030] hover:text-[#9b2c2c] font-medium underline"
+                                >
+                                  미제출
+                                </button>
+                              ) : (
+                                <span className="text-[#2d7d46] font-medium">{a.status}</span>
+                              )}
+                            </td>
+                            <td className="py-3 px-4">
+                              {a.correction === "-" ? (
+                                <span className="text-gray-400">-</span>
+                              ) : a.status === "첨삭완료" ? (
+                                <button
+                                  onClick={() => handleOpenFeedback(a)}
+                                  className="text-[#1a4d2e] hover:underline font-medium"
+                                >
+                                  확인
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => handleOpenFeedback(a)}
+                                  className="text-[#1a4d2e] hover:underline"
+                                >
+                                  {a.correction}
+                                </button>
+                              )}
+                            </td>
+                            <td className="py-3 px-4">
+                              {a.content ? (
+                                <button
+                                  onClick={() => handleViewStudent(a)}
+                                  className="text-[#1a4d2e] hover:underline"
+                                >
+                                  학생 보기
+                                </button>
+                              ) : (
+                                <span className="text-gray-400">-</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {/* Mobile: Card layout */}
+                  <div className="md:hidden divide-y divide-[#e5dfd4]">
+                    {groupedByDate[dateRange].map((a) => (
+                      <div key={a.id} className="p-4 space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium text-gray-800">{a.title}</span>
+                          {a.status === "미제출" ? (
+                            <button
+                              onClick={() => handleSubmitAssignment(a)}
+                              className="text-sm text-[#c53030] font-medium underline"
+                            >
+                              미제출
+                            </button>
+                          ) : (
+                            <span className="text-sm text-[#2d7d46] font-medium">{a.status}</span>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap gap-3 text-sm">
+                          {a.content && (
+                            <button
+                              onClick={() => handleOpenFeedback(a)}
+                              className="text-[#1a4d2e] hover:underline"
+                            >
+                              {a.correction === "-" ? "첨삭하기" : "첨삭 확인"}
+                            </button>
+                          )}
+                          {a.content && (
+                            <button
+                              onClick={() => handleViewStudent(a)}
+                              className="text-[#1a4d2e] hover:underline"
+                            >
+                              학생 보기
+                            </button>
+                          )}
+                          {!a.content && <span className="text-gray-400">첨삭: -</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </main>
+
+          {/* Sidebar for submit tab */}
+          <aside className="sidebar">
+            <div className="sidebar-card">
+              <div className="sidebar-title">課題提出</div>
+              <button className="mypage-btn" onClick={handleSubmitClick}>
+                과제 제출 버튼
+              </button>
+              <div className="auth-row">
+                <span>最新の課題一覧は下のリストから確認できます。</span>
               </div>
             </div>
-          )}
-          </div>
-        </main>
+          </aside>
         </div>
-      </div>
+      )}
+
+      {/* TOPIK TAB */}
+      {activeTab === "topik" && (
+        <div className="layout">
+          <main className="main">
+            <div className="hero-card" style={{ marginBottom: 24 }}>
+              <div className="hero-eyebrow">TOPIK対策コース</div>
+              <h1>TOPIK作文トレーニング</h1>
+              <p className="sub">TOPIK作文に特化した添削トレーニングを準備中です。</p>
+            </div>
+            <div className="details-section">
+              <div className="sec-label">準備中</div>
+              <div className="details-grid">
+                <div className="detail-row">
+                  <div className="detail-key">お知らせ</div>
+                  <div className="detail-val">TOPIK作文トレーニングの詳細は近日公開予定です。</div>
+                </div>
+              </div>
+            </div>
+          </main>
+          <aside className="sidebar">
+            <div className="sidebar-card">
+              <div className="sidebar-title">TOPIK情報</div>
+              <p style={{ fontSize: 13, color: "var(--gray)", lineHeight: 1.7 }}>
+                TOPIKの試験日程・出題傾向などの情報も順次追加していきます。
+              </p>
+            </div>
+          </aside>
+        </div>
+      )}
 
 
       {/* 과제 예시 기반 제출 모달 */}
