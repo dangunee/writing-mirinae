@@ -1,6 +1,13 @@
 # writing.mirinae.jp
 
-ミリネ韓国語教室・作文トレーニング
+ミリネ韓国語教室の 한국어 작문(作文)トレーニング用ウェブアプリです。
+
+## 機能
+
+- **과제 리스트**: 週ごとの課題一覧、제출・첨삭 상태表示
+- **과제 제출**: 学生が課題を提出（スレッド形式）
+- **첨삭**: 講師がテキストエディタで添削・保存
+- **학생 보기**: 学生が添削結果を確認
 
 ## 開発
 
@@ -9,23 +16,27 @@ npm install
 npm run dev
 ```
 
-http://localhost:3000 で確認できます。
-
-## ビルド・デプロイ
+## ビルド
 
 ```bash
 npm run build
-npm start
 ```
 
-## writing.mirinae.jp で公開するには
+## デプロイ (writing.mirinae.jp)
 
-### Vercel の場合
+### Vercel でのデプロイ例
 
-1. [Vercel](https://vercel.com) にプロジェクトをインポート
-2. **Settings** → **Domains** で `writing.mirinae.jp` を追加
-3. DNS で `writing.mirinae.jp` を Vercel に向ける（CNAME または A レコード）
+```bash
+npm run build
+vercel --prod
+```
 
-### その他のホスティング
+Vercel のプロジェクト設定で `writing.mirinae.jp` をカスタムドメインとして追加してください。
 
-- Netlify, Cloudflare Pages などでも同様にドメインを設定可能です。
+DNS 設定:
+- `writing` を CNAME で `cname.vercel-dns.com` に設定
+- または A レコードで Vercel の IP を指定
+
+## データ保存
+
+現在は localStorage を使用しています。本番運用では Firebase、Supabase などへの移行を検討してください。

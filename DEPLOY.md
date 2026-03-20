@@ -1,55 +1,53 @@
-# writing.mirinae.jp 배포 가이드
+# writing.mirinae.jp Vercel 배포 가이드
 
-## 1. Git 저장소 초기화 및 GitHub 푸시
+## 1. 로컬에서 빌드 확인
 
 ```bash
-cd /Users/dangunee/Desktop/writing-mirinae
-
-# Git 초기화
-git init
-
-# 파일 추가
-git add .
-git commit -m "Initial commit: writing-mirinae"
-
-# GitHub에서 새 저장소 생성 후 (예: writing-mirinae)
-git remote add origin https://github.com/YOUR_USERNAME/writing-mirinae.git
-git branch -M main
-git push -u origin main
+cd /Users/dangunee/writing-mirinae
+npm install
+npm run build
 ```
 
-## 2. Vercel에 프로젝트 Import
+`dist/` 폴더가 생성되면 빌드 성공입니다.
+
+## 2. Vercel 배포
+
+### 방법 A: Vercel CLI
+
+```bash
+# Vercel CLI 설치 (처음 한 번만)
+npm i -g vercel
+
+# 로그인 (브라우저가 열림)
+vercel login
+
+# 배포
+cd /Users/dangunee/writing-mirinae
+vercel --prod
+```
+
+### 방법 B: Vercel 웹사이트 (Git 연동)
 
 1. [vercel.com](https://vercel.com) 로그인
-2. **Add New...** → **Project**
-3. **Import Git Repository**에서 `writing-mirinae` 저장소 선택
-4. **Import** 클릭
-5. Framework Preset: Next.js (자동 감지)
-6. **Deploy** 클릭
+2. **Add New** → **Project**
+3. GitHub에 writing-mirinae 저장소가 있다면 **Import**  
+   없다면 **Deploy** → **Browse**에서 `writing-mirinae` 폴더 선택
+4. Framework Preset: **Vite** (자동 감지됨)
+5. **Deploy** 클릭
 
-## 3. 도메인 추가
+## 3. 커스텀 도메인 추가 (writing.mirinae.jp)
 
-1. 배포된 프로젝트 → **Settings** → **Domains**
-2. `writing.mirinae.jp` 입력 후 **Add**
-3. Vercel이 DNS 설정 방법을 안내합니다
+1. Vercel 대시보드 → 프로젝트 선택 → **Settings** → **Domains**
+2. **Add** 클릭 후 `writing.mirinae.jp` 입력
+3. Vercel이 표시하는 DNS 설정대로 진행:
 
-## 4. DNS 설정
+   **CNAME 레코드 추가:**
+   - Name: `writing` (또는 `writing.mirinae`)
+   - Value: `cname.vercel-dns.com`
 
-도메인 관리 페이지(예: お名前.com, ムームードメイン 등)에서:
+4. mirinae.jp 도메인 관리 페이지(가비아, Cloudflare 등)에서 위 설정 추가
+5. 전파 완료까지 수 분~24시간 소요될 수 있음
 
-### CNAME 방식 (권장)
-| 타입 | 이름 | 값 |
-|------|------|-----|
-| CNAME | writing | cname.vercel-dns.com |
+## 4. 확인
 
-### A 레코드 방식
-| 타입 | 이름 | 값 |
-|------|------|-----|
-| A | writing | 76.76.21.21 |
-
-> **참고**: `writing.mirinae.jp`의 경우 `writing`이 서브도메인입니다.  
-> 루트 도메인 `mirinae.jp`에 `writing` 서브도메인을 추가하는 형태입니다.
-
-## 5. SSL 인증서
-
-Vercel이 자동으로 Let's Encrypt SSL을 발급합니다. DNS 전파 후 몇 분~몇 시간 소요될 수 있습니다.
+배포 후 `https://writing.mirinae.jp` 로 접속해 확인하세요.

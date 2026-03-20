@@ -1,0 +1,507 @@
+/* Layout */
+.layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  background: linear-gradient(135deg, var(--color-primary) 0%, #1e4620 100%);
+  color: white;
+  padding: 1.5rem 2rem;
+  text-align: center;
+}
+
+.logo {
+  display: inline-block;
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: white;
+  letter-spacing: -0.02em;
+}
+
+.logo:hover {
+  color: var(--color-primary-light);
+}
+
+.logo-domain {
+  opacity: 0.9;
+  font-weight: 400;
+}
+
+.tagline {
+  margin: 0.5rem 0 0;
+  font-size: 0.95rem;
+  opacity: 0.95;
+}
+
+.main {
+  flex: 1;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+  width: 100%;
+}
+
+.layout-embedded .main {
+  padding-top: 1.5rem;
+}
+
+.footer {
+  padding: 1.5rem 2rem;
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  border-top: 1px solid var(--color-border);
+}
+
+.footer a {
+  color: var(--color-primary);
+}
+
+/* Writing Layout - Sidebar + Main */
+.writing-layout {
+  display: flex;
+  gap: 2rem;
+  min-height: 60vh;
+}
+
+.writing-sidebar {
+  flex-shrink: 0;
+  width: 200px;
+  padding: 1rem;
+  background: var(--color-surface);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  height: fit-content;
+}
+
+.sidebar-title {
+  margin: 0 0 1rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.submit-btn {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.submit-btn:hover {
+  background: #234a24;
+}
+
+.writing-main {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Writing Page */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.writing-page {
+  animation: fadeIn 0.3s ease;
+}
+
+.writing-page-title {
+  margin: 0 0 1.5rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.assignment-weeks {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.week-section {
+  background: var(--color-surface);
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.week-label {
+  margin: 0 0 1rem;
+  font-size: 0.95rem;
+  color: var(--color-text-muted);
+}
+
+.assignment-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.assignment-table th,
+.assignment-table td {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.assignment-table th {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.assignment-title {
+  font-weight: 500;
+}
+
+.status {
+  font-size: 0.9rem;
+}
+
+.status.submitted {
+  color: var(--color-primary);
+}
+
+.status.corrected {
+  color: var(--color-primary);
+}
+
+.status.partial {
+  color: var(--color-accent);
+}
+
+.status.pending {
+  color: var(--color-text-muted);
+}
+
+.view-links {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.view-link {
+  font-size: 0.85rem;
+}
+
+.no-assignments {
+  text-align: center;
+  color: var(--color-text-muted);
+  padding: 3rem;
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.modal-content {
+  background: var(--color-surface);
+  border-radius: 16px;
+  max-width: 560px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+}
+
+.submission-modal .modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.submission-modal .modal-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.modal-close:hover {
+  color: var(--color-text);
+}
+
+.modal-body {
+  padding: 1.5rem;
+}
+
+.form-group {
+  margin-bottom: 1.25rem;
+}
+
+.form-group label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: var(--color-text);
+}
+
+.form-group select {
+  width: 100%;
+  padding: 0.625rem 0.875rem;
+  border: 2px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  background: var(--color-surface);
+}
+
+.submission-textarea {
+  width: 100%;
+  padding: 1rem;
+  border: 2px solid var(--color-border);
+  border-radius: 10px;
+  font-size: 1rem;
+  font-family: var(--font-hangul), inherit;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.submission-textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.modal-footer {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.submit-button {
+  padding: 0.75rem 1.5rem;
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.submit-button:hover:not(:disabled) {
+  background: #234a24;
+}
+
+.submit-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Correction Page */
+.correction-page {
+  animation: fadeIn 0.3s ease;
+}
+
+.correction-header {
+  margin-bottom: 1.5rem;
+}
+
+.back-link {
+  display: inline-block;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.correction-header h1 {
+  margin: 0.5rem 0 0;
+  font-size: 1.25rem;
+}
+
+.correction-layout {
+  display: flex;
+  gap: 2rem;
+}
+
+.student-list {
+  flex-shrink: 0;
+  width: 180px;
+}
+
+.student-list h3 {
+  margin: 0 0 1rem;
+  font-size: 0.95rem;
+}
+
+.student-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.625rem 0.875rem;
+  margin-bottom: 0.5rem;
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  text-align: left;
+}
+
+.student-item:hover {
+  border-color: var(--color-primary);
+}
+
+.student-item.active {
+  border-color: var(--color-primary);
+  background: rgba(44, 95, 45, 0.08);
+}
+
+.student-item .badge {
+  font-size: 0.7rem;
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.correction-editor-area {
+  flex: 1;
+  min-width: 0;
+}
+
+.instructor-label {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  margin: 0 0 1rem;
+}
+
+.editor-section {
+  margin-bottom: 1.25rem;
+}
+
+.editor-section label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.original-text {
+  padding: 1rem;
+  background: #f5f5f5;
+  border-radius: 8px;
+  white-space: pre-wrap;
+  font-family: var(--font-hangul), inherit;
+  line-height: 1.7;
+}
+
+.correction-textarea {
+  width: 100%;
+  padding: 1rem;
+  border: 2px solid var(--color-border);
+  border-radius: 10px;
+  font-size: 1rem;
+  font-family: var(--font-hangul), inherit;
+  line-height: 1.7;
+  resize: vertical;
+}
+
+.correction-textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.editor-actions {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  margin-top: 1rem;
+}
+
+.save-btn {
+  padding: 0.75rem 1.5rem;
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.save-btn:hover {
+  background: #234a24;
+}
+
+.view-student-link {
+  font-size: 0.9rem;
+}
+
+.no-submissions {
+  color: var(--color-text-muted);
+  padding: 2rem;
+}
+
+/* View Correction Page (Student View) */
+.view-correction-page {
+  animation: fadeIn 0.3s ease;
+}
+
+.view-header {
+  margin-bottom: 1.5rem;
+}
+
+.view-header h1 {
+  margin: 0.5rem 0 0;
+  font-size: 1.25rem;
+}
+
+.student-name {
+  margin: 0.25rem 0 0;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+.correction-view {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.view-section {
+  background: var(--color-surface);
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.view-section h3 {
+  margin: 0 0 1rem;
+  font-size: 0.95rem;
+  color: var(--color-text-muted);
+}
+
+.original-content,
+.corrected-content {
+  white-space: pre-wrap;
+  font-family: var(--font-hangul), inherit;
+  line-height: 1.8;
+}
+
+.corrected-content {
+  color: var(--color-primary);
+}
+
+.view-section .pending {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
