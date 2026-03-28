@@ -1,0 +1,62 @@
+/**
+ * Stitch 랜딩 전용 — index.css 토큰과 병행
+ */
+.landing-stitch-root {
+  font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  color: #1e1b13;
+}
+
+.landing-stitch-root .headline-font {
+  font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+}
+
+.landing-stitch-root .material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+.landing-stitch-root .ink-gradient {
+  background: linear-gradient(135deg, #000666 0%, #1a237e 100%);
+}
+
+.landing-stitch-root .correction-red {
+  color: #d32f2f;
+  text-decoration: line-through;
+}
+
+.landing-stitch-root .correction-blue {
+  color: #1976d2;
+  font-weight: 600;
+}
+
+.landing-stitch-root .circular-chart {
+  display: block;
+  margin: 10px auto;
+  max-width: 80%;
+  max-height: 250px;
+}
+
+@media (max-width: 1023px) {
+  .landing-stitch-root .circular-chart {
+    max-width: 100%;
+    max-height: 200px;
+  }
+}
+
+.landing-stitch-root .circle-bg {
+  fill: none;
+  stroke: #eee;
+  stroke-width: 3.8;
+}
+
+.landing-stitch-root .circle {
+  fill: none;
+  stroke-width: 2.8;
+  stroke-linecap: round;
+  animation: landing-progress 1s ease-out forwards;
+}
+
+@keyframes landing-progress {
+  0% {
+    stroke-dasharray: 0 100;
+  }
+}
