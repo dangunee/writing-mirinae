@@ -1,4 +1,4 @@
-import { Link, useLocation } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -10,6 +10,9 @@ function isEmbedded(): boolean {
   return params.get('embed') === '1'
 }
 
+/**
+ * 전역 레이아웃 — 상단 녹색 헤더는 사용하지 않음(랜딩·각 페이지 자체 헤더만 사용).
+ */
 export default function Layout({ children }: LayoutProps) {
   const location = useLocation()
   const embedded = isEmbedded()
@@ -20,16 +23,6 @@ export default function Layout({ children }: LayoutProps) {
 
   return (
     <div className={embedded ? 'layout layout-embedded' : 'layout'}>
-      {!embedded && (
-        <header className="header">
-          <Link to="/writing" className="logo">
-            <span className="logo-text">writing</span>
-            <span className="logo-domain">.mirinae.jp</span>
-          </Link>
-          <p className="tagline">ミリネ韓国語教室 · 作文トレーニング</p>
-        </header>
-      )}
-
       <main
         className={location.pathname === '/writing/app' ? 'main main-writing-stitch' : 'main'}
       >

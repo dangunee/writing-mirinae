@@ -5,36 +5,6 @@
   flex-direction: column;
 }
 
-.header {
-  background: linear-gradient(135deg, var(--color-primary) 0%, #1e4620 100%);
-  color: white;
-  padding: 1.5rem 2rem;
-  text-align: center;
-}
-
-.logo {
-  display: inline-block;
-  font-size: 1.75rem;
-  font-weight: 700;
-  color: white;
-  letter-spacing: -0.02em;
-}
-
-.logo:hover {
-  color: var(--color-primary-light);
-}
-
-.logo-domain {
-  opacity: 0.9;
-  font-weight: 400;
-}
-
-.tagline {
-  margin: 0.5rem 0 0;
-  font-size: 0.95rem;
-  opacity: 0.95;
-}
-
 .main {
   flex: 1;
   max-width: 960px;
