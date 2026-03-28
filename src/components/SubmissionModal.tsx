@@ -70,8 +70,8 @@ export default function SubmissionModal({
             <p className="status pending submission-modal-hint">이 세션에서는 제출할 수 없습니다.</p>
           )}
 
-          <section className="rounded-xl p-6 md:p-8 mb-6 shadow-sm bg-white">
-            <div className="flex flex-col md:flex-row gap-8">
+          <section className="rounded-2xl p-6 bg-white shadow-[0_10px_30px_rgba(0,0,0,0.06)] border border-gray-100 mb-6">
+            <div className="flex flex-col md:flex-row gap-8 p-4 md:p-6">
               <div className="flex-1">
                 <div className="mb-6">
                   <span className="bg-primary/10 text-primary px-3 py-1 rounded-full text-xs font-bold font-label tracking-widest uppercase">
@@ -95,7 +95,7 @@ export default function SubmissionModal({
                 placeholder="작문을 입력하세요."
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
-                className="w-full h-80 bg-white p-8 rounded-xl border-none shadow-[0_10px_40px_rgba(30,27,19,0.04)] focus:outline-none focus:ring-2 focus:ring-primary/20 text-lg leading-relaxed font-body placeholder:text-on-surface/20"
+                className="w-full h-80 bg-white p-8 rounded-2xl border border-gray-100 shadow-[0_20px_60px_rgba(0,0,0,0.08)] focus:ring-2 focus:ring-green-500/30 text-lg leading-relaxed placeholder:text-gray-300"
               />
               <div className="absolute bottom-4 right-6 text-sm font-label tracking-widest text-on-surface/40">
                 {String(content.length)}
@@ -111,7 +111,7 @@ export default function SubmissionModal({
             </button>
             <button
               type="button"
-              className="px-8 py-3 rounded-lg font-bold bg-primary text-white shadow-lg hover:opacity-90 transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-3 rounded-xl font-semibold bg-green-700 text-white shadow-lg hover:bg-green-800 active:scale-95 transition disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={() => void handleSubmit()}
               disabled={saving || !content.trim() || !sessionId || !canSubmit}
             >
