@@ -103,6 +103,49 @@
   min-width: 0;
 }
 
+.writing-layout--no-sidebar {
+  flex-direction: column;
+}
+
+.writing-layout--no-sidebar .writing-main {
+  width: 100%;
+  max-width: 100%;
+}
+
+.writing-submit-page {
+  width: 100%;
+}
+
+.writing-submit-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 32px;
+  align-items: start;
+}
+
+@media (max-width: 1024px) {
+  .writing-submit-shell {
+    grid-template-columns: 1fr;
+  }
+}
+
+.writing-submit-main {
+  min-width: 0;
+}
+
+.writing-submit-sidebar {
+  min-width: 0;
+}
+
+.writing-submit-sidebar-inner {
+  position: sticky;
+  top: 6rem;
+}
+
+.writing-submit-table {
+  margin-top: 1.5rem;
+}
+
 /* Writing Page */
 @keyframes fadeIn {
   from { opacity: 0; }

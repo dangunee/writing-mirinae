@@ -6,7 +6,7 @@ import WritingLayout from '../components/WritingLayout'
 
 export default function TestPage() {
   return (
-    <WritingLayout onOpenSubmitModal={() => alert('과제 제출 모달 (테스트)')}>
+    <WritingLayout>
       <div className="writing-page">
         <h1 className="writing-page-title">테스트 페이지</h1>
         <p style={{ color: 'var(--color-text-muted)', marginBottom: '1.5rem' }}>
