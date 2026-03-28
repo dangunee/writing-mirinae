@@ -41,22 +41,24 @@ export default function LandingHero({ goApp }: Props) {
         </div>
 
         <div className="relative mt-4 lg:mt-0">
-          <div className="absolute -top-10 -right-10 w-64 h-64 bg-[#a0f399]/20 rounded-full blur-3xl -z-10 hidden lg:block" />
+          <div className="absolute -top-10 -right-10 w-64 h-64 bg-[#a0f399]/20 rounded-full blur-3xl -z-10" />
+
           <div className="rounded-xl overflow-hidden shadow-2xl rotate-1">
             <img
               alt="Minimalist study space"
-              className="w-full h-[300px] md:h-[500px] lg:h-[600px] object-cover"
+              className="w-full h-[320px] md:h-[600px] object-cover"
               src={HERO_IMG}
               width={1200}
               height={600}
             />
           </div>
-          <div className="absolute -bottom-4 -left-2 md:-bottom-6 md:-left-6 bg-white p-4 md:p-6 rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.08)] border border-[#c6c5d4]/15 max-w-[180px] md:max-w-[240px]">
-            <div className="hidden md:flex items-center gap-3 mb-2">
+
+          <div className="absolute -bottom-6 -left-6 bg-white p-6 rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.08)] border border-[#c6c5d4]/15 max-w-[240px]">
+            <div className="flex items-center gap-3 mb-2">
               <div className="w-2 h-2 rounded-full bg-[#1b6d24]" />
               <span className="text-[10px] font-bold tracking-widest uppercase opacity-60">Status</span>
             </div>
-            <p className="text-[11px] md:text-sm font-bold leading-tight italic">
+            <p className="text-sm font-bold leading-tight italic text-[#1e1b13]">
               &quot;言葉は、その人の品格を映し出す鏡である。&quot;
             </p>
           </div>

@@ -35,16 +35,16 @@ export default function LandingDashboard() {
           </div>
           <div className="space-y-6">
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-white p-5 rounded-xl border border-black/5 shadow-sm text-center">
+              <div className="bg-white p-5 rounded-[2rem] border border-[#c6c5d4]/5 shadow-[0_20px_50px_rgba(0,0,0,0.04)] text-center">
                 <div className="text-[9px] font-bold uppercase tracking-widest text-[#1e1b13]/40 mb-1">累積執筆文字数</div>
                 <div className="text-xl font-extrabold text-[#000666]">12,450 자</div>
               </div>
-              <div className="bg-white p-5 rounded-xl border border-black/5 shadow-sm text-center">
+              <div className="bg-white p-5 rounded-[2rem] border border-[#c6c5d4]/5 shadow-[0_20px_50px_rgba(0,0,0,0.04)] text-center">
                 <div className="text-[9px] font-bold uppercase tracking-widest text-[#1e1b13]/40 mb-1">向上率</div>
                 <div className="text-xl font-extrabold text-[#1b6d24]">+42%</div>
               </div>
             </div>
-            <div className="bg-white rounded-2xl shadow-xl p-8 border border-black/5">
+            <div className="bg-white rounded-[2rem] shadow-[0_40px_100px_rgba(0,0,0,0.08)] p-8 border border-[#c6c5d4]/5">
               <div className="flex justify-between items-center mb-8">
                 <h4 className="font-bold text-[#000666] headline-font">Student Dashboard</h4>
                 <div className="w-10 h-10 rounded-full bg-black/5 flex items-center justify-center">
@@ -68,7 +68,7 @@ export default function LandingDashboard() {
                 </span>
               </div>
             </div>
-            <div className="bg-white p-8 rounded-2xl border border-black/5 shadow-sm">
+            <div className="bg-white p-8 rounded-[2rem] border border-[#c6c5d4]/5 shadow-[0_20px_50px_rgba(0,0,0,0.04)]">
               <div className="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-6 text-center">添削率の推移</div>
               <div className="relative flex items-center justify-center mb-8">
                 <CircularChart className="w-32 h-32" />

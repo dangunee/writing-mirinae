@@ -47,7 +47,7 @@ export default function LandingCTA({ goApp }: Props) {
           </div>
           <button
             type="submit"
-            className="w-full bg-[#1b6d24] text-white py-4 md:py-5 rounded-lg font-['Manrope'] font-bold tracking-widest uppercase hover:bg-[#1b6d24]/90 transition-all text-xs md:text-sm"
+            className="w-full bg-[#1b6d24] text-white py-5 rounded-lg font-['Manrope'] font-bold tracking-widest uppercase hover:bg-[#1b6d24]/90 transition-all text-xs md:text-sm"
           >
             受講を申し込む
           </button>

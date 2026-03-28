@@ -20,7 +20,7 @@ export default function LandingCorrection({ goApp }: Props) {
 
         <div className="grid lg:grid-cols-3 gap-8 lg:gap-12">
           <div className="lg:col-span-2 space-y-8">
-            <div className="bg-white p-6 md:p-8 lg:p-12 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-[#c6c5d4]/10 relative">
+            <div className="bg-white p-8 md:p-10 lg:p-12 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.04)] border border-[#c6c5d4]/5 relative">
               <div className="flex items-center justify-between mb-6 md:mb-8 pb-3 md:pb-4 border-b border-[#c6c5d4]/20">
                 <div className="flex items-center gap-3">
                   <span className="material-symbols-outlined text-[#000666]">edit_note</span>
@@ -60,7 +60,7 @@ export default function LandingCorrection({ goApp }: Props) {
           </div>
 
           <div className="space-y-4 md:space-y-6">
-            <div className="bg-white p-5 md:p-6 rounded-xl border-l-4 border-[#000666] shadow-[0_4px_15px_rgba(0,0,0,0.03)]">
+            <div className="bg-white p-6 md:p-8 rounded-[2rem] border-l-4 border-[#000666] border border-[#c6c5d4]/10 shadow-[0_20px_50px_rgba(0,0,0,0.04)]">
               <div className="flex items-center gap-2 mb-2 md:mb-3">
                 <span className="material-symbols-outlined text-[#000666] text-lg md:text-xl">spellcheck</span>
                 <h4 className="font-bold text-[11px] md:text-sm text-[#000666] uppercase tracking-tight">
@@ -71,7 +71,7 @@ export default function LandingCorrection({ goApp }: Props) {
                 「~까지는」を「~때까지는」に修正。期間を明確にすることで、文脈がよりスムーズになります。助詞の微細な使い分けを指導します。
               </p>
             </div>
-            <div className="bg-white p-5 md:p-6 rounded-xl border-l-4 border-[#1b6d24] shadow-[0_4px_15px_rgba(0,0,0,0.03)]">
+            <div className="bg-white p-6 md:p-8 rounded-[2rem] border-l-4 border-[#1b6d24] border border-[#c6c5d4]/10 shadow-[0_20px_50px_rgba(0,0,0,0.04)]">
               <div className="flex items-center gap-2 mb-2 md:mb-3">
                 <span className="material-symbols-outlined text-[#1b6d24] text-lg md:text-xl">auto_awesome</span>
                 <h4 className="font-bold text-[11px] md:text-sm text-[#1b6d24] uppercase tracking-tight">
@@ -82,7 +82,7 @@ export default function LandingCorrection({ goApp }: Props) {
                 「몸의 선이 나온」を「드러나는」へ。より洗練された、ネイティブらしい情緒的な語彙の選択を提案します。
               </p>
             </div>
-            <div className="hidden lg:block bg-white p-6 rounded-xl border-l-4 border-[#670007] shadow-[0_4px_15px_rgba(0,0,0,0.03)]">
+            <div className="hidden lg:block bg-white p-6 md:p-8 rounded-[2rem] border-l-4 border-[#670007] border border-[#c6c5d4]/10 shadow-[0_20px_50px_rgba(0,0,0,0.04)]">
               <div className="flex items-center gap-2 mb-3">
                 <span className="material-symbols-outlined text-[#670007] text-xl">translate</span>
                 <h4 className="font-bold text-sm text-[#670007] uppercase tracking-tight">Vocabulary Choice</h4>
