@@ -512,6 +512,57 @@ a.status-badge.status.corrected {
   cursor: not-allowed;
 }
 
+/* SubmissionModal — Stitch: 레거시/iframe/비활성(opacity) 때문에 Tailwind만으로 톤이 죽는 경우 대비 */
+.submission-modal-stitch .submission-modal-assignment-card {
+  border: 1px solid #e5e7eb !important;
+  border-radius: 1rem !important;
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.1),
+    0 4px 12px rgba(0, 0, 0, 0.06) !important;
+}
+
+.submission-modal-stitch .submission-modal-stitch-textarea {
+  min-height: 20rem !important;
+  padding: 2rem !important;
+  border-radius: 1rem !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.12),
+    0 8px 24px rgba(0, 0, 0, 0.06) !important;
+}
+
+.submission-modal-stitch .submission-modal-stitch-textarea:focus {
+  outline: none !important;
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.12),
+    0 8px 24px rgba(0, 0, 0, 0.06),
+    0 0 0 3px rgba(34, 197, 94, 0.35) !important;
+}
+
+.submission-modal-stitch .submission-modal-submit-btn {
+  background-color: #15803d !important;
+  color: #fff !important;
+  border: none !important;
+  box-shadow:
+    0 10px 28px rgba(21, 128, 61, 0.45),
+    0 4px 10px rgba(0, 0, 0, 0.12) !important;
+}
+
+.submission-modal-stitch .submission-modal-submit-btn:hover:not(:disabled) {
+  background-color: #166534 !important;
+}
+
+.submission-modal-stitch .submission-modal-submit-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.submission-modal-stitch .submission-modal-submit-btn:disabled {
+  opacity: 0.72 !important;
+  cursor: not-allowed !important;
+  filter: saturate(0.92);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+}
+
 /* Correction Page */
 .correction-page {
   animation: fadeIn 0.3s ease;
