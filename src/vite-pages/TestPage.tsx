@@ -1,5 +1,5 @@
 /**
- * 테스트 페이지 - apps.mirinae.jp/writing UI 검증용
+ * 테스트 페이지
  * 로컬 개발: npm run dev → http://localhost:5173/test
  */
 import WritingLayout from '../components/WritingLayout'
