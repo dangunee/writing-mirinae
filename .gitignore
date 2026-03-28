@@ -4,3 +4,11 @@ dist
 .env.local
 *.local
 .vercel
+.npm-cache
+
+# Next.js / 로컬 빌드 산출물 (커밋 금지)
+.next/
+out/
+
+# TypeScript incremental 캐시
+*.tsbuildinfo
