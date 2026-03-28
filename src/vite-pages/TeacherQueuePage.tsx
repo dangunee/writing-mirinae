@@ -132,7 +132,7 @@ export default function TeacherQueuePage() {
                     <tr key={item.submissionId}>
                       {/* 상세 이동: 세션 셀만 클릭 영역 */}
                       <td>
-                        <Link className="view-link" to={`/correct/${item.submissionId}`}>
+                        <Link className="view-link" to={`/writing/teacher/correct/${item.submissionId}`}>
                           {item.sessionIndex}
                         </Link>
                       </td>
@@ -142,7 +142,7 @@ export default function TeacherQueuePage() {
                       </td>
                       {/* 상세 이동: 미리보기 셀만 클릭 영역 */}
                       <td className="assignment-title">
-                        <Link className="view-link" to={`/correct/${item.submissionId}`}>
+                        <Link className="view-link" to={`/writing/teacher/correct/${item.submissionId}`}>
                           {(item.bodyPreview ?? '').trim() || '—'}
                         </Link>
                       </td>

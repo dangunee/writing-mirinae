@@ -2,7 +2,7 @@
  * Security: only allow redirects to configured URL prefixes (exact prefix match).
  * Set CHECKOUT_REDIRECT_ALLOWLIST to comma-separated full URL prefixes, e.g.
  * https://mirinae.jp/writing,https://localhost:5173/writing
- * (success URL 예: …/writing/complete — prefix가 …/writing 이면 허용)
+ * (success URL 예: …/writing/app/complete — prefix가 …/writing 이면 허용)
  */
 export function parseCheckoutAllowlist(): string[] {
   const raw = process.env.CHECKOUT_REDIRECT_ALLOWLIST ?? "";

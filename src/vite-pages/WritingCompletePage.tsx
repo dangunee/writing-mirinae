@@ -51,7 +51,7 @@ export default function WritingCompletePage() {
             doneRef.current = true
             window.clearInterval(intervalId)
             window.clearTimeout(timeoutId)
-            navigate('/', { replace: true })
+            navigate('/writing/app', { replace: true })
             return
           }
         }

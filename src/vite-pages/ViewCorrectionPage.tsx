@@ -97,7 +97,7 @@ export default function ViewCorrectionPage() {
       <WritingLayout>
         <div className="view-correction-page">
           <p>로딩 중...</p>
-          <Link to="/">목록으로</Link>
+          <Link to="/writing/app">목록으로</Link>
         </div>
       </WritingLayout>
     )
@@ -108,7 +108,7 @@ export default function ViewCorrectionPage() {
       <WritingLayout>
         <div className="view-correction-page">
           <p>제출 내용을 찾을 수 없습니다.</p>
-          <Link to="/">목록으로</Link>
+          <Link to="/writing/app">목록으로</Link>
         </div>
       </WritingLayout>
     )
@@ -119,7 +119,7 @@ export default function ViewCorrectionPage() {
       <WritingLayout>
         <div className="view-correction-page">
           <p>아직 공개되지 않았습니다.</p>
-          <Link to="/">목록으로</Link>
+          <Link to="/writing/app">목록으로</Link>
         </div>
       </WritingLayout>
     )
@@ -130,7 +130,7 @@ export default function ViewCorrectionPage() {
       <WritingLayout>
         <div className="view-correction-page">
           <p>제출 내용을 찾을 수 없습니다.</p>
-          <Link to="/">목록으로</Link>
+          <Link to="/writing/app">목록으로</Link>
         </div>
       </WritingLayout>
     )
@@ -145,7 +145,7 @@ export default function ViewCorrectionPage() {
     <WritingLayout>
       <div className="view-correction-page">
         <div className="view-header">
-          <Link to="/" className="back-link">
+          <Link to="/writing/app" className="back-link">
             ← 목록으로
           </Link>
           <h1>학생이 볼 수 있음 View</h1>

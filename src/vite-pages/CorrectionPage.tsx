@@ -47,7 +47,7 @@ type ListRow = {
 }
 
 export default function CorrectionPage() {
-  const { assignmentId: submissionId } = useParams<{ assignmentId: string }>()
+  const { submissionId } = useParams<{ submissionId: string }>()
   const [detail, setDetail] = useState<TeacherSubmissionDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedSubmission, setSelectedSubmission] = useState<ListRow | null>(null)
@@ -209,7 +209,7 @@ export default function CorrectionPage() {
       <WritingLayout>
         <div className="correction-page">
           <p>과제를 찾을 수 없습니다.</p>
-          <Link to="/">목록으로</Link>
+          <Link to="/writing/teacher">목록으로</Link>
         </div>
       </WritingLayout>
     )
@@ -220,7 +220,7 @@ export default function CorrectionPage() {
       <WritingLayout>
         <div className="correction-page">
           <p>로딩 중...</p>
-          <Link to="/">목록으로</Link>
+          <Link to="/writing/teacher">목록으로</Link>
         </div>
       </WritingLayout>
     )
@@ -231,7 +231,7 @@ export default function CorrectionPage() {
       <WritingLayout>
         <div className="correction-page">
           <p>과제를 찾을 수 없습니다.</p>
-          <Link to="/">목록으로</Link>
+          <Link to="/writing/teacher">목록으로</Link>
         </div>
       </WritingLayout>
     )
@@ -241,7 +241,7 @@ export default function CorrectionPage() {
     <WritingLayout>
       <div className="correction-page">
         <div className="correction-header">
-          <Link to="/" className="back-link">
+          <Link to="/writing/teacher" className="back-link">
             ← 목록으로
           </Link>
           <h1>첨삭: 세션 {detail.session.index}회</h1>
@@ -392,7 +392,7 @@ export default function CorrectionPage() {
                   {/* [FIX] 학생 결과는 published만 — publishedAt 있을 때만 링크 (draft 숨김) */}
                   {detail.correction?.publishedAt != null &&
                     String(detail.correction.publishedAt).trim() !== '' && (
-                      <Link to={`/view/${activeRow.id}`} className="view-student-link">
+                      <Link to={`/writing/app/view/${activeRow.id}`} className="view-student-link">
                         학생 보기 →
                       </Link>
                     )}

@@ -486,7 +486,7 @@ function SessionRow({
       </td>
       <td>
         {isPublished && submission?.id ? (
-          <Link to={`/view/${submission.id}`} className="status-badge status corrected">
+          <Link to={`/writing/app/view/${submission.id}`} className="status-badge status corrected">
             완료
             <br />
             <small>결과 보기</small>
@@ -505,7 +505,7 @@ function SessionRow({
         {/* [FIX] published + id 있을 때만 View (draft/진행 중 결과 페이지 노출 방지) */}
         {isPublished && submission?.id ? (
           <div className="view-links">
-            <Link to={`/view/${submission.id}`} className="view-link">
+            <Link to={`/writing/app/view/${submission.id}`} className="view-link">
               결과 보기
             </Link>
           </div>

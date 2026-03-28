@@ -1,4 +1,4 @@
-import { useLocation } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -14,7 +14,7 @@ export default function Layout({ children }: LayoutProps) {
   const location = useLocation()
   const embedded = isEmbedded()
 
-  if (location.pathname === '/mypage') {
+  if (location.pathname === '/writing/app/mypage') {
     return <>{children}</>
   }
 
@@ -22,16 +22,16 @@ export default function Layout({ children }: LayoutProps) {
     <div className={embedded ? 'layout layout-embedded' : 'layout'}>
       {!embedded && (
         <header className="header">
-          <a href="/" className="logo">
+          <Link to="/writing" className="logo">
             <span className="logo-text">writing</span>
             <span className="logo-domain">.mirinae.jp</span>
-          </a>
+          </Link>
           <p className="tagline">ミリネ韓国語教室 · 作文トレーニング</p>
         </header>
       )}
 
       <main
-        className={location.pathname === '/' ? 'main main-writing-stitch' : 'main'}
+        className={location.pathname === '/writing/app' ? 'main main-writing-stitch' : 'main'}
       >
         {children}
       </main>
