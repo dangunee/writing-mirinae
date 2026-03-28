@@ -7,13 +7,13 @@ export default function WritingLayout({ children, onOpenSubmitModal }: WritingLa
   return (
     <div className="writing-layout">
       <aside className="writing-sidebar">
-        <h2 className="sidebar-title">과제 제출</h2>
+        <h2 className="sidebar-title">제출</h2>
         <button
           type="button"
           className="submit-btn"
           onClick={onOpenSubmitModal}
         >
-          과제 제출 버튼
+          과제 제출하기
         </button>
       </aside>
       <main className="writing-main">{children}</main>

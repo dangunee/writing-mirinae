@@ -115,8 +115,13 @@
 
 .writing-page-title {
   margin: 0 0 1.5rem;
-  font-size: 1.25rem;
+  font-size: 1.35rem;
   font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.writing-page-loading {
+  margin: 0 0 1rem;
 }
 
 .assignment-weeks {
@@ -135,7 +140,8 @@
 .week-label {
   margin: 0 0 1rem;
   font-size: 0.95rem;
-  color: var(--color-text-muted);
+  font-weight: 600;
+  color: var(--color-text);
 }
 
 .assignment-table {
@@ -154,6 +160,10 @@
   font-size: 0.85rem;
   color: var(--color-text-muted);
   font-weight: 600;
+}
+
+.assignment-table-stitch th {
+  letter-spacing: 0.02em;
 }
 
 .assignment-title {
@@ -196,6 +206,165 @@
   padding: 3rem;
 }
 
+/* WritingPage — 제출 후 상태 (Stitch 힌트, CSS 변수만 사용) */
+.writing-submission-banner {
+  margin: 0 0 1rem;
+  padding: 1.1rem 1.25rem;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+.writing-submission-banner--neutral {
+  border-color: var(--color-border);
+}
+
+.writing-submission-banner--success {
+  border-color: rgba(44, 95, 45, 0.25);
+  background: rgba(44, 95, 45, 0.06);
+}
+
+.writing-submission-banner-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.writing-submission-banner-desc {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+.writing-status-flow {
+  margin: 0 0 1rem;
+  padding-top: 0.25rem;
+}
+
+.writing-status-flow-track {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 28rem;
+}
+
+.writing-flow-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.writing-flow-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 9999px;
+  background: var(--color-border);
+}
+
+.writing-flow-step--current .writing-flow-dot {
+  width: 0.65rem;
+  height: 0.65rem;
+  background: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(44, 95, 45, 0.2);
+}
+
+.writing-flow-step--done .writing-flow-dot {
+  background: var(--color-primary);
+}
+
+.writing-flow-step--upcoming .writing-flow-label {
+  color: var(--color-text-muted);
+}
+
+.writing-flow-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  letter-spacing: 0.04em;
+}
+
+.writing-flow-step--current .writing-flow-label {
+  color: var(--color-primary);
+}
+
+.writing-flow-line {
+  flex: 1;
+  height: 2px;
+  min-width: 0.75rem;
+  margin: 0 0.2rem;
+  align-self: flex-start;
+  margin-top: 0.25rem;
+  border-radius: 1px;
+}
+
+.writing-flow-line--done {
+  background: var(--color-primary);
+  opacity: 0.45;
+}
+
+.writing-flow-line--muted {
+  background: var(--color-border);
+}
+
+.writing-lock-hint {
+  margin: 0 0 1rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: rgba(44, 95, 45, 0.65);
+  background: rgba(44, 95, 45, 0.06);
+  padding: 0.35rem 0.6rem;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.writing-lock-hint::before {
+  content: '🔒';
+  font-size: 0.7rem;
+}
+
+.status-badge {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0.25rem 0.55rem;
+  border-radius: 9999px;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.status-badge small {
+  font-size: 0.72rem;
+  font-weight: 500;
+  opacity: 0.9;
+}
+
+a.status-badge.status.corrected {
+  text-decoration: none;
+}
+
+@keyframes writing-badge-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.72;
+  }
+}
+
+.writing-status-badge-pulse {
+  animation: writing-badge-pulse 1.6s ease-in-out infinite;
+}
+
 /* Modal */
 .modal-overlay {
   position: fixed;
@@ -229,6 +398,18 @@
 .submission-modal .modal-header h2 {
   margin: 0;
   font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.submission-modal-stitch .submission-modal-hint {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+}
+
+.submission-session-value {
+  font-size: 0.95rem;
+  color: var(--color-text);
 }
 
 .modal-close {
@@ -289,6 +470,27 @@
   border-top: 1px solid var(--color-border);
   display: flex;
   justify-content: flex-end;
+}
+
+.submission-modal-footer {
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.modal-footer-cancel {
+  padding: 0.75rem 1.25rem;
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 2px solid var(--color-border);
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.modal-footer-cancel:hover {
+  color: var(--color-text);
+  border-color: var(--color-text-muted);
 }
 
 .submit-button {

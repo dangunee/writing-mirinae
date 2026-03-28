@@ -1,3 +1,5 @@
+import { useLocation } from 'react-router-dom'
+
 interface LayoutProps {
   children: React.ReactNode
 }
@@ -9,7 +11,12 @@ function isEmbedded(): boolean {
 }
 
 export default function Layout({ children }: LayoutProps) {
+  const location = useLocation()
   const embedded = isEmbedded()
+
+  if (location.pathname === '/mypage') {
+    return <>{children}</>
+  }
 
   return (
     <div className={embedded ? 'layout layout-embedded' : 'layout'}>
