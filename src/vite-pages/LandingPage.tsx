@@ -26,13 +26,13 @@ export default function LandingPage() {
     <div className="landing-stitch-root relative left-1/2 w-screen max-w-[100vw] -translate-x-1/2 bg-[#F5F5F5] text-[#1e1b13]">
       <LandingNav goApp={goApp} />
       <main>
-        <LandingHero goApp={goApp} />
+        <LandingHero />
         <LandingCorrection goApp={goApp} />
         <LandingCurriculum />
         <LandingProcess />
         <LandingDashboard />
         <LandingTestimonials />
-        <LandingCTA goApp={goApp} />
+        <LandingCTA />
       </main>
       <LandingFooter />
     </div>

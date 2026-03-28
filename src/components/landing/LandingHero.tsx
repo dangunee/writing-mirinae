@@ -1,11 +1,18 @@
-type Props = {
-  goApp: () => void
-}
+import { Link } from 'react-router-dom'
 
-const HERO_IMG =
+const HERO_FALLBACK =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuDSPB8kESuXgxSqxjzgcP2yiBmNzrj_OrHsKJ7T28RmRzN4Cgap9LM_ZfB1-JMSj_OZDndIPDOYWkJkLp1kGGyuH7r9nQtJ9v4DZbteHf46Rai4S-babLp9ho2-x_ei2kjLTRQdkVPFbXclZsmbzDc6w1_jDuPQ0HLuWqywOEhzm_aAtBBEW2d6exLxjor1U-aahJZiArqSNfe5gkbleXtruuKgLDeQJ5i4npEM2o1ALwEOpqgPYx4vLUgY_blLiSIM5tusDBdeP4M'
 
-export default function LandingHero({ goApp }: Props) {
+function heroImageSrc(): string {
+  const base = import.meta.env.BASE_URL.endsWith('/')
+    ? import.meta.env.BASE_URL
+    : `${import.meta.env.BASE_URL}/`
+  return `${base}writing/images/hero-study.jpg`
+}
+
+export default function LandingHero() {
+  const src = heroImageSrc()
+
   return (
     <section className="pt-28 md:pt-32 pb-16 md:pb-20 px-6 md:px-8 max-w-7xl mx-auto overflow-hidden">
       <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
@@ -22,43 +29,48 @@ export default function LandingHero({ goApp }: Props) {
           <p className="text-base md:text-lg text-[#454652] max-w-md mb-8 md:mb-10 leading-relaxed">
             単なる学習を超え、魂を込めて綴る。韓国語の深淵に触れる、日本で唯一のライティング専門アトリエ。
           </p>
-          <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
-            <button
-              type="button"
-              onClick={goApp}
-              className="ink-gradient text-white w-full sm:w-auto px-8 md:px-10 py-4 md:py-5 rounded-lg font-['Manrope'] font-bold tracking-widest uppercase text-xs md:text-sm shadow-xl hover:opacity-90 transition-all"
+          <div className="flex flex-col sm:flex-row gap-4">
+            <Link
+              to="/writing/app"
+              className="inline-flex items-center justify-center ink-gradient text-white px-8 md:px-10 py-4 md:py-5 rounded-lg font-['Manrope'] font-bold tracking-widest uppercase text-xs md:text-sm shadow-[0_12px_30px_rgba(0,6,102,0.24)] hover:opacity-90 transition-all"
             >
               Trial Class
-            </button>
-            <button
-              type="button"
-              onClick={goApp}
-              className="border-b-2 border-[#000666]/20 text-[#000666] w-full sm:w-auto px-8 md:px-10 py-4 md:py-5 font-['Manrope'] font-bold tracking-widest uppercase text-xs md:text-sm hover:border-[#000666] transition-all bg-transparent"
+            </Link>
+
+            <a
+              href="https://mirinae.jp"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center justify-center border-b-2 border-[#000666]/20 text-[#000666] px-8 md:px-10 py-4 md:py-5 font-['Manrope'] font-bold tracking-widest uppercase text-xs md:text-sm hover:border-[#000666] transition-all"
             >
               Course Details
-            </button>
+            </a>
           </div>
         </div>
 
         <div className="relative mt-4 lg:mt-0">
-          <div className="absolute -top-10 -right-10 w-64 h-64 bg-[#a0f399]/20 rounded-full blur-3xl -z-10" />
+          <div className="absolute -top-8 md:-top-10 -right-6 md:-right-10 w-40 h-40 md:w-64 md:h-64 bg-[#a0f399]/30 rounded-full blur-3xl -z-10" />
 
-          <div className="rounded-xl overflow-hidden shadow-2xl rotate-1">
+          <div className="rounded-xl overflow-hidden shadow-[0_24px_60px_rgba(0,0,0,0.12)] rotate-[1deg]">
             <img
-              alt="Minimalist study space"
-              className="w-full h-[320px] md:h-[600px] object-cover"
-              src={HERO_IMG}
+              alt="Study space"
+              className="w-full h-[240px] md:h-[520px] object-cover"
+              src={src}
               width={1200}
-              height={600}
+              height={520}
+              onError={(e) => {
+                const el = e.currentTarget
+                if (el.src !== HERO_FALLBACK) el.src = HERO_FALLBACK
+              }}
             />
           </div>
 
-          <div className="absolute -bottom-6 -left-6 bg-white p-6 rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.08)] border border-[#c6c5d4]/15 max-w-[240px]">
-            <div className="flex items-center gap-3 mb-2">
+          <div className="absolute -bottom-4 md:-bottom-6 left-4 md:-left-6 bg-white px-4 py-3 md:p-6 rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.1)] border border-[#c6c5d4]/15 max-w-[180px] md:max-w-[240px]">
+            <div className="flex items-center gap-2 md:gap-3 mb-2">
               <div className="w-2 h-2 rounded-full bg-[#1b6d24]" />
-              <span className="text-[10px] font-bold tracking-widest uppercase opacity-60">Status</span>
+              <span className="text-[9px] md:text-[10px] font-bold tracking-widest uppercase opacity-60">Status</span>
             </div>
-            <p className="text-sm font-bold leading-tight italic text-[#1e1b13]">
+            <p className="text-[11px] md:text-sm font-bold leading-tight italic text-[#1e1b13]">
               &quot;言葉は、その人の品格を映し出す鏡である。&quot;
             </p>
           </div>

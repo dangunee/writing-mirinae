@@ -1,35 +1,25 @@
-import type { FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 
-type Props = {
-  goApp: () => void
-}
-
-export default function LandingCTA({ goApp }: Props) {
-  const onSubmit = (e: FormEvent) => {
-    e.preventDefault()
-    goApp()
-  }
-
+export default function LandingCTA() {
   return (
-    <section id="cta-apply" className="py-20 md:py-24 bg-[#000666] text-white">
+    <section id="cta-apply" className="py-24 bg-[#000666] text-white">
       <div className="max-w-4xl mx-auto px-6 md:px-8 text-center">
-        <h2 className="headline-font text-3xl md:text-4xl lg:text-5xl font-extrabold mb-6 md:mb-8 tracking-tight">
+        <h2 className="headline-font text-3xl md:text-5xl font-extrabold mb-6 md:mb-8 tracking-tight">
           アトリエであなたの旅を始めましょう
         </h2>
+
         <p className="opacity-70 text-sm md:text-lg mb-10 md:mb-12 leading-relaxed">
           扉はいつでも開かれています。あなたの言葉が、あなただけの筆跡で、韓国語の海へと漕ぎ出すために。
         </p>
-        <form
-          onSubmit={onSubmit}
-          className="bg-white/5 p-6 md:p-8 rounded-2xl backdrop-blur-sm border border-white/10 text-left"
-        >
-          <div className="grid md:grid-cols-2 gap-6 mb-6 md:mb-8">
+
+        <div className="bg-white/5 p-5 md:p-8 rounded-2xl backdrop-blur-sm border border-white/10 text-left">
+          <div className="grid md:grid-cols-2 gap-5 md:gap-6 mb-6 md:mb-8">
             <div className="space-y-2">
               <label className="text-[10px] font-bold uppercase tracking-widest opacity-60">氏名</label>
               <input
                 name="dummy-name"
                 autoComplete="name"
-                className="w-full bg-white/10 border-transparent rounded-lg p-4 focus:ring-2 focus:ring-[#1b6d24] focus:border-[#1b6d24] transition-all placeholder:text-white/20 text-white"
+                className="w-full bg-white/10 border-transparent rounded-lg p-4 text-sm text-white placeholder:text-white/20 focus:ring-2 focus:ring-[#1b6d24] focus:border-[#1b6d24] transition-all"
                 placeholder="姓名"
                 type="text"
               />
@@ -39,19 +29,20 @@ export default function LandingCTA({ goApp }: Props) {
               <input
                 name="dummy-email"
                 autoComplete="email"
-                className="w-full bg-white/10 border-transparent rounded-lg p-4 focus:ring-2 focus:ring-[#1b6d24] focus:border-[#1b6d24] transition-all placeholder:text-white/20 text-white"
+                className="w-full bg-white/10 border-transparent rounded-lg p-4 text-sm text-white placeholder:text-white/20 focus:ring-2 focus:ring-[#1b6d24] focus:border-[#1b6d24] transition-all"
                 placeholder="example@mirinae.jp"
                 type="email"
               />
             </div>
           </div>
-          <button
-            type="submit"
-            className="w-full bg-[#1b6d24] text-white py-5 rounded-lg font-['Manrope'] font-bold tracking-widest uppercase hover:bg-[#1b6d24]/90 transition-all text-xs md:text-sm"
+
+          <Link
+            to="/writing/app"
+            className="w-full inline-flex items-center justify-center bg-[#1b6d24] text-white py-4 md:py-5 rounded-lg font-['Manrope'] font-bold tracking-widest uppercase hover:bg-[#1b6d24]/90 transition-all text-xs md:text-sm"
           >
             受講を申し込む
-          </button>
-        </form>
+          </Link>
+        </div>
       </div>
     </section>
   )
