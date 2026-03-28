@@ -1,9 +1,15 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
+// 기본 `/` — Vercel 루트 도메인(writing-mirinae.vercel.app 등)에서 자산 경로 일치
+// mirinae.jp 의 /writing 서브패스에 올릴 때만 빌드 전 `VITE_BASE=/writing/` 설정
+const base = process.env.VITE_BASE ?? '/'
+if (!base.endsWith('/')) {
+  throw new Error('VITE_BASE must end with / (e.g. /writing/)')
+}
+
 export default defineConfig({
-  // mirinae.jp 에서 /writing 하위에만 배포 (자산 경로)
-  base: '/writing/',
+  base,
   plugins: [react()],
   // [API 연결] Vite dev에서 Next `/api`로 프록시 (환경에 따라 `VITE_API_BASE_URL` 사용 가능)
   server: {
