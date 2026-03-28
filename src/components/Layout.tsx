@@ -30,7 +30,11 @@ export default function Layout({ children }: LayoutProps) {
         </header>
       )}
 
-      <main className="main">{children}</main>
+      <main
+        className={location.pathname === '/' ? 'main main-writing-stitch' : 'main'}
+      >
+        {children}
+      </main>
 
       {!embedded && (
         <footer className="footer">

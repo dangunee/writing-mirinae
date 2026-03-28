@@ -43,6 +43,21 @@
   width: 100%;
 }
 
+/* WritingPage Stitch: 課題提出 2컬럼(본문 + 우측 사이드) — 기존 960px 상한 해제 */
+.main-writing-stitch {
+  max-width: min(1440px, 100%);
+  margin-left: auto;
+  margin-right: auto;
+  padding: 1rem 1rem 2rem;
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .main-writing-stitch {
+    padding: 1.25rem 1.5rem 2.5rem;
+  }
+}
+
 .layout-embedded .main {
   padding-top: 1.5rem;
 }

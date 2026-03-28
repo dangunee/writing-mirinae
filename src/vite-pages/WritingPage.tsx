@@ -86,6 +86,9 @@ export default function WritingPage() {
     session != null ? `제${session.index}회 작문` : '作文課題'
   const activeSessionDescription = '今回の作文を下記入力欄に作成して提出してください。'
 
+  const hasSession = session != null
+  const canUseForm = Boolean(canSubmit && session?.id)
+
   const emptyAssignmentsText = (() => {
     if (current?.ok && current.mode === 'all_done') return '모든 과제를 완료했습니다.'
     if (current?.ok && current.mode === 'fresh') return '첫 과제를 시작하세요.'
@@ -98,6 +101,10 @@ export default function WritingPage() {
     if (submission.status === 'published') return 'published' as const
     return 'in_progress' as const
   })()
+
+  const cardDescription = hasSession
+    ? activeSessionDescription
+    : `${emptyAssignmentsText} 이용 가능한 과제가 열리면 이 영역에 과제 안내가 표시됩니다.`
 
   const handleSubmit = async () => {
     const sessionId = session?.id ?? null
@@ -124,215 +131,262 @@ export default function WritingPage() {
 
   return (
     <WritingLayout>
-      <main className="writing-submit-page">
-        <div className="writing-page">
-          <h1 className="writing-page-title">작문 과제</h1>
-          {loading && <p className="status pending writing-page-loading">불러오는 중…</p>}
+      <main className="writing-submit-page writing-stitch-root bg-[#F5F5F5] min-h-[60vh]">
+        {loading && (
+          <p className="text-sm text-on-surface-variant mb-4 px-1" role="status">
+            불러오는 중…
+          </p>
+        )}
 
-          <div className="assignment-weeks">
-            {showSessionTable && session != null && (
-              <section key={session.id} className="week-section">
-                <h3 className="week-label">{weekLabel}</h3>
-                {submission != null && submissionFlowKind != null && (
-                  <>
-                    <SubmissionBanner kind={submissionFlowKind} />
-                    <SubmissionFlow kind={submissionFlowKind} />
-                    {submission.status !== 'draft' && (
-                      <p className="writing-lock-hint" role="status">
-                        제출 후에는 수정할 수 없습니다.
-                      </p>
-                    )}
-                  </>
-                )}
+        <div className="max-w-[1400px] mx-auto flex flex-col lg:flex-row">
+          <div className="flex-1 p-4 sm:p-6 lg:p-10 lg:pr-4">
+            <div className="max-w-4xl mx-auto w-full">
+              <header className="mb-8">
+                <h1 className="text-3xl sm:text-4xl font-extrabold text-primary font-headline tracking-tight mb-6">
+                  과제 제출
+                </h1>
+                <div className="flex gap-4 sm:gap-8 border-b border-on-surface/10 overflow-x-auto">
+                  <button
+                    type="button"
+                    className="pb-4 text-sm sm:text-lg font-bold border-b-2 border-primary text-primary shrink-0 transition-colors"
+                  >
+                    제출 (Submit)
+                  </button>
+                  <button
+                    type="button"
+                    className="pb-4 text-sm sm:text-lg font-medium text-on-surface/50 hover:text-primary shrink-0 transition-colors"
+                  >
+                    제출 완료
+                  </button>
+                  <button
+                    type="button"
+                    className="pb-4 text-sm sm:text-lg font-medium text-on-surface/50 hover:text-primary shrink-0 transition-colors"
+                  >
+                    첨삭 완료
+                  </button>
+                </div>
+              </header>
 
-                <div className="writing-submit-shell">
-                  <div className="writing-submit-main">
-                    <section className="rounded-xl p-8 mb-8 shadow-sm bg-white">
-                      <div className="flex flex-col md:flex-row gap-8">
-                        <div className="flex-1">
-                          <div className="mb-6">
-                            <span className="bg-primary/10 text-primary px-3 py-1 rounded-full text-xs font-bold font-label tracking-widest uppercase">
-                              Theme
-                            </span>
-                            <h2 className="text-2xl font-bold text-on-background mt-3 font-headline">
-                              {activeSessionTitle}
-                            </h2>
-                          </div>
+              {hasSession && weekLabel ? (
+                <h2 className="week-label text-lg font-semibold text-on-surface mb-4">{weekLabel}</h2>
+              ) : null}
 
-                          <div className="bg-surface-container-lowest p-6 rounded-lg border border-outline-variant/10 mb-6">
-                            <p className="text-on-surface font-body leading-relaxed">{activeSessionDescription}</p>
-                          </div>
-                        </div>
-                      </div>
-                    </section>
+              {hasSession && submission != null && submissionFlowKind != null && (
+                <>
+                  <SubmissionBanner kind={submissionFlowKind} />
+                  <SubmissionFlow kind={submissionFlowKind} />
+                  {submission.status !== 'draft' && (
+                    <p className="writing-lock-hint mb-6" role="status">
+                      제출 후에는 수정할 수 없습니다.
+                    </p>
+                  )}
+                </>
+              )}
 
-                    <section className="rounded-xl p-8 mb-8 shadow-sm bg-white">
-                      <div className="space-y-4">
-                        <h3 className="font-bold text-primary flex items-center gap-2">
-                          <span className="material-symbols-outlined text-sm">info</span>
-                          Requirement
-                        </h3>
-
-                        <p className="text-sm text-on-surface-variant mb-4">
-                          아래 안내를 확인한 뒤 작문을 작성해 주세요.
-                        </p>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {REQUIREMENT_FALLBACK.map((item, index) => (
-                            <div
-                              key={index}
-                              className="bg-white/60 p-4 rounded-lg border-l-4 border-primary"
-                            >
-                              <p className="font-bold text-sm">{item.title}</p>
-                              {item.example ? (
-                                <p className="text-xs text-on-surface-variant mt-1">{item.example}</p>
-                              ) : null}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </section>
-
-                    {canSubmit && session.id ? (
-                      <>
-                        <section className="space-y-6">
-                          <div className="relative">
-                            <textarea
-                              id="submission-body"
-                              className="w-full h-80 bg-white p-8 rounded-xl border-none shadow-[0_10px_40px_rgba(30,27,19,0.04)] focus:ring-2 focus:ring-primary/20 text-lg leading-relaxed font-body placeholder:text-on-surface/20"
-                              placeholder="여기에 작문을 입력해 주세요..."
-                              value={content}
-                              onChange={(e) => setContent(e.target.value)}
-                            />
-                            <div className="absolute bottom-4 right-6 text-sm font-label tracking-widest text-on-surface/40">
-                              {content.length}
-                            </div>
-                          </div>
-                        </section>
-
-                        <div className="mt-8">
-                          <p className="text-sm font-bold text-on-surface-variant mb-3 font-headline flex items-center gap-2">
-                            <span className="material-symbols-outlined text-base">attachment</span>
-                            손글씨 원고 업로드
-                          </p>
-
-                          <div className="border-2 border-dashed border-outline-variant/30 rounded-2xl p-12 bg-surface-container-low/30 hover:bg-surface-container-low/50 transition-colors cursor-pointer group flex flex-col items-center justify-center text-center">
-                            <div className="w-16 h-16 bg-surface-container rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
-                              <span className="material-symbols-outlined text-4xl text-on-surface-variant/40">
-                                cloud_upload
-                              </span>
-                            </div>
-
-                            <p className="text-on-surface font-medium mb-1">
-                              이미지 또는 PDF를 업로드하거나
-                              <span className="text-primary font-bold underline decoration-2 underline-offset-4 ml-1">
-                                파일을 선택
-                              </span>
-                            </p>
-
-                            <p className="text-[10px] text-on-surface-variant/60 font-label tracking-wider uppercase mt-2">
-                              MAX FILE SIZE: 10MB (PNG, JPG, PDF)
-                            </p>
-
-                            <input type="file" className="hidden" accept=".png,.jpg,.jpeg,.pdf" />
-                          </div>
-                        </div>
-
-                        <div className="flex justify-end gap-4 mt-10 pb-20 lg:pb-0">
-                          <button
-                            type="button"
-                            className="px-8 py-3 rounded-lg font-bold bg-primary text-white shadow-lg hover:opacity-90 transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                            onClick={() => void handleSubmit()}
-                            disabled={saving || !content.trim() || !session.id || !canSubmit}
-                          >
-                            {saving ? '제출 중…' : '과제 제출'}
-                          </button>
-                        </div>
-                      </>
-                    ) : (
-                      session.id && (
-                        <p className="status pending submission-modal-hint" role="status">
-                          이 세션에서는 제출할 수 없습니다.
-                        </p>
-                      )
-                    )}
-
-                    <table className="assignment-table assignment-table-stitch writing-submit-table">
-                      <thead>
-                        <tr>
-                          <th scope="col">과제</th>
-                          <th scope="col">제출</th>
-                          <th scope="col">첨삭</th>
-                          <th scope="col">결과</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <SessionRow session={session} submission={submission} />
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <aside className="writing-submit-sidebar w-full lg:w-80">
-                    <div className="writing-submit-sidebar-inner sticky top-24 space-y-6">
-                      <section className="bg-white p-6 rounded-2xl shadow-[0_10px_40px_rgba(30,27,19,0.04)]">
-                        <div className="flex items-center justify-between mb-6">
-                          <h4 className="font-headline font-bold text-primary">2026년 3월</h4>
-                          <div className="flex gap-2">
-                            <span className="material-symbols-outlined text-on-surface/40">chevron_left</span>
-                            <span className="material-symbols-outlined text-on-surface/40">chevron_right</span>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-7 gap-y-4 text-center text-[10px] font-bold font-label tracking-widest text-on-surface/40 uppercase mb-4">
-                          <span>Sun</span>
-                          <span>Mon</span>
-                          <span>Tue</span>
-                          <span>Wed</span>
-                          <span>Thu</span>
-                          <span>Fri</span>
-                          <span>Sat</span>
-                        </div>
-
-                        <div className="grid grid-cols-7 gap-y-2 text-center text-sm font-medium">
-                          <span className="p-2 text-on-surface/20">1</span>
-                          <span className="p-2">2</span>
-                          <span className="p-2">3</span>
-                          <span className="p-2 bg-primary text-white rounded-lg">4</span>
-                          <span className="p-2">5</span>
-                          <span className="p-2">6</span>
-                          <span className="p-2">7</span>
-                        </div>
-                      </section>
-
-                      <section className="bg-white p-6 rounded-2xl shadow-[0_10px_40px_rgba(30,27,19,0.04)]">
-                        <div className="flex items-center justify-between mb-6">
-                          <h4 className="font-headline font-bold text-primary">최근 제출</h4>
-                        </div>
-
-                        <div className="space-y-4">
-                          <div className="bg-white/50 p-4 rounded-xl border border-outline-variant/10">
-                            <div className="flex justify-between items-start mb-2">
-                              <span className="text-[10px] font-bold font-label tracking-widest text-on-surface/40 uppercase">
-                                최근
-                              </span>
-                              <span className="bg-secondary/10 text-secondary text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-tight">
-                                확인
-                              </span>
-                            </div>
-                            <p className="font-bold text-sm text-on-surface">이전 제출 내역</p>
-                          </div>
-                        </div>
-                      </section>
+              <section className="rounded-xl p-6 sm:p-8 mb-8 shadow-sm bg-white">
+                <div className="flex flex-col md:flex-row gap-8">
+                  <div className="flex-1">
+                    <div className="mb-6">
+                      <span className="bg-primary/10 text-primary px-3 py-1 rounded-full text-xs font-bold font-label tracking-widest uppercase">
+                        Theme
+                      </span>
+                      <h2 className="text-2xl font-bold text-on-background mt-3 font-headline">
+                        {activeSessionTitle}
+                      </h2>
                     </div>
-                  </aside>
+
+                    <div className="bg-surface-container-lowest p-6 rounded-lg border border-outline-variant/10 mb-6">
+                      <p className="text-on-surface font-body leading-relaxed whitespace-pre-line">{cardDescription}</p>
+                    </div>
+                  </div>
                 </div>
               </section>
-            )}
+
+              <section className="rounded-xl p-6 sm:p-8 mb-8 shadow-sm bg-white">
+                <div className="space-y-4">
+                  <h3 className="font-bold text-primary flex items-center gap-2">
+                    <span className="material-symbols-outlined text-sm">info</span>
+                    Requirement
+                  </h3>
+
+                  <p className="text-sm text-on-surface-variant mb-4">
+                    아래 안내를 확인한 뒤 작문을 작성해 주세요.
+                  </p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {REQUIREMENT_FALLBACK.map((item, index) => (
+                      <div
+                        key={index}
+                        className="bg-white/60 p-4 rounded-lg border-l-4 border-primary"
+                      >
+                        <p className="font-bold text-sm">{item.title}</p>
+                        {item.example ? (
+                          <p className="text-xs text-on-surface-variant mt-1">{item.example}</p>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </section>
+
+              <section className="space-y-6 mb-6">
+                <div className="flex justify-between items-end px-2">
+                  <label
+                    htmlFor="submission-body"
+                    className="font-label text-[10px] font-bold tracking-widest text-on-surface-variant uppercase"
+                  >
+                    Drafting Canvas
+                  </label>
+                  <span className="text-[10px] font-medium text-on-surface-variant">{content.length}</span>
+                </div>
+                <div className="relative">
+                  <textarea
+                    id="submission-body"
+                    className="w-full h-80 bg-white p-8 rounded-xl border-none shadow-[0_10px_40px_rgba(30,27,19,0.04)] focus:ring-2 focus:ring-primary/20 text-lg leading-relaxed font-body placeholder:text-on-surface/20 disabled:bg-surface-container-high/50 disabled:cursor-not-allowed"
+                    placeholder={
+                      canUseForm
+                        ? '여기에 작문을 입력해 주세요...'
+                        : '제출 가능한 과제가 없을 때는 입력할 수 없습니다.'
+                    }
+                    value={content}
+                    onChange={(e) => setContent(e.target.value)}
+                    disabled={!canUseForm}
+                  />
+                </div>
+              </section>
+
+              <div className={`mt-8 ${!canUseForm ? 'opacity-60 pointer-events-none' : ''}`}>
+                <p className="text-sm font-bold text-on-surface-variant mb-3 font-headline flex items-center gap-2">
+                  <span className="material-symbols-outlined text-base">attachment</span>
+                  손글씨 원고 업로드
+                </p>
+
+                <div className="border-2 border-dashed border-outline-variant/30 rounded-2xl p-12 bg-surface-container-low/30 hover:bg-surface-container-low/50 transition-colors cursor-pointer group flex flex-col items-center justify-center text-center">
+                  <div className="w-16 h-16 bg-surface-container rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                    <span className="material-symbols-outlined text-4xl text-on-surface-variant/40">
+                      cloud_upload
+                    </span>
+                  </div>
+
+                  <p className="text-on-surface font-medium mb-1">
+                    이미지 또는 PDF를 업로드하거나
+                    <span className="text-primary font-bold underline decoration-2 underline-offset-4 ml-1">
+                      파일을 선택
+                    </span>
+                  </p>
+
+                  <p className="text-[10px] text-on-surface-variant/60 font-label tracking-wider uppercase mt-2">
+                    MAX FILE SIZE: 10MB (PNG, JPG, PDF)
+                  </p>
+
+                  <input type="file" className="hidden" accept=".png,.jpg,.jpeg,.pdf" />
+                </div>
+              </div>
+
+              {hasSession && session && !canSubmit ? (
+                <p className="status pending submission-modal-hint mt-6" role="status">
+                  이 세션에서는 제출할 수 없습니다.
+                </p>
+              ) : null}
+
+              <div className="flex justify-end gap-4 mt-10 pb-20 lg:pb-8">
+                <button
+                  type="button"
+                  className="px-8 py-3 rounded-lg font-bold bg-primary text-white shadow-lg hover:opacity-90 transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={() => void handleSubmit()}
+                  disabled={saving || !content.trim() || !session?.id || !canSubmit}
+                >
+                  {saving ? '제출 중…' : '과제 제출'}
+                </button>
+              </div>
+
+              <p className="text-center text-[10px] text-on-surface-variant mt-2 mb-8 font-medium tracking-wide">
+                제출 후 강사 확인·첨삭 일정은 코스 안내에 따릅니다.
+              </p>
+
+              {showSessionTable && session != null ? (
+                <table className="assignment-table assignment-table-stitch writing-submit-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">과제</th>
+                      <th scope="col">제출</th>
+                      <th scope="col">첨삭</th>
+                      <th scope="col">결과</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <SessionRow session={session} submission={submission} />
+                  </tbody>
+                </table>
+              ) : null}
+            </div>
           </div>
 
-          {!loading && !showSessionTable && (
-            <p className="no-assignments">{emptyAssignmentsText}</p>
-          )}
+          <aside className="writing-submit-sidebar w-full lg:w-80 p-4 sm:p-6 lg:p-10 lg:pl-4 bg-[#F5F5F5]">
+            <div className="writing-submit-sidebar-inner sticky top-24 space-y-6">
+              <section className="bg-white p-6 rounded-2xl shadow-[0_10px_40px_rgba(30,27,19,0.04)]">
+                <div className="flex items-center justify-between mb-6">
+                  <h4 className="font-headline font-bold text-primary">2026년 3월</h4>
+                  <div className="flex gap-2">
+                    <span className="material-symbols-outlined text-on-surface/40">chevron_left</span>
+                    <span className="material-symbols-outlined text-on-surface/40">chevron_right</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-7 gap-y-4 text-center text-[10px] font-bold font-label tracking-widest text-on-surface/40 uppercase mb-4">
+                  <span>Sun</span>
+                  <span>Mon</span>
+                  <span>Tue</span>
+                  <span>Wed</span>
+                  <span>Thu</span>
+                  <span>Fri</span>
+                  <span>Sat</span>
+                </div>
+
+                <div className="grid grid-cols-7 gap-y-2 text-center text-sm font-medium">
+                  <span className="p-2 text-on-surface/20">1</span>
+                  <span className="p-2">2</span>
+                  <span className="p-2">3</span>
+                  <span className="p-2 bg-primary text-white rounded-lg">4</span>
+                  <span className="p-2">5</span>
+                  <span className="p-2">6</span>
+                  <span className="p-2">7</span>
+                </div>
+              </section>
+
+              <section>
+                <div className="flex items-center justify-between mb-6">
+                  <h4 className="font-headline font-bold text-primary">최근 제출</h4>
+                  <span className="text-xs text-on-surface/40 font-label tracking-tighter">안내</span>
+                </div>
+
+                <div className="space-y-4">
+                  {[
+                    { date: '—', title: '제출 내역이 없습니다', tag: '—' },
+                    { date: '—', title: '연결 예정', tag: '대기' },
+                    { date: '—', title: '연결 예정', tag: '대기' },
+                  ].map((row, i) => (
+                    <div
+                      key={i}
+                      className="bg-white/50 p-4 rounded-xl border border-outline-variant/10 group hover:bg-white transition-all"
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <span className="text-[10px] font-bold font-label tracking-widest text-on-surface/40 uppercase">
+                          {row.date}
+                        </span>
+                        <span className="bg-secondary/10 text-secondary text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-tight">
+                          {row.tag}
+                        </span>
+                      </div>
+                      <p className="font-bold text-sm text-on-surface group-hover:text-primary transition-colors">
+                        {row.title}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            </div>
+          </aside>
         </div>
       </main>
     </WritingLayout>
