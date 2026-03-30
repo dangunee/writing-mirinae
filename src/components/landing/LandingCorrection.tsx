@@ -1,10 +1,8 @@
+import { useNavigate } from 'react-router-dom'
 import { smallInfoCard } from './landingCardClasses'
 
-type Props = {
-  goApp: () => void
-}
-
-export default function LandingCorrection({ goApp }: Props) {
+export default function LandingCorrection() {
+  const navigate = useNavigate()
   return (
     <section className="py-24 bg-[#ECECEC] px-6 md:px-8 border-y border-[#c6c5d4]/10">
       <div className="max-w-7xl mx-auto">
@@ -101,7 +99,7 @@ export default function LandingCorrection({ goApp }: Props) {
             </div>
             <button
               type="button"
-              onClick={goApp}
+              onClick={() => navigate('/writing/correction-detail')}
               className="w-full mt-1 py-4 rounded-lg border-2 border-[#000666] text-[#000666] font-bold text-xs md:text-sm uppercase tracking-widest hover:bg-[#000666] hover:text-white transition-all font-['Manrope']"
             >
               添削システムを詳しく見る

@@ -27,7 +27,7 @@ export default function LandingPage() {
       <LandingNav goApp={goApp} />
       <main>
         <LandingHero />
-        <LandingCorrection goApp={goApp} />
+        <LandingCorrection />
         <LandingCurriculum />
         <LandingProcess />
         <LandingDashboard />

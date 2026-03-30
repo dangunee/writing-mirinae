@@ -22,6 +22,14 @@
   width: 100%;
 }
 
+/* Atelier Koto 添削システム詳細 — Layout main 制約解除 */
+.main-atelier-detail {
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+}
+
 @media (min-width: 768px) {
   .main-writing-stitch {
     padding: 1.25rem 1.5rem 2.5rem;
