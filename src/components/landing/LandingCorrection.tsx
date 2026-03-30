@@ -7,7 +7,7 @@ export default function LandingCorrection() {
     <section className="py-24 bg-[#ECECEC] px-6 md:px-8 border-y border-[#c6c5d4]/10">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-14 md:mb-16">
-          <span className="font-['Manrope'] text-[10px] md:text-xs tracking-[0.2em] uppercase text-[#1b6d24] mb-3 md:mb-4 block font-bold">
+          <span className="font-['Manrope'] text-[10px] md:text-xs tracking-[0.2em] uppercase text-[#000666] mb-3 md:mb-4 block font-bold">
             Feedback System
           </span>
           <h2 className="headline-font text-3xl md:text-4xl font-extrabold text-[#000666] tracking-tight">
@@ -47,7 +47,7 @@ export default function LandingCorrection() {
               </div>
               <div className="mt-8 md:mt-12 pt-6 md:pt-8 border-t border-dashed border-[#c6c5d4]/30">
                 <div className="flex items-center gap-4 mb-3 md:mb-4">
-                  <span className="bg-[#1b6d24]/10 text-[#1b6d24] text-[9px] md:text-[10px] px-2 md:px-3 py-0.5 md:py-1 rounded-full font-bold uppercase tracking-widest">
+                  <span className="bg-[#000666]/10 text-[#000666] text-[9px] md:text-[10px] px-2 md:px-3 py-0.5 md:py-1 rounded-full font-bold uppercase tracking-widest">
                     Polished Version
                   </span>
                 </div>
@@ -74,11 +74,11 @@ export default function LandingCorrection() {
               </p>
             </div>
             <div
-              className={`${smallInfoCard} p-5 md:p-6 border-l-4 border-[#1b6d24]`}
+              className={`${smallInfoCard} p-5 md:p-6 border-l-4 border-[#000666]`}
             >
               <div className="flex items-center gap-2 mb-2 md:mb-3">
-                <span className="material-symbols-outlined text-[#1b6d24] text-lg md:text-xl">auto_awesome</span>
-                <h4 className="font-bold text-[11px] md:text-sm text-[#1b6d24] uppercase tracking-tight">
+                <span className="material-symbols-outlined text-[#000666] text-lg md:text-xl">auto_awesome</span>
+                <h4 className="font-bold text-[11px] md:text-sm text-[#000666] uppercase tracking-tight">
                   Natural Expression
                 </h4>
               </div>

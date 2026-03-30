@@ -19,7 +19,7 @@ export default function LandingCTA() {
               <input
                 name="dummy-name"
                 autoComplete="name"
-                className="w-full bg-white/10 border-transparent rounded-lg p-4 text-sm text-white placeholder:text-white/20 focus:ring-2 focus:ring-[#1b6d24] focus:border-[#1b6d24] transition-all"
+                className="w-full bg-white/10 border-transparent rounded-lg p-4 text-sm text-white placeholder:text-white/20 focus:ring-2 focus:ring-white/40 focus:border-white/30 transition-all"
                 placeholder="姓名"
                 type="text"
               />
@@ -29,7 +29,7 @@ export default function LandingCTA() {
               <input
                 name="dummy-email"
                 autoComplete="email"
-                className="w-full bg-white/10 border-transparent rounded-lg p-4 text-sm text-white placeholder:text-white/20 focus:ring-2 focus:ring-[#1b6d24] focus:border-[#1b6d24] transition-all"
+                className="w-full bg-white/10 border-transparent rounded-lg p-4 text-sm text-white placeholder:text-white/20 focus:ring-2 focus:ring-white/40 focus:border-white/30 transition-all"
                 placeholder="example@mirinae.jp"
                 type="email"
               />
@@ -38,7 +38,7 @@ export default function LandingCTA() {
 
           <Link
             to="/writing/app"
-            className="w-full inline-flex items-center justify-center bg-[#1b6d24] text-white py-4 md:py-5 rounded-lg font-['Manrope'] font-bold tracking-widest uppercase hover:bg-[#1b6d24]/90 transition-all text-xs md:text-sm"
+            className="w-full inline-flex items-center justify-center bg-[#000666] text-white py-4 md:py-5 rounded-lg font-['Manrope'] font-bold tracking-widest uppercase hover:bg-[#000666]/90 transition-all text-xs md:text-sm"
           >
             受講を申し込む
           </Link>

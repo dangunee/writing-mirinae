@@ -41,7 +41,7 @@ export default function AtelierCorrectionExample() {
             <label className="font-[family-name:var(--font-label)] mb-4 block text-[10px] font-bold uppercase tracking-widest text-primary/60">
               03. 修正後の文章 (POLISHED)
             </label>
-            <p className="font-[family-name:var(--font-body)] text-base font-bold leading-relaxed text-secondary md:text-lg">
+            <p className="font-[family-name:var(--font-body)] text-base font-bold leading-relaxed text-primary md:text-lg">
               어제 친구와 함께 한국 식당을 방문했습니다. 비빔밥의 맛이 정말 일품이라 조만간 다시 방문하고 싶을 정도였습니다.
             </p>
           </div>

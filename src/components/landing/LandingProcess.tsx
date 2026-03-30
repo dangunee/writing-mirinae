@@ -27,7 +27,7 @@ const STEPS: Step[] = [
     title: 'Professional Feedback',
     desc: '専門講師が文法、語彙、文体を緻密に添削します。',
     sub: '전문 첨삭',
-    imageClass: 'bg-[#c8dbc8]',
+    imageClass: 'bg-[#e0e4f0]',
     imageAlt: 'Professional Feedback',
   },
   {

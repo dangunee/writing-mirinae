@@ -17,13 +17,13 @@ export default function LandingHero() {
     <section className="pt-28 md:pt-32 pb-16 md:pb-20 px-6 md:px-8 max-w-7xl mx-auto overflow-hidden">
       <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
         <div className="z-10">
-          <span className="font-['Manrope'] text-[10px] md:text-xs tracking-[0.2em] uppercase text-[#1b6d24] mb-4 md:mb-6 block font-bold">
+          <span className="font-['Manrope'] text-[10px] md:text-xs tracking-[0.2em] uppercase text-[#000666] mb-4 md:mb-6 block font-bold">
             The Modern Calligrapher&apos;s Method
           </span>
           <h1 className="headline-font text-4xl md:text-5xl lg:text-7xl font-extrabold text-[#000666] leading-[1.1] md:leading-[1.1] tracking-tight mb-6 md:mb-8">
             書くたびに、
             <br />
-            韓国語<span className="text-[#1b6d24]">が</span> <br />
+            韓国語<span className="text-[#000666]">が</span> <br />
             自身のものになる。
           </h1>
           <p className="text-base md:text-lg text-[#454652] max-w-md mb-8 md:mb-10 leading-relaxed">
@@ -49,7 +49,7 @@ export default function LandingHero() {
         </div>
 
         <div className="relative mt-4 lg:mt-0">
-          <div className="absolute -top-8 md:-top-10 -right-6 md:-right-10 w-40 h-40 md:w-64 md:h-64 bg-[#a0f399]/30 rounded-full blur-3xl -z-10" />
+          <div className="absolute -top-8 md:-top-10 -right-6 md:-right-10 w-40 h-40 md:w-64 md:h-64 bg-[#000666]/15 rounded-full blur-3xl -z-10" />
 
           <div className="rounded-xl overflow-hidden shadow-[0_24px_60px_rgba(0,0,0,0.12)] rotate-[1deg]">
             <img
@@ -67,7 +67,7 @@ export default function LandingHero() {
 
           <div className="absolute -bottom-4 md:-bottom-6 left-4 md:-left-6 bg-white px-4 py-3 md:p-6 rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.1)] border border-[#c6c5d4]/15 max-w-[180px] md:max-w-[240px]">
             <div className="flex items-center gap-2 md:gap-3 mb-2">
-              <div className="w-2 h-2 rounded-full bg-[#1b6d24]" />
+              <div className="w-2 h-2 rounded-full bg-[#000666]" />
               <span className="text-[9px] md:text-[10px] font-bold tracking-widest uppercase opacity-60">Status</span>
             </div>
             <p className="text-[11px] md:text-sm font-bold leading-tight italic text-[#1e1b13]">

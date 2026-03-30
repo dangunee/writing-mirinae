@@ -67,11 +67,11 @@ export default function AtelierTrialFlow() {
               </div>
               <div className="flex justify-between border-b border-white/10 py-2 text-sm">
                 <span>プロフェッショナル添削</span>
-                <span className="text-secondary-fixed">込み</span>
+                <span className="text-on-primary/80">込み</span>
               </div>
               <div className="flex justify-between border-b border-white/10 py-2 text-sm">
                 <span>教材費</span>
-                <span className="text-secondary-fixed">込み</span>
+                <span className="text-on-primary/80">込み</span>
               </div>
             </div>
           </div>
@@ -144,11 +144,11 @@ export default function AtelierTrialFlow() {
                 </div>
                 <div className="flex justify-between border-b border-on-primary/10 py-2 text-sm">
                   <span>プロフェッショナル添削</span>
-                  <span className="text-secondary-fixed">込み</span>
+                  <span className="text-on-primary/80">込み</span>
                 </div>
                 <div className="flex justify-between border-b border-on-primary/10 py-2 text-sm">
                   <span>教材費</span>
-                  <span className="text-secondary-fixed">込み</span>
+                  <span className="text-on-primary/80">込み</span>
                 </div>
               </div>
               <Link

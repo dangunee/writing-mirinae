@@ -12,7 +12,7 @@ export default function LandingTestimonials() {
         '「個人に合わせた個別指導が魅力です。私の癖をすぐに見抜き、どう直せば韓国人らしい自然なリズムになるかを丁寧に教えていただきました。感謝しています。」',
       tag: '개인 맞춤형 지도',
       name: 'S. Yamamoto (大学生)',
-      avatar: 'bg-[#1b6d24]/10',
+      avatar: 'bg-[#000666]/10',
     },
     {
       quote:

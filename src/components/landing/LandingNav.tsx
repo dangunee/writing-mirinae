@@ -10,16 +10,16 @@ export default function LandingNav({ goApp }: Props) {
   const [open, setOpen] = useState(false)
 
   const linkClass =
-    "font-['Manrope'] font-bold tracking-tight text-sm uppercase text-[#1e1b13]/70 hover:text-[#1A237E] transition-colors"
+    "font-['Manrope'] font-bold tracking-tight text-sm uppercase text-[#1e1b13]/70 hover:text-[#000666] transition-colors"
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-[#F5F5F5]/80 backdrop-blur-md shadow-[0_4px_20px_rgba(0,0,0,0.05)] border-b-[0.5px] border-[#1e1b13]/10">
       <div className="flex justify-between items-center max-w-7xl mx-auto px-6 md:px-8 h-16 md:h-20">
         <div className="flex flex-col leading-tight">
-          <span className="text-[10px] font-bold tracking-widest uppercase text-[#1b6d24] md:hidden">
+          <span className="text-[10px] font-bold tracking-widest uppercase text-[#000666] md:hidden">
             作文トレーニング
           </span>
-          <div className="text-lg md:text-xl font-extrabold tracking-tighter text-[#1A237E] headline-font">
+          <div className="text-lg md:text-xl font-extrabold tracking-tighter text-[#000666] headline-font">
             ミリネ韓国語教室
           </div>
         </div>
@@ -44,7 +44,7 @@ export default function LandingNav({ goApp }: Props) {
           <button
             type="button"
             onClick={() => navigate('/writing/app')}
-            className="material-symbols-outlined text-[#1A237E] cursor-pointer bg-transparent border-0 p-0"
+            className="material-symbols-outlined text-[#000666] cursor-pointer bg-transparent border-0 p-0"
             aria-label="アカウント"
           >
             account_circle
@@ -56,7 +56,7 @@ export default function LandingNav({ goApp }: Props) {
             href="https://mirinae.jp"
             target="_blank"
             rel="noopener noreferrer"
-            className="border border-[#1e1b13]/20 text-[#1A237E] px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest"
+            className="border border-[#1e1b13]/20 text-[#000666] px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest"
           >
             MAIN SITE
           </a>
@@ -69,7 +69,7 @@ export default function LandingNav({ goApp }: Props) {
           </button>
           <button
             type="button"
-            className="material-symbols-outlined text-[#1A237E] bg-transparent border-0 p-0"
+            className="material-symbols-outlined text-[#000666] bg-transparent border-0 p-0"
             aria-expanded={open}
             aria-label="メニュー"
             onClick={() => setOpen((v) => !v)}

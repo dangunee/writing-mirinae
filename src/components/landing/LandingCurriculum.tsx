@@ -19,7 +19,7 @@ export default function LandingCurriculum() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 md:gap-6">
           <div className="md:col-span-2 md:row-span-2 bg-[#1a237e] p-8 md:p-10 rounded-xl flex flex-col justify-between text-white group hover:bg-[#000666] transition-all duration-500 shadow-xl">
             <div>
-              <span className="bg-[#a0f399] text-[#217128] text-[9px] md:text-[10px] px-2 md:px-3 py-0.5 md:py-1 rounded-full font-bold uppercase tracking-widest mb-4 md:mb-6 inline-block">
+              <span className="bg-white/15 text-white text-[9px] md:text-[10px] px-2 md:px-3 py-0.5 md:py-1 rounded-full font-bold uppercase tracking-widest mb-4 md:mb-6 inline-block">
                 Flagship Course
               </span>
               <h3 className="text-2xl md:text-3xl font-extrabold headline-font mb-3 md:mb-4">Advanced Korean Composition</h3>

@@ -9,7 +9,7 @@ function CircularChart({ className = 'w-40 h-40' }: { className?: string }) {
           d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
         />
         <path
-          className="circle text-[#1b6d24]"
+          className="circle text-[#000666]"
           d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
           stroke="currentColor"
           strokeDasharray="15, 100"
@@ -64,17 +64,17 @@ export default function LandingDashboard() {
               <div className="mb-10">
                 <div className="flex justify-between items-end mb-4">
                   <span className="text-[11px] font-bold uppercase tracking-[0.2em] opacity-60">TERM OVERVIEW</span>
-                  <span className="text-3xl font-extrabold text-[#1b6d24] headline-font">30%</span>
+                  <span className="text-3xl font-extrabold text-[#000666] headline-font">30%</span>
                 </div>
                 <div className="w-full h-2 bg-[#eeeeee] rounded-full overflow-hidden">
-                  <div className="w-[30%] h-full bg-[#1b6d24]" />
+                  <div className="w-[30%] h-full bg-[#000666]" />
                 </div>
               </div>
               <div className="grid grid-cols-1 gap-4">
                 <div className="bg-[#eeeeee]/50 p-6 rounded-xl border border-[#c6c5d4]/5">
                   <span className="text-[10px] font-bold uppercase opacity-40 block mb-3 tracking-widest">RECENT TASK</span>
                   <p className="font-bold text-base mb-4 text-[#000666]">韓国の食文化について</p>
-                  <span className="text-[10px] font-bold text-[#1b6d24] bg-[#1b6d24]/10 px-3 py-1.5 rounded-lg uppercase tracking-widest">
+                  <span className="text-[10px] font-bold text-[#000666] bg-[#000666]/10 px-3 py-1.5 rounded-lg uppercase tracking-widest">
                     添削完了
                   </span>
                 </div>
