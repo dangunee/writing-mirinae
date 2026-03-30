@@ -58,8 +58,9 @@
 :root {
   --color-bg: #faf8f5;
   --color-surface: #ffffff;
-  --color-primary: #2c5f2d;
-  --color-primary-light: #97d077;
+  /* ブランド主色はネイビー（:root が @theme の primary を上書きしないよう統一） */
+  --color-primary: #000666;
+  --color-primary-light: #bdc2ff;
   --color-accent: #c45c26;
   --color-text: #2d2d2d;
   --color-text-muted: #6b6b6b;
