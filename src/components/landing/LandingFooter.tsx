@@ -31,7 +31,6 @@ export default function LandingFooter() {
           <br />
           TEL: 03-5925-8245 / FAX: 03-5925-8249
         </p>
-        <p className="text-center text-xs text-gray-400">運営：ミリネ韓国語教室</p>
         <p className="font-['Manrope'] text-[9px] md:text-xs tracking-widest uppercase text-[#1e1b13]/60">
           © {new Date().getFullYear()} ミリネ韓国語教室 · 作文トレーニング
         </p>

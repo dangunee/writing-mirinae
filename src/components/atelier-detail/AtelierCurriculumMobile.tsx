@@ -9,7 +9,7 @@ export default function AtelierCurriculumMobile() {
   }
 
   return (
-    <section className="bg-background md:hidden" id="curriculum">
+    <section className="bg-background pt-4 md:hidden" id="curriculum">
       <div className="px-6">
         <h3 className="font-[family-name:var(--font-headline)] mb-4 text-3xl font-bold tracking-tight">カリキュラム</h3>
         <p className="mb-6 text-sm leading-relaxed text-on-surface/60">

@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom'
 export default function AtelierFinalCta() {
   return (
     <>
-      <section className="bg-white px-6 pb-12 pt-20 text-center md:hidden">
-        <div className="mx-auto max-w-3xl space-y-12">
+      <section className="bg-white px-6 pb-6 pt-20 text-center md:hidden">
+        <div className="mx-auto max-w-3xl space-y-8">
           <div className="space-y-6">
             <h2 className="font-[family-name:var(--font-headline)] text-4xl font-extrabold leading-tight tracking-tight text-primary">
               学びの美学を、その手元に.
@@ -28,8 +28,8 @@ export default function AtelierFinalCta() {
         </div>
       </section>
 
-      <section className="hidden bg-surface px-8 py-32 text-center md:block">
-        <div className="mx-auto max-w-3xl space-y-10">
+      <section className="hidden bg-surface px-8 pt-24 pb-10 text-center md:block">
+        <div className="mx-auto max-w-3xl space-y-6">
           <div className="space-y-4">
             <h2 className="font-[family-name:var(--font-headline)] text-5xl font-extrabold tracking-tight text-primary">
               学びの美学を、その手元に。

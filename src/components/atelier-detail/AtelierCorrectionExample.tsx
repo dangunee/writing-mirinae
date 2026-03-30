@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 
 export default function AtelierCorrectionExample() {
   return (
-    <section className="bg-white px-6 py-12 md:bg-background md:px-8 md:py-24" id="example">
+    <section className="bg-white px-6 py-10 pb-6 md:bg-background md:px-8 md:py-16 md:pb-8" id="example">
       <div className="mx-auto max-w-7xl space-y-6 md:space-y-12">
         <div className="mb-12 text-center md:mb-0 md:space-y-4">
           <h3 className="font-[family-name:var(--font-headline)] text-2xl font-bold md:text-4xl md:tracking-tight">

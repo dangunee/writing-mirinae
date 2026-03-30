@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 
 export default function AtelierCurriculumDesktop() {
   return (
-    <section className="mx-auto hidden max-w-7xl px-8 py-24 md:block" id="curriculum">
+    <section className="mx-auto hidden max-w-7xl px-8 pt-6 pb-20 md:block md:pt-8 md:pb-24" id="curriculum">
       <div className="mb-16">
         <h2 className="font-[family-name:var(--font-headline)] mb-4 text-4xl font-bold tracking-tight">カリキュラム</h2>
         <p className="max-w-xl text-on-surface/60">
@@ -84,7 +84,7 @@ export default function AtelierCurriculumDesktop() {
           </div>
 
           <div className="overflow-hidden rounded-[2rem] border border-outline-variant/30 bg-surface-container-lowest shadow-2xl shadow-primary/5">
-            <div className="space-y-10 p-10">
+            <div className="space-y-8 px-10 pb-6 pt-10 md:space-y-10 md:pb-8">
               <div className="space-y-4">
                 <span className="font-[family-name:var(--font-label)] text-[10px] font-bold uppercase tracking-[0.3em] text-primary/40">
                   THEME

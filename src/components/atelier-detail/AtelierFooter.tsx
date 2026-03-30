@@ -31,7 +31,6 @@ export default function AtelierFooter() {
             お問い合わせ
           </a>
         </nav>
-        <p className="text-center text-xs text-gray-400">運営：ミリネ韓国語教室</p>
         <p className="font-['Manrope'] text-center text-[10px] font-medium uppercase tracking-[0.1em] text-stone-400 md:text-xs">
           © 2024 ミリネ韓国語教室
         </p>
