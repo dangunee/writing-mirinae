@@ -7,90 +7,18 @@ import './intro-workspace.css'
 export default function IntroCorrectionWorkspace() {
   return (
     <section className="intro-workspace atelier-koto-root bg-[#F5F5F5] px-4 pb-10 pt-24 font-[family-name:var(--font-body)] text-on-surface md:px-6 md:pb-12 md:pt-28">
-      <p className="mb-8 text-center font-[family-name:var(--font-label)] text-[10px] font-bold uppercase tracking-[0.2em] text-primary md:mb-10">
-        体験レッスンで確認できる内容
-      </p>
+      <div className="mx-auto mb-8 max-w-4xl px-2 text-center md:mb-10">
+        <h2 className="font-[family-name:var(--font-headline)] text-[40px] font-extrabold leading-tight tracking-tight text-primary md:text-[44px]">
+          皆さんの韓国語がこう変わります！
+        </h2>
+        <p className="mt-3 font-[family-name:var(--font-label)] text-[20px] font-bold uppercase tracking-[0.2em] text-primary md:mt-4">
+          体験レッスンで確認できる内容
+        </p>
+      </div>
 
       <div className="mx-auto flex max-w-[1600px] flex-col overflow-hidden rounded-xl border border-outline-variant/15 bg-white shadow-sm lg:flex-row lg:items-stretch">
-        {/* 左：提出キュー */}
-        <aside className="order-3 flex w-full shrink-0 flex-col border-outline-variant/15 lg:order-1 lg:w-80 lg:border-r">
-          <div className="border-b border-outline-variant/10 p-5 md:p-6">
-            <h2 className="mb-4 font-[family-name:var(--font-headline)] text-lg font-extrabold tracking-tight">
-              講師専用 提出キュー
-            </h2>
-            <div className="relative mb-4">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">
-                search
-              </span>
-              <input
-                readOnly
-                className="w-full rounded-xl border-none bg-surface/50 py-2 pl-10 text-sm focus:ring-1 focus:ring-primary/20"
-                type="text"
-                placeholder="学生を検索..."
-                aria-label="検索"
-              />
-            </div>
-          </div>
-          <div className="no-scrollbar flex-1 space-y-8 overflow-y-auto px-3 pb-6 md:px-4">
-            <div>
-              <p className="mb-3 px-2 font-[family-name:var(--font-label)] text-[10px] font-bold uppercase tracking-widest text-outline">
-                本日 — 10月24日
-              </p>
-              <div className="space-y-2">
-                <div className="cursor-pointer rounded-xl border-l-4 border-primary bg-white p-4 shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
-                  <div className="mb-1 flex items-start justify-between">
-                    <span className="text-xs font-bold text-primary">#4092</span>
-                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase text-primary">
-                      添削中
-                    </span>
-                  </div>
-                  <h3 className="mb-0.5 font-[family-name:var(--font-headline)] text-sm font-bold text-on-surface">
-                    都市計画とAI（上級作文）
-                  </h3>
-                  <p className="mb-2 text-[10px] font-bold text-secondary">3期 · 7回目</p>
-                  <p className="truncate text-xs text-on-surface-variant">김민준 · 1,240 words</p>
-                </div>
-                <div className="group cursor-pointer rounded-xl bg-white p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-all hover:bg-surface-container-low">
-                  <div className="mb-1 flex items-start justify-between">
-                    <span className="text-xs font-bold text-outline">#4095</span>
-                    <span className="rounded-full bg-surface-container-highest px-2 py-0.5 text-[10px] font-bold uppercase text-on-surface-variant">
-                      添削待ち
-                    </span>
-                  </div>
-                  <h3 className="mb-0.5 font-[family-name:var(--font-headline)] text-sm font-bold text-on-surface">
-                    ビジネス文書の添削
-                  </h3>
-                  <p className="mb-2 text-[10px] font-bold text-outline">3期 · 7回目</p>
-                  <div className="flex items-center justify-between">
-                    <p className="truncate text-xs text-on-surface-variant">佐藤遥 · 450 words</p>
-                    <span className="text-[10px] text-outline">11:30</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div>
-              <p className="mb-3 px-2 font-[family-name:var(--font-label)] text-[10px] font-bold uppercase tracking-widest text-outline">
-                昨日
-              </p>
-              <div className="cursor-pointer rounded-xl bg-white p-4 opacity-70 shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-all hover:bg-surface-container-low">
-                <div className="mb-1 flex items-start justify-between">
-                  <span className="text-xs font-bold text-outline">#4088</span>
-                  <span className="rounded-full bg-secondary-container px-2 py-0.5 text-[10px] font-bold uppercase text-on-secondary-container">
-                    完了
-                  </span>
-                </div>
-                <h3 className="mb-0.5 font-[family-name:var(--font-headline)] text-sm font-bold text-on-surface">
-                  エッセイ対策
-                </h3>
-                <p className="mb-2 text-[10px] font-bold text-outline">3期 · 6回目</p>
-                <p className="truncate text-xs text-on-surface-variant">박지원 · 800 words</p>
-              </div>
-            </div>
-          </div>
-        </aside>
-
         {/* 中央 */}
-        <section className="order-1 min-w-0 flex-1 lg:order-2">
+        <section className="order-1 min-w-0 flex-1">
           <div className="mx-auto max-w-3xl space-y-8 px-4 py-8 md:space-y-12 md:px-8 md:py-12">
             {/* 提出詳細 */}
             <header className="rounded-3xl bg-white p-6 shadow-[0_4px_24px_rgba(0,0,0,0.04)] md:p-8">
@@ -306,7 +234,7 @@ export default function IntroCorrectionWorkspace() {
         </section>
 
         {/* 右：ツール */}
-        <aside className="order-2 w-full shrink-0 border-outline-variant/15 lg:order-3 lg:w-96 lg:border-l">
+        <aside className="order-2 w-full shrink-0 border-outline-variant/15 lg:w-96 lg:border-l">
           <div className="no-scrollbar max-h-none space-y-8 overflow-y-auto p-5 md:p-6 lg:max-h-[calc(100vh-5rem)] lg:sticky lg:top-24">
             <section>
               <div className="mb-4 flex items-center gap-2">
