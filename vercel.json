@@ -2,6 +2,18 @@
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "redirects": [
+    {
+      "source": "/writing/trial",
+      "destination": "/writing/intro",
+      "permanent": true
+    },
+    {
+      "source": "/writing/trial/",
+      "destination": "/writing/intro",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     {
       "source": "/(.*)",

@@ -18,7 +18,7 @@ function App() {
   return (
     <Layout>
       <Routes>
-        <Route path="/writing/trial" element={<TrialLandingPage />} />
+        <Route path="/writing/intro" element={<TrialLandingPage />} />
         <Route path="/writing/course" element={<CoursePage />} />
         <Route path="/writing/correction-detail" element={<CorrectionSystemDetailPage />} />
         <Route path="/writing/app/complete" element={<WritingCompletePage />} />
