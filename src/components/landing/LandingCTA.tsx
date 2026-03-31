@@ -37,7 +37,7 @@ export default function LandingCTA() {
           </div>
 
           <Link
-            to="/writing/trial-checkout"
+            to="/writing/course"
             className="w-full inline-flex items-center justify-center bg-[#000666] text-white py-4 md:py-5 rounded-lg font-['Manrope'] font-bold tracking-widest uppercase hover:bg-[#000666]/90 transition-all text-xs md:text-sm"
           >
             受講を申し込む

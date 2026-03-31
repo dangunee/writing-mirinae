@@ -13,13 +13,13 @@ import LandingFooter from '../components/landing/LandingFooter'
 
 /**
  * Stitch 랜딩 재현 (writing.mirinae.jp /writing)
- * — お申し込み → /writing/trial-checkout
+ * — お申し込み → /writing/course
  */
 export default function LandingPage() {
   const navigate = useNavigate()
 
   const goApp = useCallback(() => {
-    navigate('/writing/trial-checkout')
+    navigate('/writing/course')
   }, [navigate])
 
   return (

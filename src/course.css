@@ -1,5 +1,5 @@
-/* Stitch — ミリネ韓国語教室　作文トレーニング / trial-checkout */
-.trial-checkout-root {
+/* Stitch — ミリネ韓国語教室　作文トレーニング /writing/course */
+.course-page-root {
   --tc-navy: #000666;
   --tc-on-surface: #1a1c1e;
   --tc-on-surface-variant: #44474e;
@@ -7,21 +7,21 @@
   --tc-surface-container-low: #eff1f3;
 }
 
-.trial-checkout-root .glass-header {
+.course-page-root .glass-header {
   background: rgba(243, 244, 246, 0.9);
   backdrop-filter: blur(12px);
 }
 
-.trial-checkout-root .material-symbols-outlined {
+.course-page-root .material-symbols-outlined {
   font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
 }
 
-.trial-checkout-root .material-symbols-outlined.fill-1 {
+.course-page-root .material-symbols-outlined.fill-1 {
   font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
 }
 
 /* index.css の `a { color: primary }` がネイビー CTA を上書きしないようにする */
-.trial-checkout-root a.text-white,
-.trial-checkout-root button.text-white {
+.course-page-root a.text-white,
+.course-page-root button.text-white {
   color: #ffffff !important;
 }

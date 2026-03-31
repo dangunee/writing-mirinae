@@ -20,7 +20,7 @@ export default function Layout({ children }: LayoutProps) {
   if (
     location.pathname === '/writing/app/mypage' ||
     location.pathname === '/writing/correction-detail' ||
-    location.pathname === '/writing/trial-checkout'
+    location.pathname === '/writing/course'
   ) {
     return <>{children}</>
   }

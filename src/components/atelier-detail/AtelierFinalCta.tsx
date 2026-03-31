@@ -16,7 +16,7 @@ export default function AtelierFinalCta() {
           <div className="flex flex-col items-center gap-6">
             <Link
               className="w-full max-w-sm rounded-2xl bg-primary px-8 py-6 text-center font-[family-name:var(--font-headline)] text-lg font-extrabold text-on-primary shadow-2xl transition-all active:scale-95"
-              to="/writing/trial-checkout"
+              to="/writing/course"
             >
               体験レッスンを申し込む
             </Link>
@@ -41,7 +41,7 @@ export default function AtelierFinalCta() {
           <div className="flex flex-col items-center gap-6">
             <Link
               className="rounded-xl bg-primary px-12 py-6 font-[family-name:var(--font-headline)] text-xl font-extrabold text-on-primary shadow-2xl shadow-primary/20 transition-all hover:scale-105 active:scale-95"
-              to="/writing/trial-checkout"
+              to="/writing/course"
             >
               1,800円で開始する
             </Link>

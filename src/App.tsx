@@ -11,13 +11,13 @@ import MypagePage from './vite-pages/MypagePage'
 import TeacherQueuePage from './vite-pages/TeacherQueuePage'
 import WritingCompletePage from './vite-pages/WritingCompletePage'
 import CorrectionSystemDetailPage from './vite-pages/CorrectionSystemDetailPage'
-import TrialCheckoutPage from './vite-pages/TrialCheckoutPage'
+import CoursePage from './vite-pages/CoursePage'
 
 function App() {
   return (
     <Layout>
       <Routes>
-        <Route path="/writing/trial-checkout" element={<TrialCheckoutPage />} />
+        <Route path="/writing/course" element={<CoursePage />} />
         <Route path="/writing/correction-detail" element={<CorrectionSystemDetailPage />} />
         <Route path="/writing/app/complete" element={<WritingCompletePage />} />
         <Route element={<StudentRouteGuard />}>

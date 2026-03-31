@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import '../trial-checkout.css'
+import '../course.css'
 
-type Plan = 'ten' | 'trial'
+type Plan = 'ten' | 'experience'
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土']
 
@@ -38,7 +38,7 @@ function formatMobDateShort(d: Date) {
   return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
 }
 
-export default function TrialCheckoutPage() {
+export default function CoursePage() {
   const navigate = useNavigate()
   const [plan, setPlan] = useState<Plan>('ten')
 
@@ -51,16 +51,16 @@ export default function TrialCheckoutPage() {
   const deskCells = useMemo(() => buildCells(deskMonth.getFullYear(), deskMonth.getMonth()), [deskMonth])
   const mobCells = useMemo(() => buildCells(mobMonth.getFullYear(), mobMonth.getMonth()), [mobMonth])
 
-  const trialSub = 1636
-  const trialTax = 164
-  const trialTotal = 1800
+  const experienceSub = 1636
+  const experienceTax = 164
+  const experienceTotal = 1800
 
   const payStub = () => {
     /* Stripe 連携は次フェーズ */
   }
 
   return (
-    <div className="trial-checkout-root min-h-screen bg-[#f3f4f6] font-[family-name:var(--font-body)] text-[#1a1c1e] antialiased">
+    <div className="course-page-root min-h-screen bg-[#f3f4f6] font-[family-name:var(--font-body)] text-[#1a1c1e] antialiased">
       {/* ——— Desktop ——— */}
       <div className="hidden lg:block">
         <header className="fixed top-0 z-50 w-full border-b border-slate-100 bg-white/80 backdrop-blur-md">
@@ -101,9 +101,9 @@ export default function TrialCheckoutPage() {
                 <div className="grid grid-cols-1 gap-4">
                   <button
                     type="button"
-                    onClick={() => setPlan('trial')}
+                    onClick={() => setPlan('experience')}
                     className={`group relative flex cursor-pointer items-center justify-between rounded-2xl border border-slate-200 bg-white p-6 transition-all duration-200 hover:border-[#000666]/30 ${
-                      plan === 'trial' ? 'ring-2 ring-[#000666]' : ''
+                      plan === 'experience' ? 'ring-2 ring-[#000666]' : ''
                     }`}
                   >
                     <div className="flex items-center gap-5">
@@ -255,16 +255,16 @@ export default function TrialCheckoutPage() {
                         <div className="border-t border-slate-100 pt-6">
                           <div className="mb-2 flex items-center justify-between">
                             <span className="text-sm text-[#595c5e]">小計</span>
-                            <span className="text-sm">¥{trialSub.toLocaleString('ja-JP')}</span>
+                            <span className="text-sm">¥{experienceSub.toLocaleString('ja-JP')}</span>
                           </div>
                           <div className="mb-6 flex items-center justify-between">
                             <span className="text-sm text-[#595c5e]">消費税 (10%)</span>
-                            <span className="text-sm">¥{trialTax.toLocaleString('ja-JP')}</span>
+                            <span className="text-sm">¥{experienceTax.toLocaleString('ja-JP')}</span>
                           </div>
                           <div className="flex items-end justify-between">
                             <span className="text-base font-bold">合計金額</span>
                             <span className="text-3xl font-extrabold text-[#000666]">
-                              ¥{trialTotal.toLocaleString('ja-JP')}
+                              ¥{experienceTotal.toLocaleString('ja-JP')}
                               <span className="ml-1 text-sm font-bold">（税込）</span>
                             </span>
                           </div>
@@ -373,22 +373,22 @@ export default function TrialCheckoutPage() {
 
             <div className="relative">
               <input
-                id="plan_trial_m"
+                id="plan_experience_m"
                 className="peer hidden"
                 type="radio"
                 name="plan_m"
-                checked={plan === 'trial'}
-                onChange={() => setPlan('trial')}
+                checked={plan === 'experience'}
+                onChange={() => setPlan('experience')}
               />
               <label
-                htmlFor="plan_trial_m"
+                htmlFor="plan_experience_m"
                 className="block cursor-pointer rounded-2xl border-2 border-transparent bg-white p-6 shadow-sm transition-all duration-300 peer-checked:border-[#000666]"
               >
                 <div className="mb-3 flex items-start justify-between">
                   <span className="text-sm font-bold text-[#44474e]">体験レッスン</span>
                   <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-[#c4c6cf]">
                     <div
-                      className={`h-3 w-3 rounded-full bg-[#000666] ${plan === 'trial' ? 'opacity-100' : 'opacity-0'}`}
+                      className={`h-3 w-3 rounded-full bg-[#000666] ${plan === 'experience' ? 'opacity-100' : 'opacity-0'}`}
                     />
                   </div>
                 </div>
@@ -503,7 +503,7 @@ export default function TrialCheckoutPage() {
                         <p className="text-sm font-bold text-[#1a1c1e]">体験レッスン</p>
                         <p className="mt-0.5 text-[11px] text-[#44474e]">初めての方のための1回添削体験</p>
                       </div>
-                      <span className="text-sm font-bold text-[#1a1c1e]">¥{trialSub.toLocaleString('ja-JP')}</span>
+                      <span className="text-sm font-bold text-[#1a1c1e]">¥{experienceSub.toLocaleString('ja-JP')}</span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-[#44474e]">開始予定日</span>
@@ -511,12 +511,12 @@ export default function TrialCheckoutPage() {
                     </div>
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-[#44474e]">消費税 (10%)</span>
-                      <span className="font-medium text-[#1a1c1e]">¥{trialTax.toLocaleString('ja-JP')}</span>
+                      <span className="font-medium text-[#1a1c1e]">¥{experienceTax.toLocaleString('ja-JP')}</span>
                     </div>
                     <div className="flex items-end justify-between border-t border-black/5 pt-6">
                       <span className="text-base font-bold text-[#1a1c1e]">合計金額</span>
                       <span className="font-[family-name:var(--font-headline)] text-3xl font-extrabold text-[#000666]">
-                        ¥{trialTotal.toLocaleString('ja-JP')}
+                        ¥{experienceTotal.toLocaleString('ja-JP')}
                       </span>
                     </div>
                   </>

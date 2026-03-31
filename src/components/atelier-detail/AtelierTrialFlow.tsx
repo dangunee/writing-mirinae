@@ -153,7 +153,7 @@ export default function AtelierTrialFlow() {
               </div>
               <Link
                 className="block w-full rounded-xl bg-on-primary py-4 text-center font-[family-name:var(--font-headline)] font-bold text-primary transition-colors hover:bg-primary-fixed"
-                to="/writing/trial-checkout"
+                to="/writing/course"
               >
                 お支払いへ進む
               </Link>
