@@ -17,7 +17,11 @@ export default function Layout({ children }: LayoutProps) {
   const location = useLocation()
   const embedded = isEmbedded()
 
-  if (location.pathname === '/writing/app/mypage' || location.pathname === '/writing/correction-detail') {
+  if (
+    location.pathname === '/writing/app/mypage' ||
+    location.pathname === '/writing/correction-detail' ||
+    location.pathname === '/writing/trial-checkout'
+  ) {
     return <>{children}</>
   }
 

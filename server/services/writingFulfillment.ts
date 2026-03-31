@@ -90,7 +90,7 @@ export async function fulfillWritingPurchase(
       status: "pending_setup",
       startDate: null,
       interval: null,
-      sessionCount: 10,
+      sessionCount: product.quantity,
     });
 
     return { ok: true, skippedDuplicateEvent: false };

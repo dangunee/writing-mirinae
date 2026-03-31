@@ -18,7 +18,7 @@ export type ProvisionWritingSessionsInput = {
 };
 
 /**
- * Schedule API: owner-only; fixed 10 sessions; unlock_at computed server-side in Postgres.
+ * Schedule API: owner-only; session rows = course.session_count; unlock_at computed in Postgres.
  */
 export async function provisionWritingSessions(
   db: Db,
@@ -52,6 +52,7 @@ export async function provisionWritingSessions(
       startDate,
       intervalLiteral,
       timeZone: DEFAULT_TZ,
+      sessionCount: course.sessionCount,
     });
 
     await tx

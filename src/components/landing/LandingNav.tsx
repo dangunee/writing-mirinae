@@ -15,12 +15,9 @@ export default function LandingNav({ goApp }: Props) {
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-[#F5F5F5]/80 backdrop-blur-md shadow-[0_4px_20px_rgba(0,0,0,0.05)] border-b-[0.5px] border-[#1e1b13]/10">
       <div className="flex justify-between items-center max-w-7xl mx-auto px-6 md:px-8 h-16 md:h-20">
-        <div className="flex flex-col leading-tight">
-          <span className="text-[10px] font-bold tracking-widest uppercase text-[#000666] md:hidden">
-            作文トレーニング
-          </span>
-          <div className="text-lg md:text-xl font-extrabold tracking-tighter text-[#000666] headline-font">
-            ミリネ韓国語教室
+        <div className="min-w-0 max-w-[min(100%,14rem)] leading-tight sm:max-w-none">
+          <div className="text-sm font-extrabold tracking-tight text-[#000666] headline-font md:text-xl md:tracking-tighter">
+            ミリネ韓国語教室 作文トレーニング
           </div>
         </div>
 
@@ -37,9 +34,9 @@ export default function LandingNav({ goApp }: Props) {
           <button
             type="button"
             onClick={goApp}
-            className="bg-[#000666] text-white px-6 py-2 rounded-lg font-['Manrope'] font-bold text-sm uppercase tracking-widest hover:opacity-90 active:scale-[0.99] transition-all"
+            className="bg-[#000666] px-6 py-2 font-['Manrope'] text-sm font-bold uppercase tracking-widest text-white hover:opacity-90 active:scale-[0.99] transition-all rounded-lg"
           >
-            Apply
+            お申し込み
           </button>
           <button
             type="button"
@@ -63,9 +60,9 @@ export default function LandingNav({ goApp }: Props) {
           <button
             type="button"
             onClick={goApp}
-            className="bg-[#000666] text-white px-4 py-1.5 rounded-lg font-['Manrope'] font-bold text-xs uppercase tracking-widest"
+            className="bg-[#000666] px-4 py-1.5 font-['Manrope'] text-xs font-bold uppercase tracking-widest text-white rounded-lg"
           >
-            Apply
+            お申し込み
           </button>
           <button
             type="button"

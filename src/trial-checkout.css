@@ -1,0 +1,28 @@
+/* Stitch design tokens — コース選択とお支払い */
+.trial-checkout-root {
+  --tc-primary: #4052b6;
+  --tc-on-surface: #2c2f32;
+  --tc-on-surface-variant: #595c5e;
+  --tc-surface: #f5f7fa;
+  --tc-surface-container-low: #eef1f4;
+  --tc-surface-container: #e5e8ec;
+  --tc-surface-container-high: #dfe3e7;
+  --tc-surface-container-lowest: #ffffff;
+  --tc-outline-variant: #abadb0;
+  --tc-secondary: #006a28;
+  --tc-secondary-container: #5cfd80;
+  --tc-on-secondary-container: #005d22;
+  --tc-tertiary-container: #ff9727;
+  --tc-on-tertiary-container: #4c2700;
+  --tc-primary-container: #8899ff;
+  --tc-on-primary-container: #00156e;
+  --tc-error: #b41340;
+}
+
+.trial-checkout-root .material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+.trial-checkout-root .material-symbols-outlined.fill-1 {
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}

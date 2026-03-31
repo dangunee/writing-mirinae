@@ -83,7 +83,7 @@ export default function AtelierCorrectionExample() {
         <div className="text-center md:mx-auto md:max-w-sm md:pt-4">
           <Link
             className="inline-flex w-full items-center justify-center rounded-xl bg-primary py-5 font-[family-name:var(--font-headline)] text-sm font-bold text-on-primary shadow-lg transition-all hover:bg-primary-container md:text-base"
-            to="/writing/app"
+            to="/writing/trial-checkout"
           >
             この品質の添削を1,800円で体験する
           </Link>

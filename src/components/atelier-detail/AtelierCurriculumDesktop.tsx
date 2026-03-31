@@ -140,7 +140,7 @@ export default function AtelierCurriculumDesktop() {
                 </div>
                 <Link
                   className="rounded-xl bg-primary px-8 py-4 font-[family-name:var(--font-headline)] font-bold text-on-primary shadow-lg shadow-primary/20 transition-transform hover:scale-[1.03] active:scale-95"
-                  to="/writing/app"
+                  to="/writing/trial-checkout"
                 >
                   この課題を体験する
                 </Link>

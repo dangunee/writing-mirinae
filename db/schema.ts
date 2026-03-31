@@ -109,14 +109,13 @@ export const products = pgTable(
   },
   (t) => [
     check(
-      "products_writing_course_v1",
+      "products_writing_totals_valid",
       sql`app <> 'writing' OR (
-        sku = 'writing_course_10_sessions'
-        AND unit_price_jpy = 2180
-        AND quantity = 10
-        AND subtotal_jpy = 21800
-        AND tax_rate = 0.1000
-        AND total_jpy = 23980
+        unit_price_jpy > 0
+        AND quantity >= 1
+        AND subtotal_jpy > 0
+        AND total_jpy > 0
+        AND tax_rate >= 0
       )`
     ),
     index("idx_products_app").on(t.app),
@@ -210,7 +209,10 @@ export const writingCourses = writing.table(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    check("writing_courses_session_count_fixed", sql`session_count = 10`),
+    check(
+      "writing_courses_session_count_range",
+      sql`session_count >= 1 AND session_count <= 24`
+    ),
     check(
       "writing_courses_schedule_when_active",
       sql`status IN ('pending_setup', 'cancelled') OR (start_date IS NOT NULL AND interval IS NOT NULL)`

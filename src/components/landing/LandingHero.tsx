@@ -31,8 +31,8 @@ export default function LandingHero() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4">
             <Link
-              to="/writing/app"
-              className="inline-flex items-center justify-center ink-gradient text-white px-8 md:px-10 py-4 md:py-5 rounded-lg font-['Manrope'] font-bold tracking-widest uppercase text-xs md:text-sm shadow-[0_12px_30px_rgba(0,6,102,0.24)] hover:opacity-90 transition-all"
+              to="/writing/trial-checkout"
+              className="ink-gradient inline-flex items-center justify-center rounded-lg px-8 py-4 font-['Manrope'] text-xs font-bold uppercase tracking-widest text-white shadow-[0_12px_30px_rgba(0,6,102,0.24)] transition-all hover:opacity-90 md:px-10 md:py-5 md:text-sm"
             >
               Trial Class
             </Link>

@@ -12,6 +12,18 @@ export type { CourseInterval };
 
 export const WRITING_PRODUCT_SKU = "writing_course_10_sessions" as const;
 
+/** Allowlisted SKUs for POST /api/writing/checkout (prices from DB only). */
+export const WRITING_CHECKOUT_SKUS = [
+  "writing_trial_lesson",
+  "writing_1_session",
+  "writing_5_sessions",
+  "writing_10_sessions_promo",
+  /** Legacy catalog row (may still exist in DB). */
+  WRITING_PRODUCT_SKU,
+] as const;
+
+export type WritingCheckoutSku = (typeof WRITING_CHECKOUT_SKUS)[number];
+
 /** Stripe Checkout Session metadata (small, for reconciliation only). */
 export type CheckoutSessionMetadata = {
   payment_order_id: string;
@@ -30,7 +42,7 @@ export interface DbExecutor {
 export type CreateCheckoutInput = {
   /** Resolved from session only; never from body. */
   buyerUserId: string;
-  productSku?: typeof WRITING_PRODUCT_SKU;
+  productSku?: WritingCheckoutSku;
   successUrl?: string;
   cancelUrl?: string;
 };

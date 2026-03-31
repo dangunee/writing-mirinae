@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 
-import { WRITING_PRODUCT_SKU } from "../../../../server/design/payment-to-course-flow";
+import {
+  WRITING_CHECKOUT_SKUS,
+  WRITING_PRODUCT_SKU,
+  type WritingCheckoutSku,
+} from "../../../../server/design/payment-to-course-flow";
 import { getDb } from "../../../../server/db/client";
 import { parseCheckoutAllowlist, assertUrlAllowed } from "../../../../server/lib/urls";
 import { getSessionUserId } from "../../../../server/lib/supabaseServer";
@@ -54,11 +58,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "invalid_redirect_urls" }, { status: 400 });
   }
 
-  const productSku =
+  const productSkuRaw =
     typeof body.productSku === "string" ? body.productSku : WRITING_PRODUCT_SKU;
-  if (productSku !== WRITING_PRODUCT_SKU) {
+  if (!WRITING_CHECKOUT_SKUS.includes(productSkuRaw as (typeof WRITING_CHECKOUT_SKUS)[number])) {
     return NextResponse.json({ error: "invalid_product" }, { status: 400 });
   }
+  const productSku = productSkuRaw as WritingCheckoutSku;
 
   try {
     const db = getDb();

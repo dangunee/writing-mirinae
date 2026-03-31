@@ -116,9 +116,13 @@ export async function bulkInsertWritingSessions(
     startDate: string;
     intervalLiteral: string;
     timeZone: string;
+    sessionCount: number;
   }
 ) {
-  const { courseId, startDate, intervalLiteral, timeZone } = params;
+  const { courseId, startDate, intervalLiteral, timeZone, sessionCount } = params;
+  if (!Number.isInteger(sessionCount) || sessionCount < 1 || sessionCount > 24) {
+    throw new Error("invalid_session_count");
+  }
   const intervalSql = sql.raw(`'${intervalLiteral}'::interval`);
   const dateSql = sql.raw(`'${startDate}'::date`);
   await db.execute(sql`
@@ -131,6 +135,6 @@ export async function bulkInsertWritingSessions(
       'locked',
       now(),
       now()
-    FROM generate_series(1, 10) AS g(i)
+    FROM generate_series(1, ${sessionCount}::int) AS g(i)
   `);
 }
