@@ -22,10 +22,13 @@ export default function TrialLandingPage() {
 
   return (
     <div className="landing-stitch-root relative left-1/2 w-screen max-w-[100vw] -translate-x-1/2 bg-[#F5F5F5] text-[#1e1b13]">
-      <LandingNav goApp={goApp} anchorBase="/writing" />
+      <LandingNav goApp={goApp} anchorBase="/writing" curriculumHref="#curriculum" />
       <main>
         <IntroCorrectionWorkspace />
-        <div className="atelier-koto-root min-h-0 bg-background font-[family-name:var(--font-body)] text-on-surface selection:bg-primary-fixed-dim selection:text-primary">
+        <div
+          id="curriculum"
+          className="atelier-koto-root scroll-mt-20 min-h-0 bg-background font-[family-name:var(--font-body)] text-on-surface selection:bg-primary-fixed-dim selection:text-primary md:scroll-mt-24"
+        >
           <AtelierCurriculumMobile />
           <AtelierCurriculumDesktop />
           <AtelierTrialFlow />

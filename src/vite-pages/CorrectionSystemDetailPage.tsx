@@ -15,8 +15,10 @@ export default function CorrectionSystemDetailPage() {
       <main className="pb-0 pt-16">
         <AtelierHero />
         <AtelierCorrectionExample />
-        <AtelierCurriculumMobile />
-        <AtelierCurriculumDesktop />
+        <div id="curriculum" className="scroll-mt-20 md:scroll-mt-24">
+          <AtelierCurriculumMobile />
+          <AtelierCurriculumDesktop />
+        </div>
         <AtelierTrialFlow />
         <AtelierFinalCta />
       </main>

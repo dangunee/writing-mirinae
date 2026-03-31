@@ -6,20 +6,21 @@ import './intro-workspace.css'
  */
 export default function IntroCorrectionWorkspace() {
   return (
-    <section className="intro-workspace atelier-koto-root bg-[#F5F5F5] px-4 pb-10 pt-24 font-[family-name:var(--font-body)] text-on-surface md:px-6 md:pb-12 md:pt-28">
-      <div className="mx-auto mb-8 max-w-4xl px-2 text-center md:mb-10">
-        <h2 className="font-[family-name:var(--font-headline)] text-[40px] font-extrabold leading-tight tracking-tight text-primary md:text-[44px]">
-          皆さんの韓国語がこう変わります！
-        </h2>
-        <p className="mt-3 font-[family-name:var(--font-label)] text-[20px] font-bold uppercase tracking-[0.2em] text-primary md:mt-4">
-          体験レッスンで確認できる内容
-        </p>
-      </div>
+    <section className="intro-workspace atelier-koto-root bg-[#F5F5F5] pb-6 pt-24 font-[family-name:var(--font-body)] text-on-surface md:pb-8 md:pt-28">
+      <div className="mx-auto max-w-7xl px-6 md:px-8">
+        <div className="mx-auto mb-6 max-w-4xl text-center md:mb-8">
+          <h2 className="font-[family-name:var(--font-headline)] text-[40px] font-extrabold leading-tight tracking-tight text-primary md:text-[44px]">
+            皆さんの韓国語がこう変わります！
+          </h2>
+          <p className="mt-3 font-[family-name:var(--font-label)] text-[20px] font-bold uppercase tracking-[0.2em] text-primary md:mt-4">
+            体験レッスンで確認できる内容
+          </p>
+        </div>
 
-      <div className="mx-auto flex max-w-[1600px] flex-col overflow-hidden rounded-xl border border-outline-variant/15 bg-white shadow-sm lg:flex-row lg:items-stretch">
-        {/* 中央 */}
-        <section className="order-1 min-w-0 flex-1">
-          <div className="mx-auto max-w-3xl space-y-8 px-4 py-8 md:space-y-12 md:px-8 md:py-12">
+        <div className="grid grid-cols-1 gap-4 overflow-hidden rounded-xl border border-outline-variant/15 bg-white shadow-sm lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-stretch lg:gap-3">
+          {/* 中央 */}
+          <section className="order-1 min-w-0">
+            <div className="space-y-6 px-4 py-6 md:space-y-8 md:px-6 md:py-10">
             {/* 提出詳細 */}
             <header className="rounded-3xl bg-white p-6 shadow-[0_4px_24px_rgba(0,0,0,0.04)] md:p-8">
               <div className="mb-2 flex items-center gap-2">
@@ -64,13 +65,13 @@ export default function IntroCorrectionWorkspace() {
 
             {/* 2. 添削ビュー */}
             <div className="rounded-3xl bg-white p-6 shadow-[0_4px_24px_rgba(0,0,0,0.04)] md:p-8">
-              <div className="mb-6 flex items-center gap-2">
+              <div className="mb-5 flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary">edit_note</span>
                 <h3 className="font-[family-name:var(--font-headline)] text-lg font-bold text-on-surface">
                   添削ビュー
                 </h3>
               </div>
-              <div className="selection:bg-primary-fixed space-y-6 text-base leading-relaxed text-on-surface hangul">
+              <div className="selection:bg-primary-fixed space-y-5 text-base leading-relaxed text-on-surface hangul">
                 <p className="relative">
                   도시 계획에서 인공지능이 맡는 역할은{' '}
                   <span className="rounded-sm bg-error-container px-1 text-on-error-container line-through decoration-error">
@@ -135,7 +136,7 @@ export default function IntroCorrectionWorkspace() {
                   .
                 </p>
               </div>
-              <div className="mt-8 hidden items-center justify-center gap-6 border-t border-outline-variant/15 pt-6 lg:flex">
+              <div className="mt-6 hidden items-center justify-center gap-6 border-t border-outline-variant/15 pt-5 lg:flex">
                 <div className="flex items-center gap-4 border-r border-outline-variant/30 pr-8">
                   <button type="button" className="flex flex-col items-center" aria-hidden>
                     <span className="material-symbols-outlined text-on-surface-variant">undo</span>
@@ -188,7 +189,7 @@ export default function IntroCorrectionWorkspace() {
 
             {/* 4. 模範解答 */}
             <div className="rounded-3xl bg-white p-6 shadow-[0_4px_24px_rgba(0,0,0,0.04)] md:p-8">
-              <div className="mb-4 flex items-center gap-2">
+              <div className="mb-3 flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary">school</span>
                 <h3 className="font-[family-name:var(--font-headline)] text-lg font-bold text-on-surface">
                   模範解答
@@ -217,7 +218,7 @@ export default function IntroCorrectionWorkspace() {
 
             {/* 講師メッセージ（中央列・モバイルでも表示） */}
             <div className="rounded-3xl bg-white p-6 shadow-[0_4px_24px_rgba(0,0,0,0.04)] md:p-8">
-              <div className="mb-4 flex items-center gap-2">
+              <div className="mb-3 flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary">forum</span>
                 <h3 className="font-[family-name:var(--font-headline)] text-lg font-bold text-on-surface">
                   講師からのメッセージ
@@ -234,10 +235,10 @@ export default function IntroCorrectionWorkspace() {
         </section>
 
         {/* 右：ツール */}
-        <aside className="order-2 w-full shrink-0 border-outline-variant/15 lg:w-96 lg:border-l">
-          <div className="no-scrollbar max-h-none space-y-8 overflow-y-auto p-5 md:p-6 lg:max-h-[calc(100vh-5rem)] lg:sticky lg:top-24">
+        <aside className="order-2 min-w-0 border-outline-variant/15 lg:border-l">
+          <div className="no-scrollbar max-h-none space-y-6 overflow-y-auto p-4 md:p-5 lg:max-h-[calc(100vh-5rem)] lg:sticky lg:top-24">
             <section>
-              <div className="mb-4 flex items-center gap-2">
+              <div className="mb-3 flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary">label</span>
                 <h4 className="font-[family-name:var(--font-label)] text-xs font-bold uppercase tracking-widest text-on-surface">
                   エラーカテゴリー
@@ -264,7 +265,7 @@ export default function IntroCorrectionWorkspace() {
             </section>
 
             <section>
-              <div className="mb-4 flex items-center justify-between">
+              <div className="mb-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="material-symbols-outlined text-primary">auto_awesome</span>
                   <h4 className="font-[family-name:var(--font-label)] text-xs font-bold uppercase tracking-widest text-on-surface">
@@ -297,14 +298,14 @@ export default function IntroCorrectionWorkspace() {
               </div>
             </section>
 
-            <section className="border-t border-outline-variant/20 pt-8">
-              <div className="mb-6 flex items-center gap-2">
+            <section className="border-t border-outline-variant/20 pt-6">
+              <div className="mb-4 flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary">analytics</span>
                 <h4 className="font-[family-name:var(--font-label)] text-xs font-bold uppercase tracking-widest text-on-surface">
                   評価フィードバック
                 </h4>
               </div>
-              <div className="space-y-6">
+              <div className="space-y-5">
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-on-surface-variant">文法の正確性</span>
@@ -336,8 +337,8 @@ export default function IntroCorrectionWorkspace() {
               </div>
             </section>
 
-            <section className="border-t border-outline-variant/20 pb-8 pt-8">
-              <div className="mb-4 flex items-center justify-between">
+            <section className="border-t border-outline-variant/20 pb-6 pt-6">
+              <div className="mb-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="material-symbols-outlined text-primary">history_edu</span>
                   <h4 className="font-[family-name:var(--font-label)] text-xs font-bold uppercase tracking-widest text-on-surface">
@@ -354,6 +355,7 @@ export default function IntroCorrectionWorkspace() {
             </section>
           </div>
         </aside>
+        </div>
       </div>
     </section>
   )

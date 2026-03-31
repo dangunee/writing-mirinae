@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 
 export default function AtelierCurriculumDesktop() {
   return (
-    <section className="mx-auto hidden max-w-7xl px-8 pt-6 pb-20 md:block md:pt-8 md:pb-24" id="curriculum">
+    <section className="mx-auto hidden max-w-7xl px-8 pt-6 pb-20 md:block md:pt-8 md:pb-24">
       <div className="mb-16">
         <h2 className="font-[family-name:var(--font-headline)] mb-4 text-4xl font-bold tracking-tight">カリキュラム</h2>
         <p className="max-w-xl text-on-surface/60">

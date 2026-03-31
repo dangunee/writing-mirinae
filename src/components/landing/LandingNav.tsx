@@ -3,11 +3,14 @@ import { useState } from 'react'
 
 type Props = {
   goApp: () => void
-  /** 同一ページにアンカーがないとき（例: /writing/intro）ランディングへ飛ばす */
+  /** #learning-system などに付けるプレフィックス（例: "/writing"） */
   anchorBase?: string
+  /** カリキュラムのみ上書き（例: intro 同一ページでは "#curriculum"） */
+  curriculumHref?: string
 }
 
-export default function LandingNav({ goApp, anchorBase = '' }: Props) {
+export default function LandingNav({ goApp, anchorBase = '', curriculumHref }: Props) {
+  const curriculumLink = curriculumHref ?? `${anchorBase}#curriculum`
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
 
@@ -24,7 +27,7 @@ export default function LandingNav({ goApp, anchorBase = '' }: Props) {
         </div>
 
         <div className="hidden md:flex items-center gap-8">
-          <a className={linkClass} href={`${anchorBase}#curriculum`}>
+          <a className={linkClass} href={curriculumLink}>
             カリキュラム
           </a>
           <a className={linkClass} href={`${anchorBase}#learning-system`}>
@@ -80,7 +83,7 @@ export default function LandingNav({ goApp, anchorBase = '' }: Props) {
 
       {open ? (
         <div className="md:hidden border-t border-[#1e1b13]/10 bg-[#F5F5F5]/95 px-6 py-4 flex flex-col gap-3">
-          <a className={linkClass} href={`${anchorBase}#curriculum`} onClick={() => setOpen(false)}>
+          <a className={linkClass} href={curriculumLink} onClick={() => setOpen(false)}>
             カリキュラム
           </a>
           <a className={linkClass} href={`${anchorBase}#learning-system`} onClick={() => setOpen(false)}>
