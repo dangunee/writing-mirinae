@@ -38,7 +38,7 @@ export default function AtelierHero() {
           </div>
           <Link
             className="mb-4 mt-4 block w-full rounded-xl bg-primary py-5 text-center font-[family-name:var(--font-headline)] font-bold text-on-primary shadow-xl transition-transform active:scale-95"
-            to="/writing/course"
+            to="/writing/trial-payment"
           >
             体験レッスン（1,800円）に申し込む
           </Link>
@@ -104,7 +104,7 @@ export default function AtelierHero() {
             <div className="flex flex-col items-center gap-6 pt-4 sm:flex-row">
               <Link
                 className="w-full rounded-xl bg-primary px-10 py-5 text-center font-[family-name:var(--font-headline)] text-lg font-bold text-on-primary shadow-xl shadow-primary/10 transition-all hover:scale-[1.02] active:scale-100 sm:w-auto"
-                to="/writing/course"
+                to="/writing/trial-payment"
               >
                 体験レッスン（1,800円）に申し込む
               </Link>

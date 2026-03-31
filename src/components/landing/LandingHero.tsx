@@ -32,14 +32,14 @@ export default function LandingHero() {
           <div className="flex flex-col sm:flex-row gap-4">
             <Link
               to="/writing/intro"
-              className="inline-flex items-center justify-center border-b-2 border-[#000666]/20 text-[#000666] px-8 md:px-10 py-4 md:py-5 font-['Manrope'] font-bold tracking-widest uppercase text-xs md:text-sm hover:border-[#000666] transition-all"
+              className="ink-gradient inline-flex items-center justify-center rounded-lg px-8 py-4 font-['Manrope'] text-xs font-bold uppercase tracking-widest text-white shadow-[0_12px_30px_rgba(0,6,102,0.24)] transition-all hover:opacity-90 md:px-10 md:py-5 md:text-sm"
             >
               Course Details
             </Link>
 
             <Link
-              to="/writing/course"
-              className="ink-gradient inline-flex items-center justify-center rounded-lg px-8 py-4 font-['Manrope'] text-xs font-bold uppercase tracking-widest text-white shadow-[0_12px_30px_rgba(0,6,102,0.24)] transition-all hover:opacity-90 md:px-10 md:py-5 md:text-sm"
+              to="/writing/trial-payment"
+              className="inline-flex items-center justify-center border-b-2 border-[#000666]/20 text-[#000666] px-8 md:px-10 py-4 md:py-5 font-['Manrope'] font-bold tracking-widest uppercase text-xs md:text-sm hover:border-[#000666] transition-all"
             >
               Trial Class
             </Link>

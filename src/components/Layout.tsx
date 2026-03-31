@@ -21,7 +21,8 @@ export default function Layout({ children }: LayoutProps) {
     location.pathname === '/writing/app/mypage' ||
     location.pathname === '/writing/correction-detail' ||
     location.pathname === '/writing/course' ||
-    location.pathname === '/writing/intro'
+    location.pathname === '/writing/intro' ||
+    location.pathname === '/writing/trial-payment'
   ) {
     return <>{children}</>
   }

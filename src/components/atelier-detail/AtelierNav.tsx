@@ -52,7 +52,7 @@ export default function AtelierNav() {
           </div>
           <Link
             className="rounded-lg bg-primary px-6 py-2.5 font-[family-name:var(--font-headline)] font-semibold text-on-primary transition-transform hover:opacity-90 active:scale-95"
-            to="/writing/course"
+            to="/writing/trial-payment"
           >
             体験レッスン
           </Link>

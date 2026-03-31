@@ -1,0 +1,25 @@
+/* /writing/trial-payment — Stitch 体験レッスン決済（本文は Be Vietnam Pro、見出しは Plus Jakarta Sans） */
+.payment-page-root {
+  font-family: 'Be Vietnam Pro', 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.payment-page-root h1,
+.payment-page-root h2,
+.payment-page-root h3,
+.payment-page-root .payment-font-headline {
+  font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+}
+
+.payment-page-root .material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+.payment-page-root .glass-nav {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(20px);
+}
+
+.payment-page-mobile-main {
+  min-height: max(884px, 100dvh);
+}
