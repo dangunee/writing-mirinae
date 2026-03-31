@@ -3,9 +3,11 @@ import { useState } from 'react'
 
 type Props = {
   goApp: () => void
+  /** 同一ページにアンカーがないとき（例: /writing/intro）ランディングへ飛ばす */
+  anchorBase?: string
 }
 
-export default function LandingNav({ goApp }: Props) {
+export default function LandingNav({ goApp, anchorBase = '' }: Props) {
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
 
@@ -17,18 +19,18 @@ export default function LandingNav({ goApp }: Props) {
       <div className="flex justify-between items-center max-w-7xl mx-auto px-6 md:px-8 h-16 md:h-20">
         <div className="min-w-0 max-w-[min(100%,14rem)] leading-tight sm:max-w-none">
           <div className="text-sm font-extrabold tracking-tight text-[#000666] headline-font md:text-xl md:tracking-tighter">
-            ミリネ韓国語教室 作文トレーニング
+            ミリネ韓国語教室　作文トレーニング
           </div>
         </div>
 
         <div className="hidden md:flex items-center gap-8">
-          <a className={linkClass} href="#curriculum">
+          <a className={linkClass} href={`${anchorBase}#curriculum`}>
             カリキュラム
           </a>
-          <a className={linkClass} href="#learning-system">
+          <a className={linkClass} href={`${anchorBase}#learning-system`}>
             学習システム
           </a>
-          <a className={linkClass} href="#reviews">
+          <a className={linkClass} href={`${anchorBase}#reviews`}>
             受講生の声
           </a>
           <button
@@ -78,13 +80,13 @@ export default function LandingNav({ goApp }: Props) {
 
       {open ? (
         <div className="md:hidden border-t border-[#1e1b13]/10 bg-[#F5F5F5]/95 px-6 py-4 flex flex-col gap-3">
-          <a className={linkClass} href="#curriculum" onClick={() => setOpen(false)}>
+          <a className={linkClass} href={`${anchorBase}#curriculum`} onClick={() => setOpen(false)}>
             カリキュラム
           </a>
-          <a className={linkClass} href="#learning-system" onClick={() => setOpen(false)}>
+          <a className={linkClass} href={`${anchorBase}#learning-system`} onClick={() => setOpen(false)}>
             学習システム
           </a>
-          <a className={linkClass} href="#reviews" onClick={() => setOpen(false)}>
+          <a className={linkClass} href={`${anchorBase}#reviews`} onClick={() => setOpen(false)}>
             受講生の声
           </a>
         </div>
