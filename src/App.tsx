@@ -12,11 +12,13 @@ import TeacherQueuePage from './vite-pages/TeacherQueuePage'
 import WritingCompletePage from './vite-pages/WritingCompletePage'
 import CorrectionSystemDetailPage from './vite-pages/CorrectionSystemDetailPage'
 import CoursePage from './vite-pages/CoursePage'
+import TrialLandingPage from './vite-pages/TrialLandingPage'
 
 function App() {
   return (
     <Layout>
       <Routes>
+        <Route path="/writing/trial" element={<TrialLandingPage />} />
         <Route path="/writing/course" element={<CoursePage />} />
         <Route path="/writing/correction-detail" element={<CorrectionSystemDetailPage />} />
         <Route path="/writing/app/complete" element={<WritingCompletePage />} />

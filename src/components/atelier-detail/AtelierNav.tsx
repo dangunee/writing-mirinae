@@ -11,7 +11,7 @@ export default function AtelierNav() {
               to="/writing"
               className="mx-auto block max-w-full px-0.5 font-[family-name:var(--font-headline)] text-sm font-extrabold leading-snug tracking-tight text-primary no-underline transition-opacity hover:opacity-80"
             >
-              ミリネ韓国語教室 作文トレーニング
+              ミリネ韓国語教室　作文トレーニング
             </Link>
           </h1>
           <span className="material-symbols-outlined shrink-0 text-primary">account_circle</span>
@@ -22,7 +22,7 @@ export default function AtelierNav() {
             to="/writing"
             className="shrink-0 font-[family-name:var(--font-headline)] text-lg font-bold tracking-tight text-primary no-underline transition-opacity hover:opacity-80 lg:text-xl"
           >
-            ミリネ韓国語教室 作文トレーニング
+            ミリネ韓国語教室　作文トレーニング
           </Link>
           <div className="flex items-center gap-12">
             <a

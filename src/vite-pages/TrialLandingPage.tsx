@@ -1,4 +1,13 @@
 import { Link } from 'react-router-dom'
+import '../landing.css'
+import '../components/atelier-detail/atelier-detail.css'
+import AtelierNav from '../components/atelier-detail/AtelierNav'
+import AtelierCorrectionExample from '../components/atelier-detail/AtelierCorrectionExample'
+import AtelierCurriculumMobile from '../components/atelier-detail/AtelierCurriculumMobile'
+import AtelierCurriculumDesktop from '../components/atelier-detail/AtelierCurriculumDesktop'
+import AtelierTrialFlow from '../components/atelier-detail/AtelierTrialFlow'
+import AtelierFinalCta from '../components/atelier-detail/AtelierFinalCta'
+import AtelierFooter from '../components/atelier-detail/AtelierFooter'
 
 const HERO_FALLBACK =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuDSPB8kESuXgxSqxjzgcP2yiBmNzrj_OrHsKJ7T28RmRzN4Cgap9LM_ZfB1-JMSj_OZDndIPDOYWkJkLp1kGGyuH7r9nQtJ9v4DZbteHf46Rai4S-babLp9ho2-x_ei2kjLTRQdkVPFbXclZsmbzDc6w1_jDuPQ0HLuWqywOEhzm_aAtBBEW2d6exLxjor1U-aahJZiArqSNfe5gkbleXtruuKgLDeQJ5i4npEM2o1ALwEOpqgPYx4vLUgY_blLiSIM5tusDBdeP4M'
@@ -10,7 +19,7 @@ function heroImageSrc(): string {
   return `${base}writing/images/hero-study.jpg`
 }
 
-export default function LandingHero() {
+function TrialLandingHero() {
   const src = heroImageSrc()
 
   return (
@@ -31,16 +40,14 @@ export default function LandingHero() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4">
             <Link
-              to="/writing/trial"
+              to="/writing/course"
               className="ink-gradient inline-flex items-center justify-center rounded-lg px-8 py-4 font-['Manrope'] text-xs font-bold uppercase tracking-widest text-white shadow-[0_12px_30px_rgba(0,6,102,0.24)] transition-all hover:opacity-90 md:px-10 md:py-5 md:text-sm"
             >
               Trial Class
             </Link>
 
             <a
-              href="https://mirinae.jp"
-              target="_blank"
-              rel="noreferrer"
+              href="#curriculum"
               className="inline-flex items-center justify-center border-b-2 border-[#000666]/20 text-[#000666] px-8 md:px-10 py-4 md:py-5 font-['Manrope'] font-bold tracking-widest uppercase text-xs md:text-sm hover:border-[#000666] transition-all"
             >
               Course Details
@@ -77,5 +84,22 @@ export default function LandingHero() {
         </div>
       </div>
     </section>
+  )
+}
+
+export default function TrialLandingPage() {
+  return (
+    <div className="atelier-koto-root min-h-screen bg-background font-[family-name:var(--font-body)] text-on-surface selection:bg-primary-fixed-dim selection:text-primary">
+      <AtelierNav />
+      <main className="pb-0 pt-16">
+        <TrialLandingHero />
+        <AtelierCorrectionExample />
+        <AtelierCurriculumMobile />
+        <AtelierCurriculumDesktop />
+        <AtelierTrialFlow />
+        <AtelierFinalCta />
+      </main>
+      <AtelierFooter />
+    </div>
   )
 }
