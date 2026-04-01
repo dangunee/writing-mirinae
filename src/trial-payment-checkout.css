@@ -1,0 +1,21 @@
+/* /writing/trial-payment/checkout — Stitch カード決済モジュール */
+.trial-checkout-page-root {
+  font-family: 'Be Vietnam Pro', 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.trial-checkout-page-root h1,
+.trial-checkout-page-root h2,
+.trial-checkout-page-root h3,
+.trial-checkout-font-headline {
+  font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+}
+
+.trial-checkout-page-root .material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  vertical-align: middle;
+}
+
+.trial-checkout-mobile-main {
+  min-height: max(884px, 100dvh);
+}

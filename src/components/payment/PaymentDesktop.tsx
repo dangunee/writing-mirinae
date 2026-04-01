@@ -1,4 +1,44 @@
-export default function PaymentDesktop() {
+import type {
+  TrialPaymentCalendarSet,
+  TrialPaymentCalendarState,
+  TrialPaymentFormSet,
+  TrialPaymentFormValues,
+} from '../../types/trialPaymentForm'
+import { buildCalendarCells, formatMonthLabel } from '../../utils/trialPaymentCalendar'
+
+type Props = {
+  form: TrialPaymentFormValues
+  setForm: TrialPaymentFormSet
+  calendar: TrialPaymentCalendarState
+  setCalendar: TrialPaymentCalendarSet
+  showValidationError: boolean
+  onCardPay: () => void
+}
+
+function shiftMonth(view: Date, delta: number) {
+  return new Date(view.getFullYear(), view.getMonth() + delta, 1)
+}
+
+export default function PaymentDesktop({
+  form,
+  setForm,
+  calendar,
+  setCalendar,
+  showValidationError,
+  onCardPay,
+}: Props) {
+  const { view, selected } = calendar
+  const y = view.getFullYear()
+  const m = view.getMonth()
+  const cells = buildCalendarCells(y, m)
+
+  const isSelectedDay = (day: number, inMonth: boolean) => {
+    if (!inMonth) return false
+    return (
+      selected.getFullYear() === y && selected.getMonth() === m && selected.getDate() === day
+    )
+  }
+
   return (
     <div className="bg-[#f5f7fa] text-[#2c2f32] selection:bg-[#8899ff] selection:text-[#00156e]">
       <nav className="glass-nav fixed top-0 z-50 w-full shadow-sm">
@@ -57,63 +97,79 @@ export default function PaymentDesktop() {
               </div>
               <div className="rounded-lg border border-[#abadb0]/10 bg-white p-6 shadow-sm">
                 <div className="mb-6 flex items-center justify-between">
-                  <span className="text-sm font-bold text-[#2c2f32]">2024年 11月</span>
+                  <span className="text-sm font-bold text-[#2c2f32]">{formatMonthLabel(view)}</span>
                   <div className="flex gap-4">
-                    <span className="material-symbols-outlined cursor-pointer text-[#74777a] hover:text-[#000666]">
+                    <button
+                      type="button"
+                      className="material-symbols-outlined cursor-pointer text-[#74777a] hover:text-[#000666]"
+                      aria-label="前月"
+                      onClick={() =>
+                        setCalendar((prev) => ({ ...prev, view: shiftMonth(prev.view, -1) }))
+                      }
+                    >
                       chevron_left
-                    </span>
-                    <span className="material-symbols-outlined cursor-pointer text-[#74777a] hover:text-[#000666]">
+                    </button>
+                    <button
+                      type="button"
+                      className="material-symbols-outlined cursor-pointer text-[#74777a] hover:text-[#000666]"
+                      aria-label="次月"
+                      onClick={() =>
+                        setCalendar((prev) => ({ ...prev, view: shiftMonth(prev.view, 1) }))
+                      }
+                    >
                       chevron_right
-                    </span>
+                    </button>
                   </div>
                 </div>
                 <div className="mb-4 grid grid-cols-7 gap-px text-center">
-                  <div className="pb-3 text-[10px] font-bold uppercase tracking-tighter text-[#abadb0]">Sun</div>
-                  <div className="pb-3 text-[10px] font-bold uppercase tracking-tighter text-[#abadb0]">Mon</div>
-                  <div className="pb-3 text-[10px] font-bold uppercase tracking-tighter text-[#abadb0]">Tue</div>
-                  <div className="pb-3 text-[10px] font-bold uppercase tracking-tighter text-[#abadb0]">Wed</div>
-                  <div className="pb-3 text-[10px] font-bold uppercase tracking-tighter text-[#abadb0]">Thu</div>
-                  <div className="pb-3 text-[10px] font-bold uppercase tracking-tighter text-[#abadb0]">Fri</div>
-                  <div className="pb-3 text-[10px] font-bold uppercase tracking-tighter text-[#abadb0]">Sat</div>
-                  <div className="py-3 text-xs text-[#abadb0]/30">27</div>
-                  <div className="py-3 text-xs text-[#abadb0]/30">28</div>
-                  <div className="py-3 text-xs text-[#abadb0]/30">29</div>
-                  <div className="py-3 text-xs text-[#abadb0]/30">30</div>
-                  <div className="py-3 text-xs text-[#abadb0]/30">31</div>
-                  <div className="cursor-pointer rounded-full py-3 text-xs font-medium transition-colors hover:bg-[#eef1f4]">1</div>
-                  <div className="cursor-pointer rounded-full py-3 text-xs font-medium transition-colors hover:bg-[#eef1f4]">2</div>
-                  <div className="cursor-pointer rounded-full py-3 text-xs font-medium transition-colors hover:bg-[#eef1f4]">3</div>
-                  <div className="cursor-pointer rounded-full py-3 text-xs font-medium transition-colors hover:bg-[#eef1f4]">4</div>
-                  <div className="cursor-pointer rounded-full py-3 text-xs font-medium transition-colors hover:bg-[#eef1f4]">5</div>
-                  <div className="cursor-pointer rounded-full py-3 text-xs font-medium transition-colors hover:bg-[#eef1f4]">6</div>
-                  <div className="cursor-pointer rounded-full py-3 text-xs font-medium transition-colors hover:bg-[#eef1f4]">7</div>
-                  <div className="cursor-pointer rounded-full py-3 text-xs font-medium transition-colors hover:bg-[#eef1f4]">8</div>
-                  <div className="cursor-pointer rounded-full py-3 text-xs font-medium transition-colors hover:bg-[#eef1f4]">9</div>
-                  <div className="flex items-center justify-center">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#000666] text-xs font-bold text-white">
-                      10
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((w) => (
+                    <div
+                      key={w}
+                      className="pb-3 text-[10px] font-bold uppercase tracking-tighter text-[#abadb0]"
+                    >
+                      {w}
                     </div>
-                  </div>
-                  <div className="cursor-pointer rounded-full py-3 text-xs font-medium transition-colors hover:bg-[#eef1f4]">11</div>
-                  <div className="cursor-pointer rounded-full py-3 text-xs font-medium transition-colors hover:bg-[#eef1f4]">12</div>
-                  <div className="cursor-pointer rounded-full py-3 text-xs font-medium transition-colors hover:bg-[#eef1f4]">13</div>
-                  <div className="cursor-pointer rounded-full py-3 text-xs font-medium transition-colors hover:bg-[#eef1f4]">14</div>
-                  <div className="cursor-pointer rounded-full py-3 text-xs font-medium transition-colors hover:bg-[#eef1f4]">15</div>
-                  <div className="cursor-pointer rounded-full py-3 text-xs font-medium transition-colors hover:bg-[#eef1f4]">16</div>
-                  <div className="cursor-pointer rounded-full py-3 text-xs font-medium transition-colors hover:bg-[#eef1f4]">17</div>
-                  <div className="cursor-pointer rounded-full py-3 text-xs font-medium transition-colors hover:bg-[#eef1f4]">18</div>
-                  <div className="cursor-pointer rounded-full py-3 text-xs font-medium transition-colors hover:bg-[#eef1f4]">19</div>
-                  <div className="cursor-pointer rounded-full py-3 text-xs font-medium transition-colors hover:bg-[#eef1f4]">20</div>
-                  <div className="cursor-pointer rounded-full py-3 text-xs font-medium transition-colors hover:bg-[#eef1f4]">21</div>
-                  <div className="cursor-pointer rounded-full py-3 text-xs font-medium transition-colors hover:bg-[#eef1f4]">22</div>
-                  <div className="cursor-pointer rounded-full py-3 text-xs font-medium transition-colors hover:bg-[#eef1f4]">23</div>
-                  <div className="cursor-pointer rounded-full py-3 text-xs font-medium transition-colors hover:bg-[#eef1f4]">24</div>
-                  <div className="cursor-pointer rounded-full py-3 text-xs font-medium transition-colors hover:bg-[#eef1f4]">25</div>
-                  <div className="cursor-pointer rounded-full py-3 text-xs font-medium transition-colors hover:bg-[#eef1f4]">26</div>
-                  <div className="cursor-pointer rounded-full py-3 text-xs font-medium transition-colors hover:bg-[#eef1f4]">27</div>
-                  <div className="cursor-pointer rounded-full py-3 text-xs font-medium transition-colors hover:bg-[#eef1f4]">28</div>
-                  <div className="cursor-pointer rounded-full py-3 text-xs font-medium transition-colors hover:bg-[#eef1f4]">29</div>
-                  <div className="cursor-pointer rounded-full py-3 text-xs font-medium transition-colors hover:bg-[#eef1f4]">30</div>
+                  ))}
+                  {cells.map((cell) => {
+                    const sel = isSelectedDay(cell.day, cell.inMonth)
+                    return (
+                      <div
+                        key={cell.key}
+                        className={
+                          cell.inMonth
+                            ? sel
+                              ? 'flex items-center justify-center py-3'
+                              : 'cursor-pointer rounded-full py-3 text-xs font-medium transition-colors hover:bg-[#eef1f4]'
+                            : 'py-3 text-xs text-[#abadb0]/30'
+                        }
+                      >
+                        {cell.inMonth
+                          ? sel
+                            ? (
+                                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#000666] text-xs font-bold text-white">
+                                  {cell.day}
+                                </div>
+                              )
+                            : (
+                                <button
+                                  type="button"
+                                  className="w-full py-3 text-xs font-medium"
+                                  onClick={() =>
+                                    setCalendar((prev) => ({
+                                      ...prev,
+                                      selected: new Date(y, m, cell.day),
+                                    }))
+                                  }
+                                >
+                                  {cell.day}
+                                </button>
+                              )
+                          : (
+                              cell.day
+                            )}
+                      </div>
+                    )
+                  })}
                 </div>
                 <div className="mt-4 flex items-center gap-2 text-[#000666]/80">
                   <span className="material-symbols-outlined text-sm">info</span>
@@ -139,6 +195,8 @@ export default function PaymentDesktop() {
                       className="w-full rounded-lg border-none bg-white p-4 text-sm outline-none transition-all focus:ring-2 focus:ring-[#000666]/20"
                       placeholder="例：田中 花子"
                       type="text"
+                      value={form.fullName}
+                      onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))}
                     />
                   </div>
                   <div className="space-y-2">
@@ -149,6 +207,8 @@ export default function PaymentDesktop() {
                       className="w-full rounded-lg border-none bg-white p-4 text-sm outline-none transition-all focus:ring-2 focus:ring-[#000666]/20"
                       placeholder="例：たなか はなこ"
                       type="text"
+                      value={form.furigana}
+                      onChange={(e) => setForm((f) => ({ ...f, furigana: e.target.value }))}
                     />
                   </div>
                 </div>
@@ -156,15 +216,19 @@ export default function PaymentDesktop() {
                   <label className="flex items-center gap-1 text-xs font-bold text-[#2c2f32]">
                     韓国語レベル <span className="text-[10px] text-[#b41340]">必須</span>
                   </label>
-                  <select className="w-full appearance-none rounded-lg border-none bg-white p-4 text-sm outline-none transition-all focus:ring-2 focus:ring-[#000666]/20">
+                  <select
+                    className="w-full appearance-none rounded-lg border-none bg-white p-4 text-sm outline-none transition-all focus:ring-2 focus:ring-[#000666]/20"
+                    value={form.koreanLevel}
+                    onChange={(e) => setForm((f) => ({ ...f, koreanLevel: e.target.value }))}
+                  >
                     <option disabled value="">
                       レベルを選択してください
                     </option>
-                    <option>初級</option>
-                    <option>初中級</option>
-                    <option>中級</option>
-                    <option>中上級</option>
-                    <option>上級</option>
+                    <option value="初級">初級</option>
+                    <option value="初中級">初中級</option>
+                    <option value="中級">中級</option>
+                    <option value="中上級">中上級</option>
+                    <option value="上級">上級</option>
                   </select>
                 </div>
                 <div className="space-y-2">
@@ -175,6 +239,8 @@ export default function PaymentDesktop() {
                     className="w-full rounded-lg border-none bg-white p-4 text-sm outline-none transition-all focus:ring-2 focus:ring-[#000666]/20"
                     placeholder="example@mail.com"
                     type="email"
+                    value={form.email}
+                    onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
                   />
                   <p className="pl-1 text-[11px] italic text-[#595c5e]">
                     ※携帯キャリアメール（docomo, au, softbank）の方は受信設定をご確認ください。
@@ -184,17 +250,24 @@ export default function PaymentDesktop() {
                   <label className="text-xs font-bold text-[#2c2f32]">
                     お問い合わせ <span className="ml-2 text-[10px] font-normal text-[#595c5e]">任意</span>
                   </label>
-                  <textarea className="w-full resize-none rounded-lg border-none bg-white p-4 text-sm outline-none transition-all focus:ring-2 focus:ring-[#000666]/20" rows={4} />
+                  <textarea
+                    className="w-full resize-none rounded-lg border-none bg-white p-4 text-sm outline-none transition-all focus:ring-2 focus:ring-[#000666]/20"
+                    rows={4}
+                    value={form.inquiry}
+                    onChange={(e) => setForm((f) => ({ ...f, inquiry: e.target.value }))}
+                  />
                 </div>
               </form>
-              <p className="mt-4 text-[11px] font-medium italic text-[#b41340]">※ 必須項目を入力してください</p>
+              {showValidationError ? (
+                <p className="mt-4 text-[11px] font-medium italic text-[#b41340]">※ 必須項目を入力してください</p>
+              ) : null}
             </div>
 
             <div className="py-10 text-center">
               <button
                 type="button"
-                disabled
-                className="mx-auto mb-4 flex w-full max-w-sm cursor-not-allowed items-center justify-center gap-2 rounded-full bg-slate-300 py-5 text-lg font-bold text-slate-500 shadow-sm transition-all"
+                onClick={onCardPay}
+                className="mx-auto mb-4 flex w-full max-w-sm cursor-pointer items-center justify-center gap-2 rounded-full bg-slate-300 py-5 text-lg font-bold text-slate-500 shadow-sm transition-all hover:opacity-90"
               >
                 <span className="material-symbols-outlined">lock</span>カードで決済する
               </button>

@@ -1,11 +1,51 @@
 import { Link } from 'react-router-dom'
+import type {
+  TrialPaymentCalendarSet,
+  TrialPaymentCalendarState,
+  TrialPaymentFormSet,
+  TrialPaymentFormValues,
+} from '../../types/trialPaymentForm'
+import { buildCalendarCells, formatMonthLabel, weekdayHeaders } from '../../utils/trialPaymentCalendar'
 
 const VISA_IMG =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuB24sogpzLGBR61k0QNnVYhZq_k3ZxtdKXLtfanFUW2HL3o1lmHkmYAP0Vxg5QGTEVsa5G17pi3t97CD592H-dCICdJ7jL3xF4qP1iQv720AmiNYZlVkNx0zqYV51Jc8zelY6E3IvexrZTU5lOrtPKiFJGvr35mRxpQYemGZTzdmnlf_E7fftJufe-Fqqf39OrKz9FinU63Boq_Jq-rlkVM7nT0ysw5tk_z1CHwSO_hp85Fa-htdzE0s0Vv1SdlsvO6uLvSMBey2rY'
 const MC_IMG =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuBkjduMHr4-iYIe2mfUCuZv4TOg96JyMUYHAsfGgrtMsb4iwHWOkdMujkJF7POJ64f0_IUbo-h8tPGMXVvD10JsUACK5s15F9IHjJihUtQeTfnif0XHmZPUKQkXNoQCbbjK1GnV9QyHBa4GPkrDtVvmTYGaASFYtkVu5qqj8Y5Ps-O_iW6AVOF8pRUKWJ30cZ-eBlUauTYT8dLFno2qRBzneatAb2JlrtCewZ6xr8uzKr61Qh0aKVorjmamGtAXZO0fsqxpoon6CYI'
 
-export default function PaymentMobile() {
+type Props = {
+  form: TrialPaymentFormValues
+  setForm: TrialPaymentFormSet
+  calendar: TrialPaymentCalendarState
+  setCalendar: TrialPaymentCalendarSet
+  showValidationError: boolean
+  onCardPay: () => void
+}
+
+function shiftMonth(view: Date, delta: number) {
+  return new Date(view.getFullYear(), view.getMonth() + delta, 1)
+}
+
+export default function PaymentMobile({
+  form,
+  setForm,
+  calendar,
+  setCalendar,
+  showValidationError,
+  onCardPay,
+}: Props) {
+  const { view, selected } = calendar
+  const y = view.getFullYear()
+  const m = view.getMonth()
+  const cells = buildCalendarCells(y, m)
+  const jaWeekdays = weekdayHeaders('ja')
+
+  const isSelectedDay = (day: number, inMonth: boolean) => {
+    if (!inMonth) return false
+    return (
+      selected.getFullYear() === y && selected.getMonth() === m && selected.getDate() === day
+    )
+  }
+
   return (
     <div className="min-h-screen bg-[#f3f4f6] text-[#2c2f32]">
       <header className="fixed top-0 z-50 w-full bg-white/80 shadow-sm backdrop-blur-xl dark:bg-slate-900/80 dark:shadow-none">
@@ -50,61 +90,55 @@ export default function PaymentMobile() {
           </div>
           <div className="mb-4 rounded-lg bg-[#eef1f4] p-4">
             <div className="mb-4 flex items-center justify-between">
-              <button type="button" className="material-symbols-outlined text-[#74777a]" aria-label="前月">
+              <button type="button" className="material-symbols-outlined text-[#74777a]" aria-label="前月" onClick={() => setCalendar((prev) => ({ ...prev, view: shiftMonth(prev.view, -1) }))}>
                 chevron_left
               </button>
-              <span className="text-sm font-bold">2024年 12月</span>
-              <button type="button" className="material-symbols-outlined text-[#74777a]" aria-label="次月">
+              <span className="text-sm font-bold">{formatMonthLabel(view)}</span>
+              <button type="button" className="material-symbols-outlined text-[#74777a]" aria-label="次月" onClick={() => setCalendar((prev) => ({ ...prev, view: shiftMonth(prev.view, 1) }))}>
                 chevron_right
               </button>
             </div>
             <div className="mb-2 grid grid-cols-7 gap-1 text-center text-[10px] font-bold opacity-50">
-              <div>日</div>
-              <div>月</div>
-              <div>火</div>
-              <div>水</div>
-              <div>木</div>
-              <div>金</div>
-              <div>土</div>
+              {jaWeekdays.map((w) => (
+                <div key={w}>{w}</div>
+              ))}
             </div>
             <div className="grid grid-cols-7 gap-1 text-center">
-              <div className="p-2 text-xs opacity-20">24</div>
-              <div className="p-2 text-xs opacity-20">25</div>
-              <div className="p-2 text-xs opacity-20">26</div>
-              <div className="p-2 text-xs opacity-20">27</div>
-              <div className="p-2 text-xs opacity-20">28</div>
-              <div className="p-2 text-xs opacity-20">29</div>
-              <div className="p-2 text-xs">1</div>
-              <div className="p-2 text-xs">2</div>
-              <div className="p-2 text-xs">3</div>
-              <div className="p-2 text-xs">4</div>
-              <div className="p-2 text-xs">5</div>
-              <div className="p-2 text-xs">6</div>
-              <div className="p-2 text-xs">7</div>
-              <div className="p-2 text-xs">8</div>
-              <div className="p-2 text-xs">9</div>
-              <div className="p-2 text-xs">10</div>
-              <div className="p-2 text-xs font-bold">
-                <div className="flex items-center justify-center rounded-full bg-[#4052b6] px-2 py-1.5 text-white">11</div>
-              </div>
-              <div className="p-2 text-xs">12</div>
-              <div className="p-2 text-xs">13</div>
-              <div className="p-2 text-xs">14</div>
-              <div className="p-2 text-xs">15</div>
-              <div className="p-2 text-xs">16</div>
-              <div className="p-2 text-xs">17</div>
-              <div className="p-2 text-xs">18</div>
-              <div className="p-2 text-xs">19</div>
-              <div className="p-2 text-xs">20</div>
-              <div className="p-2 text-xs">21</div>
-              <div className="p-2 text-xs">22</div>
-              <div className="p-2 text-xs">23</div>
-              <div className="p-2 text-xs">24</div>
-              <div className="p-2 text-xs">25</div>
-              <div className="p-2 text-xs">26</div>
-              <div className="p-2 text-xs">27</div>
-              <div className="p-2 text-xs">28</div>
-              <div className="p-2 text-xs">29</div>
+              {cells.map((cell) => {
+                const sel = isSelectedDay(cell.day, cell.inMonth)
+                if (!cell.inMonth) {
+                  return (
+                    <div key={cell.key} className="p-2 text-xs opacity-20">
+                      {cell.day}
+                    </div>
+                  )
+                }
+                if (sel) {
+                  return (
+                    <div key={cell.key} className="p-2 text-xs font-bold">
+                      <div className="flex items-center justify-center rounded-full bg-[#4052b6] px-2 py-1.5 text-white">
+                        {cell.day}
+                      </div>
+                    </div>
+                  )
+                }
+                return (
+                  <div key={cell.key} className="p-2 text-xs">
+                    <button
+                      type="button"
+                      className="w-full rounded-full p-2 transition-colors hover:bg-white/50"
+                      onClick={() =>
+                        setCalendar((prev) => ({
+                          ...prev,
+                          selected: new Date(y, m, cell.day),
+                        }))
+                      }
+                    >
+                      {cell.day}
+                    </button>
+                  </div>
+                )
+              })}
             </div>
           </div>
           <p className="flex items-center gap-1 text-xs text-[#74777a]">
@@ -129,6 +163,8 @@ export default function PaymentMobile() {
                 className="w-full rounded-lg border-none bg-[#eef1f4] px-4 py-3 transition-all placeholder:text-[#74777a]/50 focus:bg-white focus:ring-2 focus:ring-[#4052b6]"
                 placeholder="例：山田 太郎"
                 type="text"
+                value={form.fullName}
+                onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))}
               />
             </div>
             <div className="space-y-1.5">
@@ -139,13 +175,19 @@ export default function PaymentMobile() {
                 className="w-full rounded-lg border-none bg-[#eef1f4] px-4 py-3 transition-all placeholder:text-[#74777a]/50 focus:bg-white focus:ring-2 focus:ring-[#4052b6]"
                 placeholder="例：やまだ たろう"
                 type="text"
+                value={form.furigana}
+                onChange={(e) => setForm((f) => ({ ...f, furigana: e.target.value }))}
               />
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-[#2c2f32]/70">
                 韓国語レベル <span className="text-[#b41340]">(必須)</span>
               </label>
-              <select className="w-full rounded-lg border-none bg-[#eef1f4] px-4 py-3 transition-all focus:bg-white focus:ring-2 focus:ring-[#4052b6]">
+              <select
+                className="w-full rounded-lg border-none bg-[#eef1f4] px-4 py-3 transition-all focus:bg-white focus:ring-2 focus:ring-[#4052b6]"
+                value={form.koreanLevel}
+                onChange={(e) => setForm((f) => ({ ...f, koreanLevel: e.target.value }))}
+              >
                 <option disabled value="">
                   選択してください
                 </option>
@@ -163,6 +205,8 @@ export default function PaymentMobile() {
                 className="w-full rounded-lg border-none bg-[#eef1f4] px-4 py-3 transition-all placeholder:text-[#74777a]/50 focus:bg-white focus:ring-2 focus:ring-[#4052b6]"
                 placeholder="example@mail.com"
                 type="email"
+                value={form.email}
+                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
               />
             </div>
             <div className="space-y-1.5">
@@ -173,13 +217,17 @@ export default function PaymentMobile() {
                 className="w-full rounded-lg border-none bg-[#eef1f4] px-4 py-3 transition-all placeholder:text-[#74777a]/50 focus:bg-white focus:ring-2 focus:ring-[#4052b6]"
                 placeholder="ご質問などあればご記入ください"
                 rows={3}
+                value={form.inquiry}
+                onChange={(e) => setForm((f) => ({ ...f, inquiry: e.target.value }))}
               />
             </div>
-            <div className="pt-2">
-              <p className="flex items-center gap-1 text-xs font-bold text-[#b41340]">
-                <span className="material-symbols-outlined text-sm">warning</span>※ 必須項目を入力してください
-              </p>
-            </div>
+            {showValidationError ? (
+              <div className="pt-2">
+                <p className="flex items-center gap-1 text-xs font-bold text-[#b41340]">
+                  <span className="material-symbols-outlined text-sm">warning</span>※ 必須項目を入力してください
+                </p>
+              </div>
+            ) : null}
           </form>
         </section>
 
@@ -196,8 +244,8 @@ export default function PaymentMobile() {
           </div>
           <button
             type="button"
-            disabled
-            className="mb-3 w-full rounded-full bg-[#d9dde1] py-4 text-sm font-bold text-[#74777a]"
+            onClick={onCardPay}
+            className="mb-3 w-full cursor-pointer rounded-full bg-[#d9dde1] py-4 text-sm font-bold text-[#74777a] transition-opacity hover:opacity-90"
           >
             カードで決済する
           </button>
@@ -231,7 +279,7 @@ export default function PaymentMobile() {
           <button
             type="button"
             disabled
-            className="mb-3 w-full rounded-full bg-[#d9dde1] py-4 text-sm font-bold text-[#74777a]"
+            className="mb-3 w-full cursor-not-allowed rounded-full bg-[#d9dde1] py-4 text-sm font-bold text-[#74777a]"
           >
             銀行振込で申し込む
           </button>

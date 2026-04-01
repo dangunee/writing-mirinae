@@ -14,12 +14,14 @@ import CorrectionSystemDetailPage from './vite-pages/CorrectionSystemDetailPage'
 import CoursePage from './vite-pages/CoursePage'
 import TrialLandingPage from './vite-pages/TrialLandingPage'
 import PaymentPage from './vite-pages/PaymentPage'
+import TrialPaymentCheckoutPage from './vite-pages/TrialPaymentCheckoutPage'
 
 function App() {
   return (
     <Layout>
       <Routes>
         <Route path="/writing/intro" element={<TrialLandingPage />} />
+        <Route path="/writing/trial-payment/checkout" element={<TrialPaymentCheckoutPage />} />
         <Route path="/writing/trial-payment" element={<PaymentPage />} />
         <Route path="/writing/course" element={<CoursePage />} />
         <Route path="/writing/correction-detail" element={<CorrectionSystemDetailPage />} />
