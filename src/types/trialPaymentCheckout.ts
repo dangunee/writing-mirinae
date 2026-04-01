@@ -1,3 +1,16 @@
+/** React Router location.state — /writing/bank-complete（URL に個人情報を載せない） */
+export type BankTransferCompleteState = {
+  fullName: string
+  email: string
+  koreanLevel: string
+  /** ISO YYYY-MM-DD */
+  startDate: string
+  /** 表示用 例: 2026年4月1日 */
+  startDateLabel: string
+  /** 入力がある場合のみ */
+  inquiry?: string
+}
+
 /** navigate state + sessionStorage 用 — 体験レッスン trial-payment → checkout */
 export type TrialPaymentCheckoutState = {
   /** ISO YYYY-MM-DD */

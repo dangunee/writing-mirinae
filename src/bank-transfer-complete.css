@@ -1,0 +1,16 @@
+/* /writing/bank-complete — 銀行振込申込完了（体験レッスン） */
+.bank-complete-root {
+  font-family: 'Be Vietnam Pro', 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.bank-complete-root h1,
+.bank-complete-root h2,
+.bank-complete-root h3,
+.bank-complete-root .bank-complete-headline {
+  font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+}
+
+.bank-complete-root .material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}

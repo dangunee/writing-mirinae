@@ -8,9 +8,11 @@ import '../payment.css'
 import {
   TRIAL_PAYMENT_DRAFT_KEY,
   TRIAL_PAYMENT_RESTORE_DRAFT_KEY,
+  type BankTransferCompleteState,
   type TrialPaymentCheckoutState,
 } from '../types/trialPaymentCheckout'
 import type { TrialPaymentCalendarState, TrialPaymentFormValues } from '../types/trialPaymentForm'
+import { apiUrl, isApiBaseConfigured, logApiFetch } from '../lib/apiUrl'
 import { formatJpDate } from '../utils/trialPaymentCalendar'
 
 const MOBILE_LEVEL_LABELS: Record<string, string> = {
@@ -68,6 +70,8 @@ export default function PaymentPage() {
   })
 
   const [showValidationError, setShowValidationError] = useState(false)
+  const [bankTransferSubmitting, setBankTransferSubmitting] = useState(false)
+  const [bankTransferError, setBankTransferError] = useState<string | null>(null)
 
   useEffect(() => {
     const shouldRestore = sessionStorage.getItem(TRIAL_PAYMENT_RESTORE_DRAFT_KEY) === '1'
@@ -155,9 +159,122 @@ export default function PaymentPage() {
     navigate('/writing/trial-payment/checkout', { state: checkout })
   }, [desktopCal, mobileCal, form, navigate, persistDraft])
 
+  const handleBankTransfer = useCallback(async () => {
+    const lg = typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches
+    const cal = lg ? desktopCal : mobileCal
+    const selected = cal.selected
+
+    const emailOk = /\S+@\S+\.\S+/.test(form.email.trim())
+    const levelOk = form.koreanLevel.trim().length > 0
+
+    if (
+      !form.fullName.trim() ||
+      !form.furigana.trim() ||
+      !emailOk ||
+      !levelOk
+    ) {
+      setShowValidationError(true)
+      return
+    }
+
+    setShowValidationError(false)
+    setBankTransferError(null)
+
+    if (!isApiBaseConfigured()) {
+      setBankTransferError(
+        'API の接続先が設定されていません。VITE_API_BASE_URL を設定して再ビルド・再デプロイしてください。'
+      )
+      return
+    }
+
+    const koreanLevelLabel = isMobileLevelValue(form.koreanLevel)
+      ? MOBILE_LEVEL_LABELS[form.koreanLevel] ?? form.koreanLevel
+      : form.koreanLevel.trim()
+
+    const y = selected.getFullYear()
+    const m = String(selected.getMonth() + 1).padStart(2, '0')
+    const day = String(selected.getDate()).padStart(2, '0')
+    const startDate = `${y}-${m}-${day}`
+    const startDateLabel = formatJpDate(selected)
+    const inquiryTrim = form.inquiry.trim()
+
+    const state: BankTransferCompleteState = {
+      fullName: form.fullName.trim(),
+      email: form.email.trim(),
+      koreanLevel: koreanLevelLabel,
+      startDate,
+      startDateLabel,
+      ...(inquiryTrim ? { inquiry: inquiryTrim } : {}),
+    }
+
+    const path = '/api/writing/trial-payment/bank-transfer-notify'
+    setBankTransferSubmitting(true)
+    try {
+      logApiFetch('POST', path)
+      const res = await fetch(apiUrl(path), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: form.fullName.trim(),
+          furigana: form.furigana.trim(),
+          email: form.email.trim(),
+          koreanLevel: koreanLevelLabel,
+          startDate,
+          startDateLabel,
+          ...(inquiryTrim ? { inquiry: inquiryTrim } : {}),
+        }),
+      })
+      const text = await res.text()
+      let json: { ok?: boolean; error?: string } = {}
+      try {
+        json = text ? (JSON.parse(text) as { ok?: boolean; error?: string }) : {}
+      } catch {
+        const looksLikeHtml = /^\s*</.test(text)
+        setBankTransferError(
+          looksLikeHtml
+            ? '通知APIが応答していません（HTMLが返りました）。別オリジンの API を VITE_API_BASE_URL に指定し、再ビルドしてください。'
+            : 'サーバーからの応答を読み取れませんでした。'
+        )
+        return
+      }
+      if (!res.ok || !json.ok) {
+        setBankTransferError(
+          'お申し込み通知の送信に失敗しました。しばらくしてから再度お試しください。'
+        )
+        return
+      }
+      navigate('/writing/bank-complete', { state })
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : ''
+      if (msg.includes('VITE_API_BASE_URL')) {
+        setBankTransferError(
+          'API の接続先が設定されていません。VITE_API_BASE_URL を設定して再ビルド・再デプロイしてください。'
+        )
+        return
+      }
+      const looksLikeFetchFailed =
+        e instanceof TypeError || /failed to fetch|load failed|networkerror/i.test(msg)
+      setBankTransferError(
+        looksLikeFetchFailed
+          ? '接続に失敗しました（ネットワークまたはCORS）。VITE_API_BASE_URL とサーバー設定をご確認ください。'
+          : 'お申し込み通知の送信に失敗しました。しばらくしてから再度お試しください。'
+      )
+    } finally {
+      setBankTransferSubmitting(false)
+    }
+  }, [desktopCal, mobileCal, form, navigate])
+
   return (
     <div className="payment-page-root">
       <LandingNav goApp={goApp} anchorBase="/writing" />
+      {bankTransferError ? (
+        <div
+          role="alert"
+          className="mx-auto max-w-4xl px-4 py-3 text-center text-sm text-red-800 bg-red-50 border-b border-red-100"
+        >
+          {bankTransferError}
+        </div>
+      ) : null}
       <div className="hidden lg:block">
         <PaymentDesktop
           form={form}
@@ -166,6 +283,8 @@ export default function PaymentPage() {
           setCalendar={setDesktopCal}
           showValidationError={showValidationError}
           onCardPay={handleCardPay}
+          onBankTransfer={handleBankTransfer}
+          bankTransferSubmitting={bankTransferSubmitting}
         />
       </div>
       <div className="lg:hidden">
@@ -176,6 +295,8 @@ export default function PaymentPage() {
           setCalendar={setMobileCal}
           showValidationError={showValidationError}
           onCardPay={handleCardPay}
+          onBankTransfer={handleBankTransfer}
+          bankTransferSubmitting={bankTransferSubmitting}
         />
       </div>
     </div>

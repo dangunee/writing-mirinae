@@ -13,6 +13,8 @@ type Props = {
   setCalendar: TrialPaymentCalendarSet
   showValidationError: boolean
   onCardPay: () => void
+  onBankTransfer: () => void | Promise<void>
+  bankTransferSubmitting?: boolean
 }
 
 function shiftMonth(view: Date, delta: number) {
@@ -26,6 +28,8 @@ export default function PaymentDesktop({
   setCalendar,
   showValidationError,
   onCardPay,
+  onBankTransfer,
+  bankTransferSubmitting = false,
 }: Props) {
   const { view, selected } = calendar
   const y = view.getFullYear()
@@ -283,10 +287,11 @@ export default function PaymentDesktop({
               </div>
               <button
                 type="button"
-                disabled
-                className="w-full cursor-not-allowed rounded-xl bg-slate-200 py-4 text-sm font-bold text-slate-400 transition-all"
+                onClick={() => void onBankTransfer()}
+                disabled={bankTransferSubmitting}
+                className="w-full rounded-xl bg-[#ff9727] py-4 text-sm font-bold text-[#4c2700] shadow-lg shadow-[#ff9727]/20 transition-all hover:brightness-105 active:scale-[0.99] disabled:cursor-wait disabled:opacity-80"
               >
-                銀行振込で申し込む
+                {bankTransferSubmitting ? '送信中…' : '銀行振込で申し込む'}
               </button>
             </div>
           </div>

@@ -23,7 +23,8 @@ export default function Layout({ children }: LayoutProps) {
     location.pathname === '/writing/course' ||
     location.pathname === '/writing/intro' ||
     location.pathname === '/writing/trial-payment' ||
-    location.pathname === '/writing/trial-payment/checkout'
+    location.pathname === '/writing/trial-payment/checkout' ||
+    location.pathname === '/writing/bank-complete'
   ) {
     return <>{children}</>
   }

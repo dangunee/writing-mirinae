@@ -18,6 +18,8 @@ type Props = {
   setCalendar: TrialPaymentCalendarSet
   showValidationError: boolean
   onCardPay: () => void
+  onBankTransfer: () => void | Promise<void>
+  bankTransferSubmitting?: boolean
 }
 
 function shiftMonth(view: Date, delta: number) {
@@ -31,6 +33,8 @@ export default function PaymentMobile({
   setCalendar,
   showValidationError,
   onCardPay,
+  onBankTransfer,
+  bankTransferSubmitting = false,
 }: Props) {
   const { view, selected } = calendar
   const y = view.getFullYear()
@@ -262,10 +266,11 @@ export default function PaymentMobile({
           </div>
           <button
             type="button"
-            disabled
-            className="mb-3 w-full cursor-not-allowed rounded-full bg-[#d9dde1] py-4 text-sm font-bold text-[#74777a]"
+            onClick={() => void onBankTransfer()}
+            disabled={bankTransferSubmitting}
+            className="mb-3 w-full rounded-full bg-[#ff9727] py-4 text-sm font-bold text-[#4c2700] shadow-lg shadow-[#ff9727]/15 transition-all hover:brightness-105 active:scale-[0.99] disabled:cursor-wait disabled:opacity-80"
           >
-            銀行振込で申し込む
+            {bankTransferSubmitting ? '送信中…' : '銀行振込で申し込む'}
           </button>
           <p className="px-2 text-center text-[10px] text-[#74777a]">※ 銀行振込は入金確認後にご利用開始となります</p>
         </section>
