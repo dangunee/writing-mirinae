@@ -14,9 +14,12 @@ export default function TrialPaymentCheckoutSuccess({ data }: Props) {
     <div className="flex min-h-screen flex-col bg-[#f5f7fa] font-['Be_Vietnam_Pro',sans-serif] text-[#2c2f32] antialiased">
       <nav className="fixed top-0 z-50 w-full bg-white/80 shadow-sm backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <div className="font-['Plus_Jakarta_Sans'] text-xl font-bold tracking-tight text-[#000666]">
+          <Link
+            to="/writing"
+            className="font-['Plus_Jakarta_Sans'] text-xl font-bold tracking-tight text-[#000666] transition-opacity hover:opacity-80 focus-visible:rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#000666]"
+          >
             ミリネ韓国語教室　作文トレーニング
-          </div>
+          </Link>
           <div className="flex items-center gap-4 text-slate-500">
             <span className="material-symbols-outlined">help</span>
             <span className="material-symbols-outlined">account_circle</span>
