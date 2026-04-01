@@ -12,22 +12,6 @@ type Props = {
 export default function TrialPaymentCheckoutSuccess({ data }: Props) {
   return (
     <div className="flex min-h-screen flex-col bg-[#f5f7fa] font-['Be_Vietnam_Pro',sans-serif] text-[#2c2f32] antialiased">
-      <nav className="fixed top-0 z-50 w-full bg-white/80 shadow-sm backdrop-blur-md">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <Link
-            to="/writing"
-            className="font-['Plus_Jakarta_Sans'] text-xl font-bold tracking-tight text-[#000666] transition-opacity hover:opacity-80 focus-visible:rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#000666]"
-          >
-            ミリネ韓国語教室　作文トレーニング
-          </Link>
-          <div className="flex items-center gap-4 text-slate-500">
-            <span className="material-symbols-outlined">help</span>
-            <span className="material-symbols-outlined">account_circle</span>
-          </div>
-        </div>
-        <div className="h-px w-full bg-slate-100/50" />
-      </nav>
-
       <main className="flex flex-grow flex-col items-center justify-center px-4 pb-12 pt-24 md:px-6">
         <div className="grid w-full max-w-4xl grid-cols-1 items-center gap-8 md:grid-cols-12">
           <div className="relative order-2 h-64 overflow-hidden rounded-xl md:order-1 md:col-span-5 md:h-[450px] [box-shadow:0_12px_24px_rgba(44,47,50,0.06)]">

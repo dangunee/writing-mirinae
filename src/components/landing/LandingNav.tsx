@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 
 type Props = {
@@ -21,9 +21,12 @@ export default function LandingNav({ goApp, anchorBase = '', curriculumHref }: P
     <nav className="fixed top-0 left-0 right-0 z-50 bg-[#F5F5F5]/80 backdrop-blur-md shadow-[0_4px_20px_rgba(0,0,0,0.05)] border-b-[0.5px] border-[#1e1b13]/10">
       <div className="flex justify-between items-center max-w-7xl mx-auto px-6 md:px-8 h-16 md:h-20">
         <div className="min-w-0 max-w-[min(100%,14rem)] leading-tight sm:max-w-none">
-          <div className="text-sm font-extrabold tracking-tight text-[#000666] headline-font md:text-xl md:tracking-tighter">
+          <Link
+            to="/writing"
+            className="block text-sm font-extrabold tracking-tight text-[#000666] headline-font transition-opacity hover:opacity-80 md:text-xl md:tracking-tighter"
+          >
             ミリネ韓国語教室　作文トレーニング
-          </div>
+          </Link>
         </div>
 
         <div className="hidden md:flex items-center gap-8">

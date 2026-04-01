@@ -13,3 +13,6 @@ export type TrialPaymentCheckoutState = {
 }
 
 export const TRIAL_PAYMENT_DRAFT_KEY = 'writing-trial-payment-draft'
+
+/** チェックアウトから「戻る」等で trial-payment に戻ったときだけ draft を復元する（新規表示・F5 では復元しない） */
+export const TRIAL_PAYMENT_RESTORE_DRAFT_KEY = 'writing-trial-payment-restore-draft'

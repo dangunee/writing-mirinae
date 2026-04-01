@@ -1,5 +1,5 @@
 import { FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import type { TrialPaymentCheckoutState } from '../../types/trialPaymentCheckout'
 
 type Props = {
@@ -11,12 +11,6 @@ type Props = {
 
 /** モバイル — Stripe Hosted Checkout 前の確認（カード入力なし） */
 export default function TrialPaymentCheckoutMobile({ data, payLoading, payError, onPayClick }: Props) {
-  const navigate = useNavigate()
-
-  const goBack = () => {
-    navigate('/writing/trial-payment')
-  }
-
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()
     if (!payLoading) onPayClick()
@@ -24,25 +18,6 @@ export default function TrialPaymentCheckoutMobile({ data, payLoading, payError,
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#f5f7fa] text-[#2c2f32] selection:bg-[#4052b6]/20">
-      <header className="fixed top-0 z-50 w-full bg-[#f5f7fa]/80 shadow-sm backdrop-blur-md">
-        <div className="flex h-16 w-full items-center justify-between px-6">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={goBack}
-              className="material-symbols-outlined cursor-pointer text-indigo-700 transition-transform duration-200 active:scale-95 dark:text-indigo-400"
-              aria-label="戻る"
-            >
-              arrow_back
-            </button>
-            <h1 className="trial-checkout-font-headline max-w-[min(100%,220px)] truncate text-base font-bold tracking-tight text-indigo-800 dark:text-indigo-300 sm:text-lg">
-              ミリネ韓国語教室　作文トレーニング
-            </h1>
-          </div>
-          <div className="w-8" />
-        </div>
-      </header>
-
       <main className="trial-checkout-mobile-main mx-auto max-w-[390px] space-y-6 px-5 pb-32 pt-24">
         <section className="mb-8">
           <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.2em] text-[#4052b6]/60">CHECKOUT</span>
@@ -120,9 +95,12 @@ export default function TrialPaymentCheckoutMobile({ data, payLoading, payError,
         </form>
 
         <footer className="pb-8 pt-12 text-center">
-          <p className="trial-checkout-font-headline text-sm font-bold uppercase tracking-widest text-[#74777a]/40">
+          <Link
+            to="/writing"
+            className="trial-checkout-font-headline text-sm font-bold uppercase tracking-widest text-[#74777a]/40 hover:text-[#000666]/70"
+          >
             ミリネ韓国語教室　作文トレーニング
-          </p>
+          </Link>
         </footer>
       </main>
     </div>

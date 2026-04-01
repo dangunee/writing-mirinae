@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom'
 import type {
   TrialPaymentCalendarSet,
   TrialPaymentCalendarState,
@@ -48,21 +47,6 @@ export default function PaymentMobile({
 
   return (
     <div className="min-h-screen bg-[#f3f4f6] text-[#2c2f32]">
-      <header className="fixed top-0 z-50 w-full bg-white/80 shadow-sm backdrop-blur-xl dark:bg-slate-900/80 dark:shadow-none">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="material-symbols-outlined shrink-0 text-[#4052b6] dark:text-[#8899ff]">edit_note</span>
-            <h1 className="payment-font-headline truncate text-base font-bold tracking-tight text-[#4052b6] dark:text-[#8899ff] sm:text-lg">
-              ミリネ韓国語教室　作文トレーニング
-            </h1>
-          </div>
-          <Link to="/writing" className="text-slate-500" aria-label="閉じる">
-            <span className="material-symbols-outlined">close</span>
-          </Link>
-        </div>
-        <div className="h-px bg-slate-100 opacity-15 dark:bg-slate-800" />
-      </header>
-
       <main className="payment-page-mobile-main mx-auto max-w-md space-y-6 px-5 pb-12 pt-24">
         <section className="relative overflow-hidden rounded-xl bg-gradient-to-br from-[#4052b6] to-[#8899ff] p-8 text-white shadow-lg shadow-[#4052b6]/10">
           <div className="absolute right-0 top-0 p-4 opacity-10">

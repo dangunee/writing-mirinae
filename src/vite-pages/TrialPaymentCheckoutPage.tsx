@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import LandingNav from '../components/landing/LandingNav'
 import TrialPaymentCheckoutCanceled from '../components/payment/TrialPaymentCheckoutCanceled'
 import TrialPaymentCheckoutDesktop from '../components/payment/TrialPaymentCheckoutDesktop'
 import TrialPaymentCheckoutMobile from '../components/payment/TrialPaymentCheckoutMobile'
 import TrialPaymentCheckoutSuccess from '../components/payment/TrialPaymentCheckoutSuccess'
 import { apiUrl, isApiBaseConfigured, logApiFetch } from '../lib/apiUrl'
+import '../landing.css'
 import '../trial-payment-checkout.css'
 import { TRIAL_PAYMENT_DRAFT_KEY, type TrialPaymentCheckoutState } from '../types/trialPaymentCheckout'
 
@@ -60,6 +62,9 @@ function parsePaymentResultStudent(raw: unknown): TrialPaymentCheckoutState | nu
 export default function TrialPaymentCheckoutPage() {
   const location = useLocation()
   const navigate = useNavigate()
+  const goApp = useCallback(() => {
+    navigate('/writing/course')
+  }, [navigate])
   const [searchParams] = useSearchParams()
 
   const success = searchParams.get('success') === 'true'
@@ -231,43 +236,57 @@ export default function TrialPaymentCheckoutPage() {
   if (success) {
     if (sessionId && successResolveLoading) {
       return (
-        <div className="flex min-h-screen flex-col items-center justify-center bg-[#f5f7fa] px-6 text-[#595c5e]">
-          <div
-            className="h-10 w-10 animate-spin rounded-full border-2 border-[#4052b6] border-t-transparent"
-            aria-hidden
-          />
-          <p className="mt-4 text-sm font-medium">お申し込み内容を確認しています…</p>
-        </div>
+        <>
+          <LandingNav goApp={goApp} anchorBase="/writing" />
+          <div className="flex min-h-screen flex-col items-center justify-center bg-[#f5f7fa] px-6 pt-16 text-[#595c5e] md:pt-20">
+            <div
+              className="h-10 w-10 animate-spin rounded-full border-2 border-[#4052b6] border-t-transparent"
+              aria-hidden
+            />
+            <p className="mt-4 text-sm font-medium">お申し込み内容を確認しています…</p>
+          </div>
+        </>
       )
     }
     const checkoutData: TrialPaymentCheckoutState | null = sessionId ? successResolved : data
     if (!checkoutData) {
       return (
-        <div className="flex min-h-screen flex-col items-center justify-center bg-[#f5f7fa] px-6 text-center text-[#595c5e]">
-          <p className="trial-checkout-font-headline text-lg font-medium">
-            申し込み情報を読み込めませんでした。体験レッスンお申し込みページからお進みください。
-          </p>
-          <button
-            type="button"
-            className="mt-6 rounded-full bg-[#4052b6] px-6 py-3 font-bold text-white"
-            onClick={() => navigate('/writing/trial-payment')}
-          >
-            戻る
-          </button>
-        </div>
+        <>
+          <LandingNav goApp={goApp} anchorBase="/writing" />
+          <div className="flex min-h-screen flex-col items-center justify-center bg-[#f5f7fa] px-6 pt-16 text-center text-[#595c5e] md:pt-20">
+            <p className="trial-checkout-font-headline text-lg font-medium">
+              申し込み情報を読み込めませんでした。体験レッスンお申し込みページからお進みください。
+            </p>
+            <button
+              type="button"
+              className="mt-6 rounded-full bg-[#4052b6] px-6 py-3 font-bold text-white"
+              onClick={() => navigate('/writing/trial-payment')}
+            >
+              戻る
+            </button>
+          </div>
+        </>
       )
     }
-    return <TrialPaymentCheckoutSuccess data={checkoutData} />
+    return (
+      <>
+        <LandingNav goApp={goApp} anchorBase="/writing" />
+        <TrialPaymentCheckoutSuccess data={checkoutData} />
+      </>
+    )
   }
 
   if (canceled) {
     return (
-      <TrialPaymentCheckoutCanceled
-        data={data}
-        payLoading={payLoading}
-        payError={payError}
-        onRetryPay={startStripeCheckout}
-      />
+      <>
+        <LandingNav goApp={goApp} anchorBase="/writing" />
+        <TrialPaymentCheckoutCanceled
+          data={data}
+          payLoading={payLoading}
+          payError={payError}
+          onRetryPay={startStripeCheckout}
+        />
+      </>
     )
   }
 
@@ -276,23 +295,26 @@ export default function TrialPaymentCheckoutPage() {
   }
 
   return (
-    <div className="trial-checkout-page-root">
-      <div className="hidden lg:block">
-        <TrialPaymentCheckoutDesktop
-          data={data}
-          payLoading={payLoading}
-          payError={payError}
-          onPayClick={startStripeCheckout}
-        />
+    <>
+      <LandingNav goApp={goApp} anchorBase="/writing" />
+      <div className="trial-checkout-page-root">
+        <div className="hidden lg:block">
+          <TrialPaymentCheckoutDesktop
+            data={data}
+            payLoading={payLoading}
+            payError={payError}
+            onPayClick={startStripeCheckout}
+          />
+        </div>
+        <div className="lg:hidden">
+          <TrialPaymentCheckoutMobile
+            data={data}
+            payLoading={payLoading}
+            payError={payError}
+            onPayClick={startStripeCheckout}
+          />
+        </div>
       </div>
-      <div className="lg:hidden">
-        <TrialPaymentCheckoutMobile
-          data={data}
-          payLoading={payLoading}
-          payError={payError}
-          onPayClick={startStripeCheckout}
-        />
-      </div>
-    </div>
+    </>
   )
 }

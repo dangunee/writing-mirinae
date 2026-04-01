@@ -1,6 +1,8 @@
-import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useCallback, useMemo, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import LandingNav from '../components/landing/LandingNav'
 import '../course.css'
+import '../landing.css'
 
 type Plan = 'ten' | 'experience'
 
@@ -40,6 +42,9 @@ function formatMobDateShort(d: Date) {
 
 export default function CoursePage() {
   const navigate = useNavigate()
+  const goApp = useCallback(() => {
+    navigate('/writing/course')
+  }, [navigate])
   const [plan, setPlan] = useState<Plan>('ten')
 
   const [deskMonth, setDeskMonth] = useState(() => new Date(2023, 10, 1))
@@ -61,24 +66,9 @@ export default function CoursePage() {
 
   return (
     <div className="course-page-root min-h-screen bg-[#f3f4f6] font-[family-name:var(--font-body)] text-[#1a1c1e] antialiased">
+      <LandingNav goApp={goApp} anchorBase="/writing" />
       {/* ——— Desktop ——— */}
       <div className="hidden lg:block">
-        <header className="fixed top-0 z-50 w-full border-b border-slate-100 bg-white/80 backdrop-blur-md">
-          <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-            <div className="text-xl font-extrabold tracking-tight text-[#000666] antialiased">
-              ミリネ韓国語教室　作文トレーニング
-            </div>
-            <div className="flex items-center gap-4">
-              <button type="button" className="text-slate-500 transition-colors hover:text-[#000666]" aria-label="ヘルプ">
-                <span className="material-symbols-outlined">help_outline</span>
-              </button>
-              <button type="button" className="text-slate-500 transition-colors hover:text-[#000666]" aria-label="アカウント">
-                <span className="material-symbols-outlined">account_circle</span>
-              </button>
-            </div>
-          </div>
-        </header>
-
         <main className="mx-auto max-w-6xl px-6 pb-32 pt-24">
           <div className="grid grid-cols-1 gap-12 lg:grid-cols-12">
             <div className="space-y-12 lg:col-span-7">
@@ -308,22 +298,6 @@ export default function CoursePage() {
 
       {/* ——— Mobile ——— */}
       <div className="pb-40 lg:hidden">
-        <header className="glass-header fixed top-0 z-50 flex h-16 w-full items-center border-b border-black/5 px-6 backdrop-blur-[12px]">
-          <div className="flex items-center gap-4">
-            <button
-              type="button"
-              className="cursor-pointer text-[#000666] transition-transform active:scale-95"
-              aria-label="戻る"
-              onClick={() => navigate(-1)}
-            >
-              <span className="material-symbols-outlined">arrow_back</span>
-            </button>
-            <span className="font-[family-name:var(--font-headline)] text-lg font-bold tracking-tight text-[#000666]">
-              ミリネ韓国語教室　作文トレーニング
-            </span>
-          </div>
-        </header>
-
         <main className="mx-auto max-w-md px-5 pt-24">
           <section className="mb-8">
             <h1 className="font-[family-name:var(--font-headline)] text-2xl font-bold leading-tight text-[#1a1c1e]">
@@ -527,7 +501,9 @@ export default function CoursePage() {
 
           <footer className="mt-4 px-1 pb-32 text-center">
             <p className="text-xs font-bold uppercase tracking-wider text-[#44474e]">
-              ミリネ韓国語教室　作文トレーニング
+              <Link to="/writing" className="hover:text-[#000666]">
+                ミリネ韓国語教室　作文トレーニング
+              </Link>
             </p>
             <div className="mt-4 flex flex-wrap justify-center gap-x-6 gap-y-2 text-[10px] font-bold uppercase text-[#44474e]/60">
               <span className="cursor-pointer hover:text-[#000666]">利用規約</span>

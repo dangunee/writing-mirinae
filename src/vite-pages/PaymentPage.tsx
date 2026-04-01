@@ -1,9 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import LandingNav from '../components/landing/LandingNav'
 import PaymentDesktop from '../components/payment/PaymentDesktop'
 import PaymentMobile from '../components/payment/PaymentMobile'
+import '../landing.css'
 import '../payment.css'
-import { TRIAL_PAYMENT_DRAFT_KEY, type TrialPaymentCheckoutState } from '../types/trialPaymentCheckout'
+import {
+  TRIAL_PAYMENT_DRAFT_KEY,
+  TRIAL_PAYMENT_RESTORE_DRAFT_KEY,
+  type TrialPaymentCheckoutState,
+} from '../types/trialPaymentCheckout'
 import type { TrialPaymentCalendarState, TrialPaymentFormValues } from '../types/trialPaymentForm'
 import { formatJpDate } from '../utils/trialPaymentCalendar'
 
@@ -39,6 +45,9 @@ function parseDraft(raw: string): {
  */
 export default function PaymentPage() {
   const navigate = useNavigate()
+  const goApp = useCallback(() => {
+    navigate('/writing/course')
+  }, [navigate])
 
   const [form, setForm] = useState<TrialPaymentFormValues>({
     fullName: '',
@@ -61,6 +70,14 @@ export default function PaymentPage() {
   const [showValidationError, setShowValidationError] = useState(false)
 
   useEffect(() => {
+    const shouldRestore = sessionStorage.getItem(TRIAL_PAYMENT_RESTORE_DRAFT_KEY) === '1'
+    sessionStorage.removeItem(TRIAL_PAYMENT_RESTORE_DRAFT_KEY)
+
+    if (!shouldRestore) {
+      sessionStorage.removeItem(TRIAL_PAYMENT_DRAFT_KEY)
+      return
+    }
+
     const raw = sessionStorage.getItem(TRIAL_PAYMENT_DRAFT_KEY)
     if (!raw) return
     const d = parseDraft(raw)
@@ -140,6 +157,7 @@ export default function PaymentPage() {
 
   return (
     <div className="payment-page-root">
+      <LandingNav goApp={goApp} anchorBase="/writing" />
       <div className="hidden lg:block">
         <PaymentDesktop
           form={form}

@@ -1,6 +1,6 @@
 import { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import type { TrialPaymentCheckoutState } from '../../types/trialPaymentCheckout'
+import { TRIAL_PAYMENT_RESTORE_DRAFT_KEY, type TrialPaymentCheckoutState } from '../../types/trialPaymentCheckout'
 
 const TRIAL_IMG =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuCVVFoIR1x3Mf18Yf3U5K1VhhJag6dPbxxOBSEqIRnHj07hL3wSeWZihNGXNuTuvypMCmse_eK-pzXIq1meZHppg9hGqM-jJTQ3ADzO9Q8DQ2fAl5Xo69mbYyGkt-ZqmsXTXhlLbluSVw2qzKSy8MOF7JtrF2mwtH-g-gTr68G0CXUlws50ehFcRNpk0LNeFcCYR5eJg25hr1YzL-79V03Wn1UDlwtLv1ZJzpF1mzfR6Jvb-2hZh2gIDj6JPHSEUCV7TPFgBwpK0oU'
@@ -17,6 +17,7 @@ export default function TrialPaymentCheckoutDesktop({ data, payLoading, payError
   const navigate = useNavigate()
 
   const goBack = () => {
+    sessionStorage.setItem(TRIAL_PAYMENT_RESTORE_DRAFT_KEY, '1')
     navigate('/writing/trial-payment')
   }
 
@@ -27,31 +28,6 @@ export default function TrialPaymentCheckoutDesktop({ data, payLoading, payError
 
   return (
     <div className="flex min-h-screen flex-col bg-[#f5f7fa] text-[#2c2f32]">
-      <nav className="fixed top-0 z-50 w-full bg-white/80 shadow-sm backdrop-blur-md dark:bg-slate-900/80 dark:shadow-none">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <div className="font-['Plus_Jakarta_Sans'] text-xl font-bold tracking-tight text-indigo-700 antialiased dark:text-indigo-300">
-            ミリネ韓国語教室　作文トレーニング
-          </div>
-          <div className="flex items-center gap-4">
-            <button
-              type="button"
-              className="text-slate-500 transition-colors duration-200 hover:text-indigo-600 active:scale-95 dark:text-slate-400 dark:hover:text-indigo-400"
-              aria-label="ヘルプ"
-            >
-              <span className="material-symbols-outlined">help</span>
-            </button>
-            <button
-              type="button"
-              className="text-slate-500 transition-colors duration-200 hover:text-indigo-600 active:scale-95 dark:text-slate-400 dark:hover:text-indigo-400"
-              aria-label="アカウント"
-            >
-              <span className="material-symbols-outlined">account_circle</span>
-            </button>
-          </div>
-        </div>
-        <div className="h-px w-full bg-slate-100/50 dark:bg-slate-800/50" />
-      </nav>
-
       <main className="flex flex-grow items-center justify-center px-4 pb-12 pt-24">
         <div className="grid w-full max-w-5xl grid-cols-1 items-start gap-12 md:grid-cols-2">
           <div className="space-y-8">

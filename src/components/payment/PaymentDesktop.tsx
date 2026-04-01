@@ -41,31 +41,6 @@ export default function PaymentDesktop({
 
   return (
     <div className="bg-[#f5f7fa] text-[#2c2f32] selection:bg-[#8899ff] selection:text-[#00156e]">
-      <nav className="glass-nav fixed top-0 z-50 w-full shadow-sm">
-        <div className="flex h-16 max-w-full items-center justify-between px-6 md:px-12">
-          <div className="font-['Plus_Jakarta_Sans'] text-xl font-bold tracking-tight text-indigo-900">
-            ミリネ韓国語教室　作文トレーニング
-          </div>
-          <div className="hidden items-center gap-8 md:flex">
-            <a className="text-sm font-medium text-slate-600 transition-colors hover:text-indigo-600" href="#">
-              Curriculum
-            </a>
-            <a className="text-sm font-medium text-slate-600 transition-colors hover:text-indigo-600" href="#">
-              Pricing
-            </a>
-            <a className="text-sm font-medium text-slate-600 transition-colors hover:text-indigo-600" href="#">
-              Community
-            </a>
-            <button
-              type="button"
-              className="rounded-full px-4 py-2 font-semibold text-indigo-700 transition-all hover:bg-slate-50 active:scale-95"
-            >
-              Sign In
-            </button>
-          </div>
-        </div>
-      </nav>
-
       <main className="px-4 pb-20 pt-24 md:px-0">
         <div className="mx-auto max-w-3xl space-y-8">
           <section className="relative overflow-hidden rounded-xl border border-[#abadb0]/15 bg-white p-8 shadow-sm">
