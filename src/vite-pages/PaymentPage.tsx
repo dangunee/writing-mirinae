@@ -12,7 +12,7 @@ import {
   type TrialPaymentCheckoutState,
 } from '../types/trialPaymentCheckout'
 import type { TrialPaymentCalendarState, TrialPaymentFormValues } from '../types/trialPaymentForm'
-import { apiUrl, isApiBaseConfigured, logApiFetch } from '../lib/apiUrl'
+import { apiUrl, logApiFetch } from '../lib/apiUrl'
 import { formatJpDate } from '../utils/trialPaymentCalendar'
 
 const MOBILE_LEVEL_LABELS: Record<string, string> = {
@@ -180,13 +180,6 @@ export default function PaymentPage() {
     setShowValidationError(false)
     setBankTransferError(null)
 
-    if (!isApiBaseConfigured()) {
-      setBankTransferError(
-        'API の接続先が設定されていません。VITE_API_BASE_URL を設定して再ビルド・再デプロイしてください。'
-      )
-      return
-    }
-
     const koreanLevelLabel = isMobileLevelValue(form.koreanLevel)
       ? MOBILE_LEVEL_LABELS[form.koreanLevel] ?? form.koreanLevel
       : form.koreanLevel.trim()
@@ -246,12 +239,6 @@ export default function PaymentPage() {
       navigate('/writing/bank-complete', { state })
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : ''
-      if (msg.includes('VITE_API_BASE_URL')) {
-        setBankTransferError(
-          'API の接続先が設定されていません。VITE_API_BASE_URL を設定して再ビルド・再デプロイしてください。'
-        )
-        return
-      }
       const looksLikeFetchFailed =
         e instanceof TypeError || /failed to fetch|load failed|networkerror/i.test(msg)
       setBankTransferError(

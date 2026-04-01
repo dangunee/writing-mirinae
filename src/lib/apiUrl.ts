@@ -1,8 +1,8 @@
 /**
  * API ベース URL の解決。
  *
- * - 本番 (import.meta.env.PROD): `VITE_API_BASE_URL` 必須。未設定時は同一オリジンへの `/api/...` フォールバックは行わない。
- * - 開発 (Vite dev): 未設定時は相対パス `/api/...`（`vite.config.ts` の proxy → localhost:3000）。
+ * - `VITE_API_BASE_URL` があればそのオリジンに接続（別ドメインの API 用）。
+ * - 未設定時は相対パス `/api/...`（開発: Vite proxy → Next、本番: 同一オリジンの Vercel Serverless `api/`）。
  */
 
 function normalizePath(path: string): string {
@@ -15,17 +15,12 @@ function resolveApiUrl(path: string): string {
   if (raw) {
     return `${raw.replace(/\/$/, '')}${p}`
   }
-  if (import.meta.env.DEV) {
-    return p
-  }
-  throw new Error(
-    '[apiUrl] VITE_API_BASE_URL is required in production builds (no same-origin /api fallback).'
-  )
+  return p
 }
 
-/** 本番で API ベースが設定されているか（開発では常に true） */
+/** fetch 可能な API 解決先があるか（相対 `/api` 含む。常に true） */
 export function isApiBaseConfigured(): boolean {
-  return import.meta.env.DEV || Boolean(import.meta.env.VITE_API_BASE_URL?.trim())
+  return true
 }
 
 export function apiUrl(path: string): string {
