@@ -12,6 +12,7 @@ type Props = {
   onPayClick: () => void
 }
 
+/** Stripe Hosted Checkout へ送る前の確認画面（カード入力 UI なし） */
 export default function TrialPaymentCheckoutDesktop({ data, payLoading, payError, onPayClick }: Props) {
   const navigate = useNavigate()
 
@@ -67,7 +68,7 @@ export default function TrialPaymentCheckoutDesktop({ data, payLoading, payError
                 お支払い手続き
               </h1>
               <p className="text-lg leading-relaxed text-[#595c5e]">
-                ミリネ韓国語教室　作文トレーニングの体験レッスンにお申し込みいただきありがとうございます。質の高い学習体験をお約束します。
+                次の画面で Stripe の安全な決済ページが開きます。カード情報の入力は Stripe 上で行われます。
               </p>
             </div>
 
@@ -96,11 +97,6 @@ export default function TrialPaymentCheckoutDesktop({ data, payLoading, payError
                   <span className="text-3xl font-extrabold tracking-tighter text-[#4052b6]">¥1,800</span>
                 </div>
               </div>
-            </div>
-
-            <div className="flex items-center gap-4 px-2 text-sm text-[#595c5e]">
-              <span className="material-symbols-outlined text-[#006a28]">verified_user</span>
-              <p>SSL暗号化通信により、お客様のカード情報は安全に保護されます。</p>
             </div>
           </div>
 
@@ -147,54 +143,7 @@ export default function TrialPaymentCheckoutDesktop({ data, payLoading, payError
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <div className="mb-2 flex items-end justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-[#595c5e]">カード情報</span>
-                  <div className="flex gap-2 opacity-60">
-                    <span className="material-symbols-outlined">credit_card</span>
-                  </div>
-                </div>
-                <div className="space-y-0.5">
-                  <div className="relative">
-                    <input
-                      className="z-10 w-full rounded-t-lg border-none bg-[#eef1f4] px-4 py-4 text-lg text-[#2c2f32] placeholder:text-[#74777a] focus:ring-2 focus:ring-[#4052b6]"
-                      placeholder="カード番号"
-                      type="text"
-                      autoComplete="off"
-                    />
-                    <div className="absolute right-4 top-1/2 flex -translate-y-1/2 gap-1">
-                      <div className="h-5 w-8 rounded-sm bg-[#d9dde1]" />
-                      <div className="h-5 w-8 rounded-sm bg-[#d9dde1]" />
-                    </div>
-                  </div>
-                  <div className="flex gap-0.5">
-                    <input
-                      className="z-10 w-1/2 rounded-bl-lg border-none bg-[#eef1f4] px-4 py-4 text-lg text-[#2c2f32] placeholder:text-[#74777a] focus:ring-2 focus:ring-[#4052b6]"
-                      placeholder="月 / 年"
-                      type="text"
-                      autoComplete="off"
-                    />
-                    <input
-                      className="z-10 w-1/2 rounded-br-lg border-none bg-[#eef1f4] px-4 py-4 text-lg text-[#2c2f32] placeholder:text-[#74777a] focus:ring-2 focus:ring-[#4052b6]"
-                      placeholder="CVC"
-                      type="text"
-                      autoComplete="off"
-                    />
-                  </div>
-                </div>
-              </div>
-
               <div className="space-y-6">
-                <div className="flex items-start gap-3">
-                  <input
-                    defaultChecked
-                    className="mt-1 rounded border-[#abadb0] text-[#4052b6] focus:ring-[#4052b6]"
-                    type="checkbox"
-                  />
-                  <span className="text-sm leading-snug text-[#595c5e]">
-                    次回以降のお支払いのために、カード情報を安全に保存する
-                  </span>
-                </div>
                 <button
                   type="submit"
                   disabled={payLoading}

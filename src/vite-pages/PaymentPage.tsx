@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import PaymentDesktop from '../components/payment/PaymentDesktop'
 import PaymentMobile from '../components/payment/PaymentMobile'
 import '../payment.css'
@@ -39,9 +39,6 @@ function parseDraft(raw: string): {
  */
 export default function PaymentPage() {
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
-
-  const [showPaymentSuccessBanner, setShowPaymentSuccessBanner] = useState(false)
 
   const [form, setForm] = useState<TrialPaymentFormValues>({
     fullName: '',
@@ -82,13 +79,6 @@ export default function PaymentPage() {
       })
     }
   }, [])
-
-  /** Stripe success_url から戻ったとき ?checkout=success を検知して表示し、URL からは外す */
-  useEffect(() => {
-    if (searchParams.get('checkout') !== 'success') return
-    setShowPaymentSuccessBanner(true)
-    navigate({ pathname: '/writing/trial-payment', search: '' }, { replace: true })
-  }, [searchParams, navigate])
 
   const persistDraft = useCallback(
     (checkout: TrialPaymentCheckoutState) => {
@@ -150,26 +140,6 @@ export default function PaymentPage() {
 
   return (
     <div className="payment-page-root">
-      {showPaymentSuccessBanner ? (
-        <div
-          className="mx-auto max-w-3xl px-4 pt-4 lg:px-0"
-          role="status"
-          aria-live="polite"
-        >
-          <div className="flex flex-col gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-950 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm font-medium leading-relaxed">
-              お支払いが完了しました。体験レッスンのお申し込みありがとうございます。確認メールが届くまでお待ちください。
-            </p>
-            <button
-              type="button"
-              className="shrink-0 self-end rounded-md border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-900 hover:bg-emerald-100 sm:self-auto"
-              onClick={() => setShowPaymentSuccessBanner(false)}
-            >
-              閉じる
-            </button>
-          </div>
-        </div>
-      ) : null}
       <div className="hidden lg:block">
         <PaymentDesktop
           form={form}

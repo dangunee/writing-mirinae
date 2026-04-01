@@ -9,6 +9,7 @@ type Props = {
   onPayClick: () => void
 }
 
+/** モバイル — Stripe Hosted Checkout 前の確認（カード入力なし） */
 export default function TrialPaymentCheckoutMobile({ data, payLoading, payError, onPayClick }: Props) {
   const navigate = useNavigate()
 
@@ -46,6 +47,7 @@ export default function TrialPaymentCheckoutMobile({ data, payLoading, payError,
         <section className="mb-8">
           <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.2em] text-[#4052b6]/60">CHECKOUT</span>
           <h2 className="trial-checkout-font-headline text-3xl font-extrabold tracking-tight text-[#2c2f32]">お支払い手続き</h2>
+          <p className="mt-2 text-sm text-[#595c5e]">次の画面で Stripe の安全な決済ページが開きます。</p>
         </section>
 
         <div className="relative overflow-hidden rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(44,47,50,0.04)]">
@@ -57,7 +59,7 @@ export default function TrialPaymentCheckoutMobile({ data, payLoading, payError,
           <div className="space-y-4">
             <div className="flex flex-col gap-0.5">
               <span className="text-[11px] font-bold uppercase tracking-wider text-[#74777a]">お名前</span>
-              <p className="font-medium text-[#2c2f32]">{data.fullName} 様</p>
+              <p className="font-medium text-[#2c2f32]">{data.fullName}</p>
             </div>
             <div className="flex flex-col gap-0.5">
               <span className="text-[11px] font-bold uppercase tracking-wider text-[#74777a]">メールアドレス</span>
@@ -96,85 +98,31 @@ export default function TrialPaymentCheckoutMobile({ data, payLoading, payError,
           </div>
         </div>
 
-        <div className="space-y-5 rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(44,47,50,0.04)]">
-          <div className="mb-2 flex items-center gap-2">
-            <span className="material-symbols-outlined text-xl text-[#4052b6]">payments</span>
-            <h3 className="trial-checkout-font-headline font-bold text-[#2c2f32]">カード情報の入力</h3>
-          </div>
-
-          <form className="space-y-5" onSubmit={onSubmit}>
-            <div className="space-y-1.5">
-              <label className="ml-1 text-[11px] font-bold uppercase tracking-wider text-[#74777a]">カード番号</label>
-              <div className="relative">
-                <input
-                  className="w-full rounded-lg border-none bg-[#eef1f4] px-4 py-3.5 text-[#2c2f32] outline-none transition-all placeholder:text-[#abadb0]/60 focus:ring-2 focus:ring-[#4052b6]/20"
-                  placeholder="0000 0000 0000 0000"
-                  type="text"
-                  autoComplete="off"
-                />
-                <div className="absolute right-3 top-1/2 flex -translate-y-1/2 gap-1">
-                  <div className="h-5 w-8 rounded-sm bg-[#d9dde1]" />
-                  <div className="h-5 w-8 rounded-sm bg-[#d9dde1]" />
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="ml-1 text-[11px] font-bold uppercase tracking-wider text-[#74777a]">有効期限 (MM/YY)</label>
-                <input
-                  className="w-full rounded-lg border-none bg-[#eef1f4] px-4 py-3.5 text-[#2c2f32] outline-none transition-all placeholder:text-[#abadb0]/60 focus:ring-2 focus:ring-[#4052b6]/20"
-                  placeholder="MM / YY"
-                  type="text"
-                  autoComplete="off"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="ml-1 text-[11px] font-bold uppercase tracking-wider text-[#74777a]">CVC</label>
-                <div className="relative">
-                  <input
-                    className="w-full rounded-lg border-none bg-[#eef1f4] px-4 py-3.5 text-[#2c2f32] outline-none transition-all placeholder:text-[#abadb0]/60 focus:ring-2 focus:ring-[#4052b6]/20"
-                    placeholder="123"
-                    type="password"
-                    autoComplete="off"
-                  />
-                  <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-lg text-[#abadb0]">
-                    help
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4 pt-4">
-              <button
-                type="submit"
-                disabled={payLoading}
-                className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-[#000666] py-4 text-base font-bold text-white shadow-lg transition-all active:scale-[0.98] disabled:cursor-wait disabled:opacity-90"
-              >
-                <span>{payLoading ? 'Stripeのお支払い画面へ…' : '¥1,800を支払う'}</span>
-                {!payLoading ? <span className="material-symbols-outlined text-lg">arrow_forward</span> : null}
-              </button>
-              {payError ? (
-                <p className="text-center text-xs font-medium text-[#b41340]" role="alert">
-                  {payError}
-                </p>
-              ) : null}
-              <p className="flex items-center justify-center gap-1.5 text-center text-xs font-medium text-[#74777a]">
-                <span className="material-symbols-outlined text-sm">info</span>※ 決済後の返金はできません
+        <form className="space-y-5 rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(44,47,50,0.04)]" onSubmit={onSubmit}>
+          <div className="space-y-4 pt-2">
+            <button
+              type="submit"
+              disabled={payLoading}
+              className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-[#000666] py-4 text-base font-bold text-white shadow-lg transition-all active:scale-[0.98] disabled:cursor-wait disabled:opacity-90"
+            >
+              <span>{payLoading ? 'Stripeのお支払い画面へ…' : '¥1,800を支払う'}</span>
+              {!payLoading ? <span className="material-symbols-outlined text-lg">arrow_forward</span> : null}
+            </button>
+            {payError ? (
+              <p className="text-center text-xs font-medium text-[#b41340]" role="alert">
+                {payError}
               </p>
-            </div>
-          </form>
-        </div>
+            ) : null}
+            <p className="flex items-center justify-center gap-1.5 text-center text-xs font-medium text-[#74777a]">
+              <span className="material-symbols-outlined text-sm">info</span>※ 決済後の返金はできません
+            </p>
+          </div>
+        </form>
 
         <footer className="pb-8 pt-12 text-center">
           <p className="trial-checkout-font-headline text-sm font-bold uppercase tracking-widest text-[#74777a]/40">
             ミリネ韓国語教室　作文トレーニング
           </p>
-          <div className="mt-4 flex justify-center gap-4 text-[#74777a]/30">
-            <span className="material-symbols-outlined text-lg">language</span>
-            <span className="material-symbols-outlined text-lg">shield_lock</span>
-            <span className="material-symbols-outlined text-lg">verified_user</span>
-          </div>
         </footer>
       </main>
     </div>

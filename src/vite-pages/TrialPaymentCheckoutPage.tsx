@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import TrialPaymentCheckoutCanceled from '../components/payment/TrialPaymentCheckoutCanceled'
 import TrialPaymentCheckoutDesktop from '../components/payment/TrialPaymentCheckoutDesktop'
 import TrialPaymentCheckoutMobile from '../components/payment/TrialPaymentCheckoutMobile'
+import TrialPaymentCheckoutSuccess from '../components/payment/TrialPaymentCheckoutSuccess'
 import { apiUrl, isApiBaseConfigured, logApiFetch } from '../lib/apiUrl'
 import '../trial-payment-checkout.css'
 import { TRIAL_PAYMENT_DRAFT_KEY, type TrialPaymentCheckoutState } from '../types/trialPaymentCheckout'
@@ -30,34 +32,122 @@ function parseCheckoutState(raw: unknown): TrialPaymentCheckoutState | null {
   }
 }
 
+function loadCheckoutFromStorage(): TrialPaymentCheckoutState | null {
+  try {
+    const raw = sessionStorage.getItem(TRIAL_PAYMENT_DRAFT_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as { checkout?: unknown }
+    return parseCheckoutState(parsed.checkout)
+  } catch {
+    return null
+  }
+}
+
+function parsePaymentResultStudent(raw: unknown): TrialPaymentCheckoutState | null {
+  if (!raw || typeof raw !== 'object') return null
+  const s = raw as Record<string, unknown>
+  return parseCheckoutState({
+    startDate: s.startDate,
+    startDateLabel: s.startDateLabel,
+    fullName: s.fullName,
+    furigana: s.furigana,
+    email: s.email,
+    koreanLevel: s.koreanLevel,
+    inquiry: s.inquiry,
+  })
+}
+
 export default function TrialPaymentCheckoutPage() {
   const location = useLocation()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+
+  const success = searchParams.get('success') === 'true'
+  const canceled = searchParams.get('canceled') === 'true'
+  const sessionId = searchParams.get('session_id')?.trim() ?? ''
+
   const [data, setData] = useState<TrialPaymentCheckoutState | null>(null)
   const [payLoading, setPayLoading] = useState(false)
   const [payError, setPayError] = useState<string | null>(null)
+  const [hydrated, setHydrated] = useState(false)
+  const [successResolved, setSuccessResolved] = useState<TrialPaymentCheckoutState | null>(null)
+  const [successResolveLoading, setSuccessResolveLoading] = useState(() => success && !!sessionId)
 
   useEffect(() => {
     const fromNav = parseCheckoutState(location.state)
     if (fromNav) {
       setData(fromNav)
+      setHydrated(true)
       return
     }
-    try {
-      const raw = sessionStorage.getItem(TRIAL_PAYMENT_DRAFT_KEY)
-      if (raw) {
-        const parsed = JSON.parse(raw) as { checkout?: unknown }
-        const co = parseCheckoutState(parsed.checkout)
-        if (co) {
-          setData(co)
+    const fromStorage = loadCheckoutFromStorage()
+    if (fromStorage) {
+      setData(fromStorage)
+      setHydrated(true)
+      return
+    }
+    setHydrated(true)
+  }, [location.state])
+
+  useEffect(() => {
+    if (!hydrated) return
+    if (success || canceled) return
+    if (!data) {
+      navigate('/writing/trial-payment', { replace: true })
+    }
+  }, [hydrated, success, canceled, data, navigate])
+
+  useEffect(() => {
+    if (!success || !sessionId) {
+      setSuccessResolveLoading(false)
+      return
+    }
+    let cancelled = false
+    setSuccessResolveLoading(true)
+
+    const fallback = (): TrialPaymentCheckoutState | null =>
+      loadCheckoutFromStorage() || parseCheckoutState(location.state)
+
+    ;(async () => {
+      try {
+        if (!isApiBaseConfigured()) {
+          if (!cancelled) {
+            setSuccessResolved(fallback())
+            setSuccessResolveLoading(false)
+          }
           return
         }
+        const path = `/api/writing/trial-payment/payment-result?session_id=${encodeURIComponent(sessionId)}`
+        logApiFetch('GET', path)
+        const res = await fetch(apiUrl(path))
+        const text = await res.text()
+        let json: { ok?: boolean; student?: unknown } = {}
+        try {
+          json = text ? (JSON.parse(text) as { ok?: boolean; student?: unknown }) : {}
+        } catch {
+          if (!cancelled) {
+            setSuccessResolved(fallback())
+            setSuccessResolveLoading(false)
+          }
+          return
+        }
+        if (!cancelled) {
+          const parsed = res.ok && json.ok ? parsePaymentResultStudent(json.student) : null
+          setSuccessResolved(parsed ?? fallback())
+          setSuccessResolveLoading(false)
+        }
+      } catch {
+        if (!cancelled) {
+          setSuccessResolved(fallback())
+          setSuccessResolveLoading(false)
+        }
       }
-    } catch {
-      /* ignore */
+    })()
+
+    return () => {
+      cancelled = true
     }
-    navigate('/writing/trial-payment', { replace: true })
-  }, [location.state, navigate])
+  }, [success, sessionId, location.state])
 
   const startStripeCheckout = useCallback(async () => {
     if (!data) return
@@ -73,8 +163,8 @@ export default function TrialPaymentCheckoutPage() {
         return
       }
       const origin = window.location.origin
-      const successUrl = `${origin}/writing/trial-payment?checkout=success`
-      const cancelUrl = `${origin}/writing/trial-payment/checkout`
+      const successUrl = `${origin}/writing/trial-payment/checkout?success=true&session_id={CHECKOUT_SESSION_ID}`
+      const cancelUrl = `${origin}/writing/trial-payment/checkout?canceled=true`
       logApiFetch('POST', checkoutPath)
       const res = await fetch(apiUrl(checkoutPath), {
         method: 'POST',
@@ -133,6 +223,53 @@ export default function TrialPaymentCheckoutPage() {
       setPayLoading(false)
     }
   }, [data])
+
+  if (!hydrated) {
+    return null
+  }
+
+  if (success) {
+    if (sessionId && successResolveLoading) {
+      return (
+        <div className="flex min-h-screen flex-col items-center justify-center bg-[#f5f7fa] px-6 text-[#595c5e]">
+          <div
+            className="h-10 w-10 animate-spin rounded-full border-2 border-[#4052b6] border-t-transparent"
+            aria-hidden
+          />
+          <p className="mt-4 text-sm font-medium">お申し込み内容を確認しています…</p>
+        </div>
+      )
+    }
+    const checkoutData: TrialPaymentCheckoutState | null = sessionId ? successResolved : data
+    if (!checkoutData) {
+      return (
+        <div className="flex min-h-screen flex-col items-center justify-center bg-[#f5f7fa] px-6 text-center text-[#595c5e]">
+          <p className="trial-checkout-font-headline text-lg font-medium">
+            申し込み情報を読み込めませんでした。体験レッスンお申し込みページからお進みください。
+          </p>
+          <button
+            type="button"
+            className="mt-6 rounded-full bg-[#4052b6] px-6 py-3 font-bold text-white"
+            onClick={() => navigate('/writing/trial-payment')}
+          >
+            戻る
+          </button>
+        </div>
+      )
+    }
+    return <TrialPaymentCheckoutSuccess data={checkoutData} />
+  }
+
+  if (canceled) {
+    return (
+      <TrialPaymentCheckoutCanceled
+        data={data}
+        payLoading={payLoading}
+        payError={payError}
+        onRetryPay={startStripeCheckout}
+      />
+    )
+  }
 
   if (!data) {
     return null

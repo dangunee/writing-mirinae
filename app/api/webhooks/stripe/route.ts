@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 
 import { getDb } from "../../../../server/db/client";
+import * as repo from "../../../../server/repositories/platformWritingRepository";
 import { fulfillWritingPurchase } from "../../../../server/services/writingFulfillment";
+import { sendTrialLessonEmailsFromStripeSession } from "../../../../server/services/trialLessonEmails";
 import { TRIAL_LESSON_AMOUNT_JPY } from "../../../../server/services/trialLessonStripe";
 
 export const runtime = "nodejs";
@@ -66,6 +68,22 @@ export async function POST(req: Request) {
       });
       return NextResponse.json({ error: "amount_mismatch" }, { status: 400 });
     }
+
+    const db = getDb();
+    const recorded = await repo.insertStripeWebhookEvent(db, {
+      stripeEventId: event.id,
+      payloadHash: null,
+    });
+    if (!recorded) {
+      return new NextResponse(null, { status: 200 });
+    }
+
+    try {
+      await sendTrialLessonEmailsFromStripeSession(session);
+    } catch (e) {
+      console.error("trial_lesson_email_send_error", e);
+    }
+
     console.info("trial_lesson_checkout_completed", {
       stripeEventId: event.id,
       sessionId: session.id,
