@@ -1,12 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import WritingLayout from '../components/WritingLayout'
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
-
-function apiUrl(path: string) {
-  return `${API_BASE}${path}`
-}
+import { apiUrl } from '../lib/apiUrl'
 
 /** GET /api/teacher/writing/submissions/:id 응답 (TeacherSubmissionDetail 요약) */
 type TeacherSubmissionDetail = {

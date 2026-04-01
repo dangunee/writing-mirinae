@@ -1,11 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-
-// [API 연결] 세션 쿠키 기반 — base URL은 Vite 프록시(/) 또는 VITE_API_BASE_URL
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
-
-function apiUrl(path: string) {
-  return `${API_BASE}${path}`
-}
+import { apiUrl } from '../lib/apiUrl'
 
 const DONUT_C = 251.2
 

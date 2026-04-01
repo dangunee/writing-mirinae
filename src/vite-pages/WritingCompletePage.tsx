@@ -1,14 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
+import { apiUrl } from '../lib/apiUrl'
 
 const POLL_MS = 2000
 const MAX_WAIT_MS = 60_000
-
-function apiUrl(path: string) {
-  return `${API_BASE}${path}`
-}
 
 type UiState = 'pending' | 'unauthorized' | 'timeout'
 

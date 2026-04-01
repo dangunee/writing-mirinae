@@ -1,11 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
-
-function apiUrl(path: string) {
-  return `${API_BASE}${path}`
-}
+import { apiUrl } from '../lib/apiUrl'
 
 /** GET /api/teacher/writing/submissions/queue — 서버 QueueGroupedResponse와 동형 */
 type QueueItem = {

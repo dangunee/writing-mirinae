@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import TrialPaymentCheckoutDesktop from '../components/payment/TrialPaymentCheckoutDesktop'
 import TrialPaymentCheckoutMobile from '../components/payment/TrialPaymentCheckoutMobile'
-import { apiUrl } from '../lib/apiUrl'
+import { apiUrl, isApiBaseConfigured, logApiFetch } from '../lib/apiUrl'
 import '../trial-payment-checkout.css'
 import { TRIAL_PAYMENT_DRAFT_KEY, type TrialPaymentCheckoutState } from '../types/trialPaymentCheckout'
 
@@ -63,11 +63,20 @@ export default function TrialPaymentCheckoutPage() {
     if (!data) return
     setPayError(null)
     setPayLoading(true)
+    const checkoutPath = '/api/writing/trial-payment/create-checkout-session'
     try {
+      if (!isApiBaseConfigured()) {
+        setPayError(
+          'API の接続先が設定されていません。VITE_API_BASE_URL を設定して再ビルド・再デプロイしてください。'
+        )
+        setPayLoading(false)
+        return
+      }
       const origin = window.location.origin
       const successUrl = `${origin}/writing/trial-payment?checkout=success`
       const cancelUrl = `${origin}/writing/trial-payment/checkout`
-      const res = await fetch(apiUrl('/api/writing/trial-payment/create-checkout-session'), {
+      logApiFetch('POST', checkoutPath)
+      const res = await fetch(apiUrl(checkoutPath), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -84,7 +93,7 @@ export default function TrialPaymentCheckoutPage() {
         const looksLikeHtml = /^\s*</.test(text)
         setPayError(
           looksLikeHtml
-            ? '決済APIが応答していません（HTMLが返りました）。/api がデプロイされているか、VITE_API_BASE_URL をご確認ください。'
+            ? '決済APIが応答していません（HTMLが返りました）。別オリジンの API を VITE_API_BASE_URL に指定し、再ビルドしてください。'
             : 'サーバーからの応答を読み取れませんでした。'
         )
         setPayLoading(false)
@@ -107,6 +116,13 @@ export default function TrialPaymentCheckoutPage() {
       setPayLoading(false)
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : ''
+      if (msg.includes('VITE_API_BASE_URL')) {
+        setPayError(
+          'API の接続先が設定されていません。VITE_API_BASE_URL を設定して再ビルド・再デプロイしてください。'
+        )
+        setPayLoading(false)
+        return
+      }
       const looksLikeFetchFailed =
         e instanceof TypeError || /failed to fetch|load failed|networkerror/i.test(msg)
       setPayError(
