@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import TrialPaymentCheckoutDesktop from '../components/payment/TrialPaymentCheckoutDesktop'
 import TrialPaymentCheckoutMobile from '../components/payment/TrialPaymentCheckoutMobile'
+import { apiUrl } from '../lib/apiUrl'
 import '../trial-payment-checkout.css'
 import { TRIAL_PAYMENT_DRAFT_KEY, type TrialPaymentCheckoutState } from '../types/trialPaymentCheckout'
 
@@ -33,6 +34,8 @@ export default function TrialPaymentCheckoutPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const [data, setData] = useState<TrialPaymentCheckoutState | null>(null)
+  const [payLoading, setPayLoading] = useState(false)
+  const [payError, setPayError] = useState<string | null>(null)
 
   useEffect(() => {
     const fromNav = parseCheckoutState(location.state)
@@ -56,6 +59,45 @@ export default function TrialPaymentCheckoutPage() {
     navigate('/writing/trial-payment', { replace: true })
   }, [location.state, navigate])
 
+  const startStripeCheckout = useCallback(async () => {
+    if (!data) return
+    setPayError(null)
+    setPayLoading(true)
+    try {
+      const origin = window.location.origin
+      const successUrl = `${origin}/writing/trial-payment?checkout=success`
+      const cancelUrl = `${origin}/writing/trial-payment/checkout`
+      const res = await fetch(apiUrl('/api/writing/trial-payment/create-checkout-session'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...data,
+          successUrl,
+          cancelUrl,
+        }),
+      })
+      const json = (await res.json()) as { checkoutUrl?: string; error?: string }
+      if (!res.ok) {
+        setPayError(
+          json.error === 'invalid_redirect_urls'
+            ? 'リダイレクトURLが許可されていません。CHECKOUT_REDIRECT_ALLOWLIST をご確認ください。'
+            : '決済の開始に失敗しました。しばらくしてから再度お試しください。'
+        )
+        setPayLoading(false)
+        return
+      }
+      if (json.checkoutUrl) {
+        window.location.assign(json.checkoutUrl)
+        return
+      }
+      setPayError('決済URLを取得できませんでした。')
+      setPayLoading(false)
+    } catch {
+      setPayError('ネットワークエラーが発生しました。')
+      setPayLoading(false)
+    }
+  }, [data])
+
   if (!data) {
     return null
   }
@@ -63,10 +105,20 @@ export default function TrialPaymentCheckoutPage() {
   return (
     <div className="trial-checkout-page-root">
       <div className="hidden lg:block">
-        <TrialPaymentCheckoutDesktop data={data} />
+        <TrialPaymentCheckoutDesktop
+          data={data}
+          payLoading={payLoading}
+          payError={payError}
+          onPayClick={startStripeCheckout}
+        />
       </div>
       <div className="lg:hidden">
-        <TrialPaymentCheckoutMobile data={data} />
+        <TrialPaymentCheckoutMobile
+          data={data}
+          payLoading={payLoading}
+          payError={payError}
+          onPayClick={startStripeCheckout}
+        />
       </div>
     </div>
   )

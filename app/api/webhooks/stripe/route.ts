@@ -3,6 +3,7 @@ import Stripe from "stripe";
 
 import { getDb } from "../../../../server/db/client";
 import { fulfillWritingPurchase } from "../../../../server/services/writingFulfillment";
+import { TRIAL_LESSON_AMOUNT_JPY } from "../../../../server/services/trialLessonStripe";
 
 export const runtime = "nodejs";
 
@@ -46,6 +47,35 @@ export async function POST(req: Request) {
   }
 
   const session = event.data.object as Stripe.Checkout.Session;
+
+  /** 体験レッスン — DB payment_orders なし。金額はサーバー定数と一致する場合のみ受理 */
+  if (session.metadata?.trial_lesson === "true") {
+    const currency = (session.currency ?? "").toLowerCase();
+    if (currency !== "jpy") {
+      return NextResponse.json({ error: "unsupported_currency" }, { status: 400 });
+    }
+    const amountTotal = session.amount_total;
+    if (amountTotal == null) {
+      return NextResponse.json({ error: "missing_amount" }, { status: 400 });
+    }
+    if (amountTotal !== TRIAL_LESSON_AMOUNT_JPY) {
+      console.error("trial_lesson_amount_mismatch", {
+        amountTotal,
+        expected: TRIAL_LESSON_AMOUNT_JPY,
+        sessionId: session.id,
+      });
+      return NextResponse.json({ error: "amount_mismatch" }, { status: 400 });
+    }
+    console.info("trial_lesson_checkout_completed", {
+      stripeEventId: event.id,
+      sessionId: session.id,
+      customerEmail: session.customer_details?.email ?? session.customer_email,
+      paymentStatus: session.payment_status,
+      metadata: session.metadata,
+    });
+    return new NextResponse(null, { status: 200 });
+  }
+
   const paymentOrderId = session.metadata?.payment_order_id;
   const supabaseUserId = session.metadata?.supabase_user_id ?? null;
 

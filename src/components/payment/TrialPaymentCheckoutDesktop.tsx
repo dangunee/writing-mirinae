@@ -7,9 +7,12 @@ const TRIAL_IMG =
 
 type Props = {
   data: TrialPaymentCheckoutState
+  payLoading: boolean
+  payError: string | null
+  onPayClick: () => void
 }
 
-export default function TrialPaymentCheckoutDesktop({ data }: Props) {
+export default function TrialPaymentCheckoutDesktop({ data, payLoading, payError, onPayClick }: Props) {
   const navigate = useNavigate()
 
   const goBack = () => {
@@ -18,6 +21,7 @@ export default function TrialPaymentCheckoutDesktop({ data }: Props) {
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()
+    if (!payLoading) onPayClick()
   }
 
   return (
@@ -193,11 +197,19 @@ export default function TrialPaymentCheckoutDesktop({ data }: Props) {
                 </div>
                 <button
                   type="submit"
-                  className="group flex w-full items-center justify-center gap-2 rounded-full bg-[#4052b6] py-5 font-bold text-[#f3f1ff] shadow-lg shadow-[#4052b6]/20 transition-all hover:bg-[#3346a9] active:scale-[0.98]"
+                  disabled={payLoading}
+                  className="group flex w-full items-center justify-center gap-2 rounded-full bg-[#4052b6] py-5 font-bold text-[#f3f1ff] shadow-lg shadow-[#4052b6]/20 transition-all hover:bg-[#3346a9] active:scale-[0.98] disabled:cursor-wait disabled:opacity-90"
                 >
-                  <span>¥1,800を支払う</span>
-                  <span className="material-symbols-outlined transition-transform group-hover:translate-x-1">arrow_forward</span>
+                  <span>{payLoading ? 'Stripeのお支払い画面へ移動しています…' : '¥1,800を支払う'}</span>
+                  {!payLoading ? (
+                    <span className="material-symbols-outlined transition-transform group-hover:translate-x-1">arrow_forward</span>
+                  ) : null}
                 </button>
+                {payError ? (
+                  <p className="px-2 text-center text-xs font-medium text-[#b41340]" role="alert">
+                    {payError}
+                  </p>
+                ) : null}
                 <p className="px-4 text-center text-xs leading-relaxed text-[#595c5e]">
                   「支払う」をクリックすることで、当教室の
                   <a className="underline" href="#">

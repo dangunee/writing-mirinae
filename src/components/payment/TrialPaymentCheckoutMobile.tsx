@@ -4,9 +4,12 @@ import type { TrialPaymentCheckoutState } from '../../types/trialPaymentCheckout
 
 type Props = {
   data: TrialPaymentCheckoutState
+  payLoading: boolean
+  payError: string | null
+  onPayClick: () => void
 }
 
-export default function TrialPaymentCheckoutMobile({ data }: Props) {
+export default function TrialPaymentCheckoutMobile({ data, payLoading, payError, onPayClick }: Props) {
   const navigate = useNavigate()
 
   const goBack = () => {
@@ -15,6 +18,7 @@ export default function TrialPaymentCheckoutMobile({ data }: Props) {
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()
+    if (!payLoading) onPayClick()
   }
 
   return (
@@ -144,11 +148,17 @@ export default function TrialPaymentCheckoutMobile({ data }: Props) {
             <div className="space-y-4 pt-4">
               <button
                 type="submit"
-                className="flex w-full items-center justify-center gap-2 rounded-full bg-[#000666] py-4 text-base font-bold text-white shadow-lg transition-all active:scale-[0.98]"
+                disabled={payLoading}
+                className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-[#000666] py-4 text-base font-bold text-white shadow-lg transition-all active:scale-[0.98] disabled:cursor-wait disabled:opacity-90"
               >
-                <span>¥1,800を支払う</span>
-                <span className="material-symbols-outlined text-lg">arrow_forward</span>
+                <span>{payLoading ? 'Stripeのお支払い画面へ…' : '¥1,800を支払う'}</span>
+                {!payLoading ? <span className="material-symbols-outlined text-lg">arrow_forward</span> : null}
               </button>
+              {payError ? (
+                <p className="text-center text-xs font-medium text-[#b41340]" role="alert">
+                  {payError}
+                </p>
+              ) : null}
               <p className="flex items-center justify-center gap-1.5 text-center text-xs font-medium text-[#74777a]">
                 <span className="material-symbols-outlined text-sm">info</span>※ 決済後の返金はできません
               </p>
