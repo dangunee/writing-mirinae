@@ -76,7 +76,20 @@ export default function TrialPaymentCheckoutPage() {
           cancelUrl,
         }),
       })
-      const json = (await res.json()) as { checkoutUrl?: string; error?: string }
+      const text = await res.text()
+      let json: { checkoutUrl?: string; error?: string } = {}
+      try {
+        json = text ? (JSON.parse(text) as { checkoutUrl?: string; error?: string }) : {}
+      } catch {
+        const looksLikeHtml = /^\s*</.test(text)
+        setPayError(
+          looksLikeHtml
+            ? '決済APIが応答していません（HTMLが返りました）。/api がデプロイされているか、VITE_API_BASE_URL をご確認ください。'
+            : 'サーバーからの応答を読み取れませんでした。'
+        )
+        setPayLoading(false)
+        return
+      }
       if (!res.ok) {
         setPayError(
           json.error === 'invalid_redirect_urls'
@@ -92,8 +105,15 @@ export default function TrialPaymentCheckoutPage() {
       }
       setPayError('決済URLを取得できませんでした。')
       setPayLoading(false)
-    } catch {
-      setPayError('ネットワークエラーが発生しました。')
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : ''
+      const looksLikeFetchFailed =
+        e instanceof TypeError || /failed to fetch|load failed|networkerror/i.test(msg)
+      setPayError(
+        looksLikeFetchFailed
+          ? '接続に失敗しました（ネットワークまたはCORS）。VITE_API_BASE_URL とサーバー設定をご確認ください。'
+          : '決済の開始に失敗しました。しばらくしてから再度お試しください。'
+      )
       setPayLoading(false)
     }
   }, [data])
