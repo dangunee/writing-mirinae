@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import LandingNav from '../components/landing/LandingNav'
 import PaymentDesktop from '../components/payment/PaymentDesktop'
@@ -72,6 +72,13 @@ export default function PaymentPage() {
   const [showValidationError, setShowValidationError] = useState(false)
   const [bankTransferSubmitting, setBankTransferSubmitting] = useState(false)
   const [bankTransferError, setBankTransferError] = useState<string | null>(null)
+  const bankTransferErrorRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (bankTransferError && bankTransferErrorRef.current) {
+      bankTransferErrorRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [bankTransferError])
 
   useEffect(() => {
     const shouldRestore = sessionStorage.getItem(TRIAL_PAYMENT_RESTORE_DRAFT_KEY) === '1'
@@ -200,7 +207,7 @@ export default function PaymentPage() {
       ...(inquiryTrim ? { inquiry: inquiryTrim } : {}),
     }
 
-    const path = '/api/writing/trial-payment/bank-transfer-notify'
+    const path = '/api/bank-transfer-notify'
     setBankTransferSubmitting(true)
     try {
       logApiFetch('POST', path)
@@ -256,6 +263,7 @@ export default function PaymentPage() {
       <LandingNav goApp={goApp} anchorBase="/writing" />
       {bankTransferError ? (
         <div
+          ref={bankTransferErrorRef}
           role="alert"
           className="mx-auto max-w-4xl px-4 py-3 text-center text-sm text-red-800 bg-red-50 border-b border-red-100"
         >

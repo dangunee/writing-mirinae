@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
 
-import { handleBankTransferNotifyPostJson } from "../../../../../server/services/trialPaymentBankTransferNotifyHandler";
+import { handleBankTransferNotifyPostJson } from "../../../server/services/trialPaymentBankTransferNotifyHandler";
 
 export const runtime = "nodejs";
 
 /**
- * POST /api/writing/trial-payment/bank-transfer-notify
- * 銀行振込申込 — Resend で管理先・申込者へ通知（金額はサーバー固定 ¥1,800 のみ）。
+ * POST /api/bank-transfer-notify — next dev（Vite proxy → :3000）用
  */
 export async function POST(req: Request) {
   let body: Record<string, unknown> = {};

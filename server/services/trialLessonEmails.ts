@@ -1,6 +1,6 @@
 import type { Stripe } from "stripe";
 
-import { TRIAL_LESSON_AMOUNT_JPY } from "./trialLessonStripe";
+import { TRIAL_LESSON_AMOUNT_JPY } from "../constants/trialLessonAmount";
 
 export type TrialLessonBankTransferEmailPayload = {
   fullName: string;

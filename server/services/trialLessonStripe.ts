@@ -1,7 +1,8 @@
 import Stripe from "stripe";
 
-/** サーバー固定 — クライアントの金額は一切使わない */
-export const TRIAL_LESSON_AMOUNT_JPY = 1800;
+import { TRIAL_LESSON_AMOUNT_JPY } from "../constants/trialLessonAmount";
+
+export { TRIAL_LESSON_AMOUNT_JPY } from "../constants/trialLessonAmount";
 
 const META_MAX = 500;
 

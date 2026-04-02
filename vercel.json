@@ -2,6 +2,11 @@
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "functions": {
+    "api/bank-transfer-notify.ts": {
+      "maxDuration": 30
+    }
+  },
   "redirects": [
     {
       "source": "/writing/trial",
