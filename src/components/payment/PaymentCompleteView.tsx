@@ -193,19 +193,19 @@ export default function PaymentCompleteView({ paymentMethod, data }: Props) {
               振込先情報
             </h2>
             <div className="w-full rounded-xl border border-[#abadb0]/20 bg-white p-4 shadow-sm [box-shadow:0_8px_16px_rgba(44,47,50,0.05)]">
-              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-[#595c5e]">三井住友銀行</p>
-              <div className="space-y-1 text-sm leading-relaxed text-[#2c2f32]">
-                <p>日暮里支店</p>
-                <p>普通 7961777</p>
-                <p>（株）カオンヌリ</p>
+              <div className="flex flex-col gap-3 text-sm leading-relaxed text-[#2c2f32] md:flex-row md:flex-wrap md:items-center md:gap-x-5 md:gap-y-0">
+                <span className="text-xs font-bold uppercase tracking-wider text-[#595c5e] md:shrink-0">三井住友銀行</span>
+                <span>日暮里支店</span>
+                <span>普通 7961777</span>
+                <span>（株）カオンヌリ</span>
               </div>
             </div>
             <div className="w-full rounded-xl border border-[#abadb0]/20 bg-white p-4 shadow-sm [box-shadow:0_8px_16px_rgba(44,47,50,0.05)]">
-              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-[#595c5e]">ゆうちょ銀行</p>
-              <div className="space-y-1 text-sm leading-relaxed text-[#2c2f32]">
-                <p>記号 10190</p>
-                <p>番号 90647671</p>
-                <p>カ）カオンヌリ</p>
+              <div className="flex flex-col gap-3 text-sm leading-relaxed text-[#2c2f32] md:flex-row md:flex-wrap md:items-center md:gap-x-5 md:gap-y-0">
+                <span className="text-xs font-bold uppercase tracking-wider text-[#595c5e] md:shrink-0">ゆうちょ銀行</span>
+                <span>記号 10190</span>
+                <span>番号 90647671</span>
+                <span>カ）カオンヌリ</span>
               </div>
             </div>
             <div className="w-full rounded-xl border border-[#abadb0]/20 bg-white px-4 py-3 shadow-sm [box-shadow:0_8px_16px_rgba(44,47,50,0.05)]">
