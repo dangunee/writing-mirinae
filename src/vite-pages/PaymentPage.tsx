@@ -209,11 +209,15 @@ export default function PaymentPage() {
 
     const path = '/api/bank-transfer-notify'
     setBankTransferSubmitting(true)
+    const controller = new AbortController()
+    const timeoutMs = 15000
+    const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs)
     try {
       logApiFetch('POST', path)
       const res = await fetch(apiUrl(path), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           fullName: form.fullName.trim(),
           furigana: form.furigana.trim(),
@@ -245,15 +249,24 @@ export default function PaymentPage() {
       }
       navigate('/writing/bank-complete', { state })
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : ''
-      const looksLikeFetchFailed =
-        e instanceof TypeError || /failed to fetch|load failed|networkerror/i.test(msg)
-      setBankTransferError(
-        looksLikeFetchFailed
-          ? '接続に失敗しました（ネットワークまたはCORS）。VITE_API_BASE_URL とサーバー設定をご確認ください。'
-          : 'お申し込み通知の送信に失敗しました。しばらくしてから再度お試しください。'
-      )
+      const aborted =
+        (e instanceof Error || e instanceof DOMException) && (e as { name?: string }).name === 'AbortError'
+      if (aborted) {
+        setBankTransferError(
+          `サーバー応答が${timeoutMs / 1000}秒以内にありませんでした。時間をおいて再度お試しください。`
+        )
+      } else {
+        const msg = e instanceof Error ? e.message : ''
+        const looksLikeFetchFailed =
+          e instanceof TypeError || /failed to fetch|load failed|networkerror/i.test(msg)
+        setBankTransferError(
+          looksLikeFetchFailed
+            ? '接続に失敗しました（ネットワークまたはCORS）。VITE_API_BASE_URL とサーバー設定をご確認ください。'
+            : 'お申し込み通知の送信に失敗しました。しばらくしてから再度お試しください。'
+        )
+      }
     } finally {
+      window.clearTimeout(timeoutId)
       setBankTransferSubmitting(false)
     }
   }, [desktopCal, mobileCal, form, navigate])

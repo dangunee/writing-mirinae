@@ -1,34 +1,34 @@
 /**
- * Vercel Serverless — ルート直下の api/ のみ確実にルーティングされる（ネスト api/writing/... は環境によって 404 になり得る）
+ * Vercel Edge — Request.json() のみ使用（Node req ストリームが空でハングする事例を回避）
  */
-import { readJsonObjectFromVercelRequest } from "../server/lib/vercelReadJsonBody";
 import { handleBankTransferNotifyPostJson } from "../server/services/trialPaymentBankTransferNotifyHandler";
 
-type VercelStyleRes = {
-  status: (code: number) => { json: (data: unknown) => void };
+export const config = {
+  runtime: "edge",
 };
 
-export default async function handler(
-  req: { method?: string; body?: unknown } & import("http").IncomingMessage,
-  res: VercelStyleRes
-): Promise<void> {
-  if (req.method !== "POST") {
-    res.status(405).json({ error: "method_not_allowed" });
-    return;
+function jsonResponse(status: number, data: unknown): Response {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json; charset=utf-8" },
+  });
+}
+
+export default async function handler(request: Request): Promise<Response> {
+  if (request.method !== "POST") {
+    return jsonResponse(405, { error: "method_not_allowed" });
   }
 
   let body: Record<string, unknown>;
   try {
-    body = await readJsonObjectFromVercelRequest(req);
+    body = (await request.json()) as Record<string, unknown>;
   } catch {
-    res.status(400).json({ error: "invalid_json" });
-    return;
+    return jsonResponse(400, { error: "invalid_json" });
   }
 
   const result = await handleBankTransferNotifyPostJson(body);
   if (!result.ok) {
-    res.status(result.status).json(result.json);
-    return;
+    return jsonResponse(result.status, result.json);
   }
-  res.status(result.status).json(result.json);
+  return jsonResponse(result.status, result.json);
 }

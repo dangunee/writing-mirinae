@@ -1,4 +1,4 @@
-import { sendTrialLessonBankTransferEmails } from "./trialLessonEmails";
+import { sendTrialLessonBankTransferEmails } from "./trialLessonBankTransferEmails";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
