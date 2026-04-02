@@ -1,4 +1,4 @@
-import { handleTrialPaymentResultGet } from "../../../../../server/lib/trialPaymentResultHandler";
+import { handleTrialPaymentResultGet } from "../../../../../api/_lib/trialPaymentResultHandler";
 
 export const runtime = "nodejs";
 

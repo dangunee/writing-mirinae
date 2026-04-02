@@ -1,8 +1,8 @@
 /**
  * GET /api/writing/trial-payment/payment-result
- * Next route と Vercel `api/writing/.../payment-result.ts` から共有。
+ * api/_lib のみ import（Vercel バンドル用）。
  */
-import { getStripeClient, TRIAL_LESSON_AMOUNT_JPY } from "../services/trialLessonStripe";
+import { getStripeClient, TRIAL_LESSON_AMOUNT_JPY } from "./trialLessonStripe";
 
 function json(data: unknown, status: number): Response {
   return new Response(JSON.stringify(data), {

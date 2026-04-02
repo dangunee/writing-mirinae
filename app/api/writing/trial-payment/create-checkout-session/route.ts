@@ -1,4 +1,4 @@
-import { handleTrialCreateCheckoutSessionRequest } from "../../../../../server/lib/trialCreateCheckoutSessionHandler";
+import { handleTrialCreateCheckoutSessionRequest } from "../../../../../api/_lib/trialCreateCheckoutSessionHandler";
 
 export const runtime = "nodejs";
 

@@ -3,7 +3,7 @@
  */
 import type { IncomingMessage, ServerResponse } from "http";
 
-import { handleTrialPaymentResultGet } from "../../../server/lib/trialPaymentResultHandler";
+import { handleTrialPaymentResultGet } from "../../_lib/trialPaymentResultHandler";
 
 export const config = {
   runtime: "nodejs",

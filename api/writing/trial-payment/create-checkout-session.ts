@@ -4,7 +4,7 @@
  */
 import type { IncomingMessage, ServerResponse } from "http";
 
-import { handleTrialCreateCheckoutSessionRequest } from "../../../server/lib/trialCreateCheckoutSessionHandler";
+import { handleTrialCreateCheckoutSessionRequest } from "../../_lib/trialCreateCheckoutSessionHandler";
 
 export const config = {
   runtime: "nodejs",
