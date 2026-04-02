@@ -8,7 +8,8 @@ export const runtime = "nodejs";
  * GET /api/writing/trial-payment/payment-result?session_id=cs_...
  * Stripe Checkout Session を読み取り専用で返す（完了ページ表示用）
  *
- * - `trial_entitlement`（mirinae-api 申込）と `trial_lesson`（レガシー）の両方を受理
+ * - `trial_entitlement`（mirinae-api 申込またはフォールバック Checkout）
+ * - 古い Session に残る `trial_lesson` も受理（レガシー）
  */
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);

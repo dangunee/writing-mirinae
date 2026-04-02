@@ -13,7 +13,8 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  *
  * - `MIRINAE_API_BASE_URL` があれば mirinae-api `POST /api/trial/applications` にプロキシし、
  *   Stripe metadata に `trial_entitlement` + `application_id` が付く（webhook でトークンリンクメール）。
- * - 未設定時のみ従来の `trial_lesson` Checkout（ローカル開発用フォールバック）。
+ * - 未設定時は writing-mirinae 側で Checkout を作成（metadata に `trial_entitlement: "true"` のみ。
+ *   `application_id` は付かないため本番の internal fulfill には mirinae-api 経由を推奨）。
  */
 export async function POST(req: Request) {
   let body: Record<string, unknown> = {};
@@ -141,8 +142,9 @@ export async function POST(req: Request) {
     }
   }
 
-  console.warn("trial_checkout_fallback_legacy_trial_lesson", {
+  console.warn("trial_checkout_fallback_local_stripe", {
     reason: "MIRINAE_API_BASE_URL missing",
+    note: "trial_entitlement metadata without application_id; use mirinae-api proxy in production",
   });
 
   try {

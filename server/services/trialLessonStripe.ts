@@ -32,6 +32,9 @@ export type CreateTrialLessonCheckoutInput = {
 
 /**
  * Stripe Checkout Session — 体験レッスン ¥1,800 のみ（line_items はサーバー定数）
+ *
+ * metadata は `trial_entitlement: "true"`（webhook の trial_entitlement 分岐用）。
+ * `application_id` が必要な本番フローは mirinae-api 経由の Checkout 作成を使うこと。
  */
 export async function createTrialLessonCheckoutSession(
   input: CreateTrialLessonCheckoutInput
@@ -39,7 +42,7 @@ export async function createTrialLessonCheckoutSession(
   const stripe = getStripeClient();
 
   const metadata: Record<string, string> = {
-    trial_lesson: "true",
+    trial_entitlement: "true",
     start_date: truncate(input.startDate, META_MAX),
     start_date_label: truncate(input.startDateLabel, META_MAX),
     full_name: truncate(input.fullName, META_MAX),
@@ -71,7 +74,7 @@ export async function createTrialLessonCheckoutSession(
     metadata,
     payment_intent_data: {
       metadata: {
-        trial_lesson: "true",
+        trial_entitlement: "true",
       },
     },
   });
