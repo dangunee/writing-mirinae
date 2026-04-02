@@ -16,11 +16,22 @@ export function StudentRouteGuard() {
           credentials: 'include',
         })
         if (cancelled) return
-        if (res.status === 401) {
-          setState('unauthorized')
+        if (res.status !== 401) {
+          setState('ok')
           return
         }
-        setState('ok')
+        const trialRes = await fetch(apiUrl('/api/writing/trial/session/current'), {
+          credentials: 'include',
+        })
+        if (cancelled) return
+        if (trialRes.ok) {
+          const data = (await trialRes.json()) as { ok?: boolean }
+          if (data?.ok === true) {
+            setState('ok')
+            return
+          }
+        }
+        setState('unauthorized')
       } catch {
         if (!cancelled) setState('error')
       }
@@ -40,8 +51,9 @@ export function StudentRouteGuard() {
   if (state === 'unauthorized') {
     return (
       <div className="writing-page">
-        <p className="status pending">로그인이 필요합니다.</p>
-        {/* TODO: 전용 로그인 URL이 생기면 Navigate 또는 링크로 연결 (지금은 프로젝트 내 로그인 라우트 없음) */}
+        <p className="status pending">
+          로그인이 필요합니다. 체험은 메일의 접근 링크를 사용해 주세요. / ログインが必要です。体験はメールのリンクからアクセスしてください。
+        </p>
       </div>
     )
   }

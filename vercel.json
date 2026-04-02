@@ -23,6 +23,12 @@
     },
     "api/writing/admin/trial-applications/[id]/resend-access.ts": {
       "maxDuration": 30
+    },
+    "api/writing/trial/access/consume.ts": {
+      "maxDuration": 30
+    },
+    "api/writing/trial/session/current.ts": {
+      "maxDuration": 15
     }
   },
   "redirects": [

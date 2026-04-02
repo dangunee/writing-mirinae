@@ -103,7 +103,11 @@ export default function TrialStartPage() {
         return
       }
       if (json.ok === true && typeof json.redirectTo === 'string' && json.redirectTo.trim()) {
-        window.location.assign(json.redirectTo.trim())
+        let url = json.redirectTo.trim()
+        if (url.includes('/writing/trial/submit')) {
+          url = url.replace(/\/writing\/trial\/submit\b/, '/writing/app')
+        }
+        window.location.assign(url)
         return
       }
       setPhase('consume_error')

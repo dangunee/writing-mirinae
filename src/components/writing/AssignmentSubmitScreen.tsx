@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import '../landing.css'
-import LandingNav from '../components/landing/LandingNav'
+import '../../landing.css'
+import LandingNav from '../landing/LandingNav'
+import type { AccessContext } from '../../types/writingAccess'
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024
 const ACCEPT = '.png,.jpg,.jpeg,.pdf'
@@ -57,11 +59,56 @@ function useNarrowScreen(): boolean {
   return narrow
 }
 
+export type AssignmentSubmitScreenProps = {
+  accessContext: AccessContext
+  /** 正規コース: 親コンポーネントが本文を保持 */
+  text?: string
+  onTextChange?: (value: string) => void
+  onPrimarySubmit?: () => void
+  onDraftSave?: () => void
+  primarySubmitDisabled?: boolean
+  primarySubmitLoading?: boolean
+  textareaDisabled?: boolean
+  /** 未指定時: trial のみ下書きボタン表示 */
+  showDraftButton?: boolean
+  desktopSlotBelowTabs?: ReactNode
+  /** デスクトップ: 提出ボタン列の下（進捗表など） */
+  desktopAfterSubmitSlot?: ReactNode
+  mobileSlotBelowTabs?: ReactNode
+  /** デスクトップ課題カード（未指定時は Stitch デモ） */
+  assignmentTitle?: string
+  assignmentDescription?: string
+  desktopTextareaPlaceholder?: string
+  mobileTextareaPlaceholder?: string
+  /** 未指定時は Stitch デモの Requirement ブロック */
+  requirementBlockDesktop?: ReactNode
+}
+
+const DEFAULT_ASSIGNMENT_TITLE = '約束'
+const DEFAULT_ASSIGNMENT_BODY = `우리는 일상생활에서 많은 약속을 하며 살아갑니다. 친구와의 약속, 자신과의 다짐, 혹은 사회적인 규칙 등 다양한 형태의 '약속'이 있습니다. 여러분에게 가장 소중한 약속은 무엇인가요? 평소에 약속을 잘 지키는 편인가요? 약속의 의미와 자신의 경험에 대해 써 보세요.`
+
 /**
- * 体験用課題提出 UI — Stitch HTML 準拠（デスクトップ / モバイル別ソース）
- * API・認証なし。ローカル state のみ。
+ * 作文提出 UI（Stitch）— trial / 正規で共通。提出 API は親または将来の loader で接続。
  */
-export default function TrialWritingPage() {
+export default function AssignmentSubmitScreen({
+  accessContext,
+  text: controlledText,
+  onTextChange,
+  onPrimarySubmit,
+  onDraftSave,
+  primarySubmitDisabled = false,
+  primarySubmitLoading = false,
+  textareaDisabled = false,
+  showDraftButton: showDraftButtonProp,
+  desktopSlotBelowTabs,
+  desktopAfterSubmitSlot,
+  mobileSlotBelowTabs,
+  assignmentTitle,
+  assignmentDescription,
+  desktopTextareaPlaceholder,
+  mobileTextareaPlaceholder,
+  requirementBlockDesktop,
+}: AssignmentSubmitScreenProps) {
   const navigate = useNavigate()
   const goApp = useCallback(() => {
     navigate('/writing/course')
@@ -80,17 +127,36 @@ export default function TrialWritingPage() {
     [calendarYear, calendarMonthIndex, calendarToday]
   )
 
-  const [text, setText] = useState('')
+  const [internalText, setInternalText] = useState('')
+  const text = controlledText !== undefined ? controlledText : internalText
+  const setText = useCallback(
+    (next: string) => {
+      const sliced = next.slice(0, maxChars)
+      if (onTextChange) onTextChange(sliced)
+      else setInternalText(sliced)
+    },
+    [maxChars, onTextChange]
+  )
+
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [dragOver, setDragOver] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const fileInputMobileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    setText((t) => (t.length > maxChars ? t.slice(0, maxChars) : t))
-  }, [maxChars])
+    if (controlledText === undefined) {
+      setInternalText((t) => (t.length > maxChars ? t.slice(0, maxChars) : t))
+    }
+  }, [maxChars, controlledText])
+
+  const showDraftButton = showDraftButtonProp ?? accessContext.type === 'trial'
 
   const count = text.length
+
+  const titleResolved = assignmentTitle ?? DEFAULT_ASSIGNMENT_TITLE
+  const bodyResolved = assignmentDescription ?? DEFAULT_ASSIGNMENT_BODY
+  const phDesktop = desktopTextareaPlaceholder ?? 'ここに韓国語で文章を入力してください...'
+  const phMobile = mobileTextareaPlaceholder ?? 'ここに論説を書き始めてください...'
 
   const validateFile = useCallback((f: File): boolean => {
     const okType = /^(image\/(png|jpeg)|application\/pdf)$/i.test(f.type) || /\.(png|jpg|jpeg|pdf)$/i.test(f.name)
@@ -109,16 +175,18 @@ export default function TrialWritingPage() {
   )
 
   const handleDraft = () => {
-    console.log('draft save clicked')
+    if (onDraftSave) onDraftSave()
+    else console.log('draft save clicked')
   }
 
   const handleSubmit = () => {
-    console.log('submit clicked')
+    if (onPrimarySubmit) onPrimarySubmit()
+    else console.log('submit clicked')
   }
 
-  const mobileSubmit = () => {
-    console.log('submit clicked')
-  }
+  const mobileSubmit = handleSubmit
+
+  const submitDisabled = primarySubmitDisabled || primarySubmitLoading
 
   return (
     <>
@@ -204,6 +272,8 @@ export default function TrialWritingPage() {
                   </div>
                 </header>
 
+                {desktopSlotBelowTabs}
+
                 <section className="rounded-xl p-8 mb-8 shadow-sm bg-white">
                   <div className="flex flex-col md:flex-row gap-8">
                     <div className="flex-1">
@@ -211,36 +281,36 @@ export default function TrialWritingPage() {
                         <span className="bg-[#000666]/10 text-[#000666] px-3 py-1 rounded-full text-xs font-bold font-['Manrope',sans-serif] tracking-widest uppercase">
                           Theme
                         </span>
-                        <h2 className="text-2xl font-bold text-[#1e1b13] mt-3 font-['Manrope',sans-serif]">約束</h2>
+                        <h2 className="text-2xl font-bold text-[#1e1b13] mt-3 font-['Manrope',sans-serif]">{titleResolved}</h2>
                       </div>
                       <div className="bg-white p-6 rounded-lg border border-[#c6c5d4]/10 mb-6">
-                        <p className="text-[#1e1b13] font-['Plus_Jakarta_Sans',sans-serif] leading-relaxed">
-                          우리는 일상생활에서 많은 약속을 하며 살아갑니다. 친구와의 약속, 자신과의 다짐, 혹은 사회적인 규칙 등 다양한 형태의
-                          &apos;약속&apos;이 있습니다. 여러분에게 가장 소중한 약속은 무엇인가요? 평소에 약속을 잘 지키는 편인가요? 약속의 의미와
-                          자신의 경험에 대해 써 보세요.
+                        <p className="text-[#1e1b13] font-['Plus_Jakarta_Sans',sans-serif] leading-relaxed whitespace-pre-line">
+                          {bodyResolved}
                         </p>
                       </div>
-                      <div className="space-y-4">
-                        <h3 className="font-bold text-[#000666] flex items-center gap-2 font-['Manrope',sans-serif]">
-                          <span className="material-symbols-outlined text-sm trial-writing-ms">info</span>
-                          Requirement
-                        </h3>
-                        <p className="text-sm text-[#454652] mb-4">下記に提示された文型を、必ず2つ以上使用すること。</p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="bg-white/60 p-4 rounded-lg border-l-4 border-[#000666]">
-                            <p className="font-bold text-sm">1. ○-기로 약속하다</p>
-                            <p className="text-xs text-[#454652] mt-1">例：다음 주말에 친구와 영화를 보기로 약속했다.</p>
-                          </div>
-                          <div className="bg-white/60 p-4 rounded-lg border-l-4 border-[#1b6d24]">
-                            <p className="font-bold text-sm">2. ○-하는 편이다</p>
-                            <p className="text-xs text-[#454652] mt-1">例：나는 약속 시간을 잘 지키는 편이다.</p>
-                          </div>
-                          <div className="bg-white/60 p-4 rounded-lg border-l-4 border-[#4c56af]">
-                            <p className="font-bold text-sm">3. ○-기 때문에</p>
-                            <p className="text-xs text-[#454652] mt-1">例：중요한 약속이기 때문에 늦으면 안 된다.</p>
+                      {requirementBlockDesktop ?? (
+                        <div className="space-y-4">
+                          <h3 className="font-bold text-[#000666] flex items-center gap-2 font-['Manrope',sans-serif]">
+                            <span className="material-symbols-outlined text-sm trial-writing-ms">info</span>
+                            Requirement
+                          </h3>
+                          <p className="text-sm text-[#454652] mb-4">下記に提示された文型を、必ず2つ以上使用すること。</p>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="bg-white/60 p-4 rounded-lg border-l-4 border-[#000666]">
+                              <p className="font-bold text-sm">1. ○-기로 약속하다</p>
+                              <p className="text-xs text-[#454652] mt-1">例：다음 주말에 친구와 영화를 보기로 약속했다.</p>
+                            </div>
+                            <div className="bg-white/60 p-4 rounded-lg border-l-4 border-[#1b6d24]">
+                              <p className="font-bold text-sm">2. ○-하는 편이다</p>
+                              <p className="text-xs text-[#454652] mt-1">例：나는 약속 시간을 잘 지키는 편이다.</p>
+                            </div>
+                            <div className="bg-white/60 p-4 rounded-lg border-l-4 border-[#4c56af]">
+                              <p className="font-bold text-sm">3. ○-기 때문에</p>
+                              <p className="text-xs text-[#454652] mt-1">例：중요한 약속이기 때문에 늦으면 안 된다.</p>
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   </div>
                 </section>
@@ -249,9 +319,10 @@ export default function TrialWritingPage() {
                   <div className="relative">
                     <textarea
                       value={text}
-                      onChange={(e) => setText(e.target.value.slice(0, maxChars))}
-                      className="w-full min-h-80 bg-white p-8 rounded-xl border-none shadow-[0_10px_40px_rgba(30,27,19,0.04)] focus:ring-2 focus:ring-[#000666]/20 text-lg leading-relaxed font-['Plus_Jakarta_Sans',sans-serif] placeholder:text-[#1e1b13]/20"
-                      placeholder="ここに韓国語で文章を入力してください..."
+                      onChange={(e) => setText(e.target.value)}
+                      disabled={textareaDisabled}
+                      className="w-full min-h-80 bg-white p-8 rounded-xl border-none shadow-[0_10px_40px_rgba(30,27,19,0.04)] focus:ring-2 focus:ring-[#000666]/20 text-lg leading-relaxed font-['Plus_Jakarta_Sans',sans-serif] placeholder:text-[#1e1b13]/20 disabled:bg-[#f5f5f5]/80 disabled:cursor-not-allowed"
+                      placeholder={phDesktop}
                     />
                     <div className="absolute bottom-4 right-6 text-sm font-['Manrope',sans-serif] tracking-widest text-[#1e1b13]/40">
                       {Math.min(count, maxChars)} / {maxChars}
@@ -308,21 +379,25 @@ export default function TrialWritingPage() {
                   </div>
 
                   <div className="flex justify-end gap-4 mt-10 pb-20 lg:pb-0">
-                    <button
-                      type="button"
-                      onClick={handleDraft}
-                      className="px-8 py-3 rounded-lg font-bold text-[#000666] border border-[#000666]/20 hover:bg-[#000666]/5 transition-colors"
-                    >
-                      下書き保存
-                    </button>
+                    {showDraftButton ? (
+                      <button
+                        type="button"
+                        onClick={handleDraft}
+                        className="px-8 py-3 rounded-lg font-bold text-[#000666] border border-[#000666]/20 hover:bg-[#000666]/5 transition-colors"
+                      >
+                        下書き保存
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       onClick={handleSubmit}
-                      className="px-8 py-3 rounded-lg font-bold bg-[#000666] text-white shadow-lg hover:opacity-90 transition-transform active:scale-95"
+                      disabled={submitDisabled}
+                      className="px-8 py-3 rounded-lg font-bold bg-[#000666] text-white shadow-lg hover:opacity-90 transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      課題を提出する
+                      {primarySubmitLoading ? '提出中…' : '課題を提出する'}
                     </button>
                   </div>
+                  {desktopAfterSubmitSlot}
                 </section>
               </div>
             </div>
@@ -463,6 +538,8 @@ export default function TrialWritingPage() {
             </button>
           </div>
 
+          {mobileSlotBelowTabs}
+
           <div className="mb-10">
             <div className="inline-block px-3 py-1 rounded-full bg-black/5 text-[10px] font-['Manrope',sans-serif] font-bold tracking-widest text-[#000666] mb-3">
               LESSON 04
@@ -521,9 +598,10 @@ export default function TrialWritingPage() {
               <div className="relative group">
                 <textarea
                   value={text}
-                  onChange={(e) => setText(e.target.value.slice(0, maxChars))}
-                  className="w-full min-h-80 p-8 rounded-2xl bg-white border-none focus:ring-2 focus:ring-[#000666]/20 text-lg leading-relaxed placeholder:text-[#767683]/50 shadow-[0_4px_20px_rgba(0,0,0,0.05)]"
-                  placeholder="ここに論説を書き始めてください..."
+                  onChange={(e) => setText(e.target.value)}
+                  disabled={textareaDisabled}
+                  className="w-full min-h-80 p-8 rounded-2xl bg-white border-none focus:ring-2 focus:ring-[#000666]/20 text-lg leading-relaxed placeholder:text-[#767683]/50 shadow-[0_4px_20px_rgba(0,0,0,0.05)] disabled:bg-[#f5f5f5]/80 disabled:cursor-not-allowed"
+                  placeholder={phMobile}
                 />
                 <div className="absolute bottom-4 right-4 flex gap-2">
                   <button type="button" className="p-2 rounded-lg bg-[#e5e5e5] text-[#454652] hover:bg-[#e1e1e1] transition-colors">
@@ -563,7 +641,8 @@ export default function TrialWritingPage() {
             <button
               type="button"
               onClick={mobileSubmit}
-              className="w-full py-5 bg-gradient-to-r from-[#000666] to-[#1a237e] text-white rounded-xl font-['Manrope',sans-serif] font-bold text-lg shadow-xl shadow-[#000666]/10 active:scale-[0.98] transition-transform flex items-center justify-center gap-3"
+              disabled={submitDisabled}
+              className="w-full py-5 bg-gradient-to-r from-[#000666] to-[#1a237e] text-white rounded-xl font-['Manrope',sans-serif] font-bold text-lg shadow-xl shadow-[#000666]/10 active:scale-[0.98] transition-transform flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span className="material-symbols-outlined trial-writing-ms" style={{ fontVariationSettings: "'FILL' 1" }}>
                 send
