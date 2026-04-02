@@ -5,8 +5,9 @@
  * Vercel Node ランタイムは `IncomingMessage` / `ServerResponse` を渡すことが多く、
  * Web `Request` の `arrayBuffer()` は存在しない → raw body を自前で読む。
  *
- * `db/schema` や `server/` は serverless バンドルに含まれないため import しない。
- * trial_lesson / payment_order の DB は `stripeCommerceSql.ts`（raw SQL）に分離。
+ * 本番では相対パス・動的 import を使わない（追加チャンクが /var/task に無く MODULE_NOT_FOUND になるため）。
+ * trial_entitlement → mirinae-api internal fulfill のみ実装。
+ * trial_lesson / payment_order は別経路で復活予定のためこのハンドラでは 200 のみ返してログする。
  */
 import type { IncomingMessage, ServerResponse } from "http";
 
@@ -19,9 +20,6 @@ export const config = {
     bodyParser: false,
   },
 };
-
-/** 体験レッスン — サーバー固定金額（Stripe / メール共通）。 */
-const TRIAL_LESSON_AMOUNT_JPY = 1800;
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -53,123 +51,6 @@ function metadataDebug(meta: Stripe.Metadata | null | undefined): Record<string,
     has_application_id: typeof meta.application_id === "string" && meta.application_id.length > 0,
     has_payment_order_id: typeof meta.payment_order_id === "string" && meta.payment_order_id.length > 0,
   };
-}
-
-/** 学習者リンクは常に「サイトオリジン + /writing/app」。SITE_URL にパスが含まれると /writing/writing/app になるため origin のみ使う */
-function siteBaseUrl(): string {
-  const raw =
-    process.env.TRIAL_WRITING_SITE_URL?.trim() ||
-    process.env.SITE_URL?.trim() ||
-    "https://writing-mirinae.vercel.app";
-  try {
-    const u = new URL(raw.endsWith("/") ? raw : `${raw}/`);
-    return u.origin;
-  } catch {
-    return "https://writing-mirinae.vercel.app";
-  }
-}
-
-function mdEscape(s: string): string {
-  return s.replace(/\|/g, "\\|");
-}
-
-/**
- * Resend REST API — RESEND_API_KEY が無い場合はスキップ（ログのみ）
- */
-async function sendTrialLessonEmailsFromStripeSession(session: Stripe.Checkout.Session): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY?.trim();
-  const adminTo = process.env.TRIAL_LESSON_ADMIN_EMAIL?.trim();
-  const from = process.env.RESEND_FROM_EMAIL?.trim() || "Writing <onboarding@resend.dev>";
-
-  const meta = session.metadata ?? {};
-  const fullName = meta.full_name ?? "";
-  const furigana = meta.furigana ?? "";
-  const email = (session.customer_details?.email ?? session.customer_email ?? "").trim();
-  const koreanLevel = meta.korean_level ?? "";
-  const startDate = meta.start_date ?? "";
-  const startDateLabel = meta.start_date_label ?? "";
-  const inquiry = meta.inquiry?.trim() ?? "";
-
-  if (!apiKey) {
-    console.warn("trial_lesson_email_skipped", { reason: "RESEND_API_KEY missing" });
-    return;
-  }
-
-  const adminSubject = `[体験レッスン] 決済完了 ${fullName || email || session.id}`;
-  const adminText = [
-    "体験レッスンの決済が完了しました。",
-    "",
-    `Stripe Session: ${session.id}`,
-    `金額: ${TRIAL_LESSON_AMOUNT_JPY} JPY`,
-    `タイプ: trial lesson`,
-    "",
-    `お名前: ${mdEscape(fullName)}`,
-    `ふりがな: ${mdEscape(furigana)}`,
-    `メール: ${mdEscape(email)}`,
-    `韓国語レベル: ${mdEscape(koreanLevel)}`,
-    `開始日(ISO): ${mdEscape(startDate)}`,
-    `開始日(表示): ${mdEscape(startDateLabel)}`,
-    inquiry ? `お問い合わせ: ${mdEscape(inquiry)}` : "",
-  ]
-    .filter(Boolean)
-    .join("\n");
-
-  const base = siteBaseUrl();
-  const studentAppUrl = `${base}/writing/app`;
-  console.info("trial_lesson_student_link_built", {
-    linkKind: "legacy_app_link",
-    studentAppPath: "/writing/app",
-  });
-  const studentSubject = "【ミリネ韓国語教室】体験レッスンのお申し込みが完了しました";
-  const studentText = [
-    `${fullName || "お客様"} 様`,
-    "",
-    "このたびは、ミリネ韓国語教室 作文トレーニング体験レッスンに",
-    "お申し込みいただき、ありがとうございます。",
-    "",
-    "お支払いの確認が完了しました。",
-    "下記リンクより、すぐに課題作成を開始していただけます。",
-    "",
-    "課題開始:",
-    studentAppUrl,
-    "",
-    "※ お支払い完了後の返金はできませんので、あらかじめご了承ください。",
-    "",
-    "ミリネ韓国語教室",
-  ].join("\n");
-
-  const send = async (to: string, subject: string, text: string) => {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ from, to: [to], subject, text }),
-    });
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`resend_${res.status}: ${errText}`);
-    }
-  };
-
-  if (adminTo) {
-    try {
-      await send(adminTo, adminSubject, adminText);
-    } catch (e) {
-      console.error("trial_lesson_admin_email_failed", e);
-    }
-  } else {
-    console.warn("trial_lesson_admin_email_skipped", { reason: "TRIAL_LESSON_ADMIN_EMAIL missing" });
-  }
-
-  if (email) {
-    try {
-      await send(email, studentSubject, studentText);
-    } catch (e) {
-      console.error("trial_lesson_student_email_failed", e);
-    }
-  }
 }
 
 /**
@@ -245,7 +126,6 @@ async function handleWritingStripeWebhookPostInner(req: Request): Promise<Respon
     metadata: metadataDebug(session.metadata),
   });
 
-  // --- trial_entitlement: DB なし。mirinae-api internal fulfill のみ（Vercel で最優先で動かす） ---
   if (session.metadata?.trial_entitlement === "true") {
     const applicationId =
       typeof session.metadata.application_id === "string" ? session.metadata.application_id.trim() : "";
@@ -330,130 +210,30 @@ async function handleWritingStripeWebhookPostInner(req: Request): Promise<Respon
     return empty(200);
   }
 
-  // trial_entitlement 以外のみ DB（raw SQL）を読み込む — チェックアウト体験は上記分岐だけで完結
-  const { insertStripeWebhookEventIdempotent, fulfillWritingPurchaseSql } = await import(
-    "./stripeCommerceSql"
-  );
-
-  // --- trial_lesson / payment_order（stripeCommerceSql） ---
-
   if (session.metadata?.trial_lesson === "true") {
-    console.info("writing_webhook_branch_decision", { branch: "trial_lesson", sessionId: session.id });
-
-    const currency = (session.currency ?? "").toLowerCase();
-    if (currency !== "jpy") {
-      return json({ error: "unsupported_currency" }, 400);
-    }
-    const amountTotal = session.amount_total;
-    if (amountTotal == null) {
-      return json({ error: "missing_amount" }, 400);
-    }
-    if (amountTotal !== TRIAL_LESSON_AMOUNT_JPY) {
-      console.error("trial_lesson_amount_mismatch", {
-        amountTotal,
-        expected: TRIAL_LESSON_AMOUNT_JPY,
-        sessionId: session.id,
-      });
-      return json({ error: "amount_mismatch" }, 400);
-    }
-
-    let recorded: boolean;
-    try {
-      recorded = await insertStripeWebhookEventIdempotent(event.id);
-    } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
-      console.error("writing_webhook_getdb_failed", { message });
-      return json({ error: "database_unavailable" }, 500);
-    }
-    if (!recorded) {
-      console.info("writing_webhook_trial_lesson_duplicate", { stripeEventId: event.id });
-      return empty(200);
-    }
-
-    console.info("writing_webhook_branch", {
-      stripeEventId: event.id,
-      sessionId: session.id,
+    console.warn("writing_webhook_legacy_branch_disabled", {
       branch: "trial_lesson",
-      mailFn: "sendTrialLessonEmailsFromStripeSession",
-      studentLinkKind: "legacy_app_link",
-    });
-
-    try {
-      await sendTrialLessonEmailsFromStripeSession(session);
-    } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
-      console.error("trial_lesson_email_send_error", { message });
-    }
-
-    console.info("trial_lesson_checkout_completed", {
-      stripeEventId: event.id,
       sessionId: session.id,
-      paymentStatus: session.payment_status,
+      note: "not_handled_in_minimal_serverless_webhook",
     });
     return empty(200);
   }
 
-  const paymentOrderId = session.metadata?.payment_order_id;
-  const supabaseUserId = session.metadata?.supabase_user_id ?? null;
-
-  if (!paymentOrderId) {
-    console.warn("writing_webhook_branch_decision", {
-      branch: "none",
-      reason: "missing_payment_order_and_not_trial",
+  if (session.metadata?.payment_order_id) {
+    console.warn("writing_webhook_legacy_branch_disabled", {
+      branch: "payment_order",
       sessionId: session.id,
+      hasPaymentOrderMetadata: true,
+      note: "not_handled_in_minimal_serverless_webhook",
     });
-    return json({ error: "missing_payment_order" }, 400);
+    return empty(200);
   }
 
   console.info("writing_webhook_branch_decision", {
-    branch: "payment_order",
+    branch: "none",
+    reason: "no_trial_entitlement_or_legacy_metadata",
     sessionId: session.id,
-    hasPaymentOrderId: true,
   });
-
-  const currency = (session.currency ?? "").toLowerCase();
-  if (currency !== "jpy") {
-    return json({ error: "unsupported_currency" }, 400);
-  }
-
-  const amountTotal = session.amount_total;
-  if (amountTotal == null) {
-    return json({ error: "missing_amount" }, 400);
-  }
-
-  const paymentIntentId =
-    typeof session.payment_intent === "string"
-      ? session.payment_intent
-      : session.payment_intent && typeof session.payment_intent === "object"
-        ? session.payment_intent.id
-        : null;
-
-  let result: Awaited<ReturnType<typeof fulfillWritingPurchaseSql>>;
-  try {
-    result = await fulfillWritingPurchaseSql({
-      paymentOrderId,
-      stripeEventId: event.id,
-      stripePaymentIntentId: paymentIntentId,
-      amountTotalYen: amountTotal,
-      metadataSupabaseUserId: supabaseUserId,
-    });
-  } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    console.error("writing_webhook_getdb_failed", { message });
-    return json({ error: "database_unavailable" }, 500);
-  }
-
-  if (!result.ok) {
-    console.error("fulfillment_failed", result.reason);
-    return json({ error: result.reason }, 500);
-  }
-
-  console.info("writing_webhook_branch", {
-    stripeEventId: event.id,
-    sessionId: session.id,
-    branch: "writing_purchase_fulfillment",
-  });
-
   return empty(200);
 }
 
