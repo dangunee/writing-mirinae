@@ -12,7 +12,6 @@ import {
   type TrialPaymentCheckoutState,
 } from '../types/trialPaymentCheckout'
 import type { TrialPaymentCalendarState, TrialPaymentFormValues } from '../types/trialPaymentForm'
-import { apiUrl, logApiFetch } from '../lib/apiUrl'
 import { formatJpDate } from '../utils/trialPaymentCalendar'
 
 const MOBILE_LEVEL_LABELS: Record<string, string> = {
@@ -207,14 +206,20 @@ export default function PaymentPage() {
       ...(inquiryTrim ? { inquiry: inquiryTrim } : {}),
     }
 
-    const path = '/api/bank-transfer-notify'
     setBankTransferSubmitting(true)
     const controller = new AbortController()
     const timeoutMs = 15000
     const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs)
     try {
-      logApiFetch('POST', path)
-      const res = await fetch(apiUrl(path), {
+      const apiBase = import.meta.env.VITE_API_BASE_URL?.trim() ?? ''
+      const fullUrl = apiBase ? `${apiBase.replace(/\/$/, '')}/api/bank-transfer-notify` : ''
+      console.log('[bank-transfer] import.meta.env.VITE_API_BASE_URL:', import.meta.env.VITE_API_BASE_URL)
+      console.log('[bank-transfer] fetch URL:', fullUrl)
+      if (!fullUrl) {
+        console.error('[bank-transfer] VITE_API_BASE_URL is empty; absolute API URL required')
+        return
+      }
+      const res = await fetch(fullUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         signal: controller.signal,
@@ -229,6 +234,9 @@ export default function PaymentPage() {
         }),
       })
       const text = await res.text()
+      console.log('[bank-transfer] response status:', res.status)
+      console.log('[bank-transfer] response content-type:', res.headers.get('content-type'))
+      console.log('[bank-transfer] response body (text):', text)
       let json: { ok?: boolean; error?: string } = {}
       try {
         json = text ? (JSON.parse(text) as { ok?: boolean; error?: string }) : {}
