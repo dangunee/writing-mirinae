@@ -36,6 +36,14 @@ export function trialPaymentApiUrl(path: string): string {
   return normalizePath(path)
 }
 
+/**
+ * 体験・銀行振込管理 BFF 専用。`VITE_API_BASE_URL` を無視し同一オリジンのみ。
+ * ブラウザが mirinae-api を直接叩かないようにする（CORS / 秘密の流出防止）。
+ */
+export function trialAdminBffApiUrl(path: string): string {
+  return normalizePath(path)
+}
+
 /** 開発中のみ: 実際に fetch する URL をコンソールに出す */
 export function logApiFetch(method: string, path: string): void {
   if (!import.meta.env.DEV) return

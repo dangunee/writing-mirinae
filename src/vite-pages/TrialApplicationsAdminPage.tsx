@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { apiUrl } from '../lib/apiUrl'
+import { trialAdminBffApiUrl } from '../lib/apiUrl'
 
 const STORAGE_KEY = 'writing_trial_admin_bff_token'
 
@@ -51,7 +51,7 @@ export default function TrialApplicationsAdminPage() {
     setLoading(true)
     setListError(null)
     try {
-      const res = await fetch(apiUrl('/api/writing/admin/trial-applications'), {
+      const res = await fetch(trialAdminBffApiUrl('/api/writing/admin/trial-applications'), {
         headers: { ...authHeaders(t) },
       })
       const data = (await res.json()) as { ok?: boolean; items?: Row[]; error?: string }
@@ -103,7 +103,7 @@ export default function TrialApplicationsAdminPage() {
     setBusyId(id)
     setBanner(null)
     try {
-      const res = await fetch(apiUrl(`/api/writing/admin/trial-applications/${encodeURIComponent(id)}/activate`), {
+      const res = await fetch(trialAdminBffApiUrl(`/api/writing/admin/trial-applications/${encodeURIComponent(id)}/activate`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
         body: JSON.stringify({}),
@@ -126,7 +126,7 @@ export default function TrialApplicationsAdminPage() {
     setBusyId(id)
     setBanner(null)
     try {
-      const res = await fetch(apiUrl(`/api/writing/admin/trial-applications/${encodeURIComponent(id)}/resend-access`), {
+      const res = await fetch(trialAdminBffApiUrl(`/api/writing/admin/trial-applications/${encodeURIComponent(id)}/resend-access`), {
         method: 'POST',
         headers: { ...authHeaders(token) },
       })
