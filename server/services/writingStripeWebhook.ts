@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import Stripe from "stripe";
 
 import { getDb } from "../db/client";
@@ -7,12 +6,16 @@ import { fulfillWritingPurchase } from "./writingFulfillment";
 import { sendTrialLessonEmailsFromStripeSession } from "./trialLessonEmails";
 import { TRIAL_LESSON_AMOUNT_JPY } from "./trialLessonStripe";
 
-function getStripe(): Stripe {
-  const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) {
-    throw new Error("STRIPE_SECRET_KEY is required");
-  }
-  return new Stripe(key, { typescript: true });
+/** Vercel 純サーバレスでは `next/server` の NextResponse がランタイムエラーになることがあるため Web 標準のみ使う */
+function json(data: unknown, status: number): Response {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json; charset=utf-8" },
+  });
+}
+
+function empty(status: number): Response {
+  return new Response(null, { status });
 }
 
 const UUID_RE =
@@ -22,29 +25,35 @@ const UUID_RE =
  * POST /api/webhooks/stripe — Vercel `api/webhooks/stripe.ts` と Next `app/api/...` の両方から呼ぶ。
  */
 export async function handleWritingStripeWebhookPost(req: Request): Promise<Response> {
+  const stripeKey = process.env.STRIPE_SECRET_KEY?.trim();
+  if (!stripeKey) {
+    console.error("STRIPE_SECRET_KEY missing");
+    return json({ error: "server_misconfigured" }, 500);
+  }
+
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!secret) {
     console.error("STRIPE_WEBHOOK_SECRET missing");
-    return NextResponse.json({ error: "server_misconfigured" }, { status: 500 });
+    return json({ error: "server_misconfigured" }, 500);
   }
 
   const signature = req.headers.get("stripe-signature");
   if (!signature) {
-    return NextResponse.json({ error: "missing_signature" }, { status: 400 });
+    return json({ error: "missing_signature" }, 400);
   }
 
   const rawBody = Buffer.from(await req.arrayBuffer());
-  const stripe = getStripe();
+  const stripe = new Stripe(stripeKey, { typescript: true });
 
   let event: Stripe.Event;
   try {
     event = stripe.webhooks.constructEvent(rawBody, signature, secret);
   } catch {
-    return NextResponse.json({ error: "invalid_signature" }, { status: 401 });
+    return json({ error: "invalid_signature" }, 401);
   }
 
   if (event.type !== "checkout.session.completed") {
-    return new NextResponse(null, { status: 200 });
+    return empty(200);
   }
 
   const session = event.data.object as Stripe.Checkout.Session;
@@ -65,7 +74,7 @@ export async function handleWritingStripeWebhookPost(req: Request): Promise<Resp
         sessionId: session.id,
         hasApplicationId: Boolean(applicationId),
       });
-      return NextResponse.json({ error: "invalid_trial_entitlement_metadata" }, { status: 400 });
+      return json({ error: "invalid_trial_entitlement_metadata" }, 400);
     }
 
     const apiBase = process.env.MIRINAE_API_BASE_URL?.trim() ?? "";
@@ -75,7 +84,7 @@ export async function handleWritingStripeWebhookPost(req: Request): Promise<Resp
         hasApiBase: Boolean(apiBase),
         hasFulfillSecret: Boolean(fulfillSecret),
       });
-      return NextResponse.json({ error: "server_misconfigured" }, { status: 500 });
+      return json({ error: "server_misconfigured" }, 500);
     }
 
     const url = `${apiBase.replace(/\/$/, "")}/api/internal/trial/fulfill-checkout-session`;
@@ -102,7 +111,7 @@ export async function handleWritingStripeWebhookPost(req: Request): Promise<Resp
           body: text.slice(0, 500),
           sessionId: session.id,
         });
-        return NextResponse.json({ error: "trial_entitlement_fulfill_failed" }, { status: 502 });
+        return json({ error: "trial_entitlement_fulfill_failed" }, 502);
       }
       console.info("writing_webhook_trial_entitlement_proxy_ok", {
         stripeEventId: event.id,
@@ -111,20 +120,20 @@ export async function handleWritingStripeWebhookPost(req: Request): Promise<Resp
       });
     } catch (e) {
       console.error("writing_webhook_trial_entitlement_proxy_error", e);
-      return NextResponse.json({ error: "trial_entitlement_fulfill_failed" }, { status: 502 });
+      return json({ error: "trial_entitlement_fulfill_failed" }, 502);
     }
 
-    return new NextResponse(null, { status: 200 });
+    return empty(200);
   }
 
   if (session.metadata?.trial_lesson === "true") {
     const currency = (session.currency ?? "").toLowerCase();
     if (currency !== "jpy") {
-      return NextResponse.json({ error: "unsupported_currency" }, { status: 400 });
+      return json({ error: "unsupported_currency" }, 400);
     }
     const amountTotal = session.amount_total;
     if (amountTotal == null) {
-      return NextResponse.json({ error: "missing_amount" }, { status: 400 });
+      return json({ error: "missing_amount" }, 400);
     }
     if (amountTotal !== TRIAL_LESSON_AMOUNT_JPY) {
       console.error("trial_lesson_amount_mismatch", {
@@ -132,17 +141,23 @@ export async function handleWritingStripeWebhookPost(req: Request): Promise<Resp
         expected: TRIAL_LESSON_AMOUNT_JPY,
         sessionId: session.id,
       });
-      return NextResponse.json({ error: "amount_mismatch" }, { status: 400 });
+      return json({ error: "amount_mismatch" }, 400);
     }
 
-    const db = getDb();
+    let db: ReturnType<typeof getDb>;
+    try {
+      db = getDb();
+    } catch (e) {
+      console.error("writing_webhook_getdb_failed", e);
+      return json({ error: "database_unavailable" }, 500);
+    }
     const recorded = await repo.insertStripeWebhookEvent(db, {
       stripeEventId: event.id,
       payloadHash: null,
     });
     if (!recorded) {
       console.info("writing_webhook_trial_lesson_duplicate", { stripeEventId: event.id });
-      return new NextResponse(null, { status: 200 });
+      return empty(200);
     }
 
     console.info("writing_webhook_branch", {
@@ -166,24 +181,24 @@ export async function handleWritingStripeWebhookPost(req: Request): Promise<Resp
       paymentStatus: session.payment_status,
       metadata: session.metadata,
     });
-    return new NextResponse(null, { status: 200 });
+    return empty(200);
   }
 
   const paymentOrderId = session.metadata?.payment_order_id;
   const supabaseUserId = session.metadata?.supabase_user_id ?? null;
 
   if (!paymentOrderId) {
-    return NextResponse.json({ error: "missing_payment_order" }, { status: 400 });
+    return json({ error: "missing_payment_order" }, 400);
   }
 
   const currency = (session.currency ?? "").toLowerCase();
   if (currency !== "jpy") {
-    return NextResponse.json({ error: "unsupported_currency" }, { status: 400 });
+    return json({ error: "unsupported_currency" }, 400);
   }
 
   const amountTotal = session.amount_total;
   if (amountTotal == null) {
-    return NextResponse.json({ error: "missing_amount" }, { status: 400 });
+    return json({ error: "missing_amount" }, 400);
   }
 
   const paymentIntentId =
@@ -193,7 +208,14 @@ export async function handleWritingStripeWebhookPost(req: Request): Promise<Resp
         ? session.payment_intent.id
         : null;
 
-  const db = getDb();
+  let db: ReturnType<typeof getDb>;
+  try {
+    db = getDb();
+  } catch (e) {
+    console.error("writing_webhook_getdb_failed", e);
+    return json({ error: "database_unavailable" }, 500);
+  }
+
   const result = await fulfillWritingPurchase(db, {
     paymentOrderId,
     stripeEventId: event.id,
@@ -204,7 +226,7 @@ export async function handleWritingStripeWebhookPost(req: Request): Promise<Resp
 
   if (!result.ok) {
     console.error("fulfillment_failed", result.reason);
-    return NextResponse.json({ error: result.reason }, { status: 500 });
+    return json({ error: result.reason }, 500);
   }
 
   console.info("writing_webhook_branch", {
@@ -213,5 +235,5 @@ export async function handleWritingStripeWebhookPost(req: Request): Promise<Resp
     branch: "writing_purchase_fulfillment",
   });
 
-  return new NextResponse(null, { status: 200 });
+  return empty(200);
 }
