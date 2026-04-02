@@ -4,7 +4,7 @@ import LandingNav from '../components/landing/LandingNav'
 import TrialPaymentCheckoutCanceled from '../components/payment/TrialPaymentCheckoutCanceled'
 import TrialPaymentCheckoutDesktop from '../components/payment/TrialPaymentCheckoutDesktop'
 import TrialPaymentCheckoutMobile from '../components/payment/TrialPaymentCheckoutMobile'
-import { apiUrl, isApiBaseConfigured, logApiFetch } from '../lib/apiUrl'
+import { isApiBaseConfigured, logApiFetch, trialPaymentApiUrl } from '../lib/apiUrl'
 import { parseTrialPaymentCheckoutState } from '../lib/paymentCompleteState'
 import '../landing.css'
 import '../trial-payment-checkout.css'
@@ -106,7 +106,7 @@ export default function TrialPaymentCheckoutPage() {
         }
         const path = `/api/writing/trial-payment/payment-result?session_id=${encodeURIComponent(sessionId)}`
         logApiFetch('GET', path)
-        const res = await fetch(apiUrl(path))
+        const res = await fetch(trialPaymentApiUrl(path))
         const text = await res.text()
         let json: { ok?: boolean; student?: unknown; trialFlow?: string } = {}
         try {
@@ -151,18 +151,11 @@ export default function TrialPaymentCheckoutPage() {
     setPayLoading(true)
     const checkoutPath = '/api/writing/trial-payment/create-checkout-session'
     try {
-      if (!isApiBaseConfigured()) {
-        setPayError(
-          'API の接続先が設定されていません。VITE_API_BASE_URL を設定して再ビルド・再デプロイしてください。'
-        )
-        setPayLoading(false)
-        return
-      }
       const origin = window.location.origin
       const successUrl = `${origin}/writing/trial-payment/checkout?success=true&session_id={CHECKOUT_SESSION_ID}`
       const cancelUrl = `${origin}/writing/trial-payment/checkout?canceled=true`
       logApiFetch('POST', checkoutPath)
-      const res = await fetch(apiUrl(checkoutPath), {
+      const res = await fetch(trialPaymentApiUrl(checkoutPath), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

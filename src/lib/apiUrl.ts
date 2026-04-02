@@ -3,6 +3,10 @@
  *
  * - `VITE_API_BASE_URL` があればそのオリジンに接続（別ドメインの API 用）。
  * - 未設定時は相対パス `/api/...`（開発: Vite proxy → Next、本番: 同一オリジンの Vercel Serverless `api/`）。
+ *
+ * 体験決済（trial-payment）は writing-mirinae 同一デプロイの `api/writing/trial-payment/*` を叩く必要がある。
+ * `VITE_API_BASE_URL` が mirinae-api 等を指していると Next/Vercel 側のハンドラに届かないため、
+ * `trialPaymentApiUrl` は常に相対パス（同一オリジン）を返す。
  */
 
 function normalizePath(path: string): string {
@@ -25,6 +29,11 @@ export function isApiBaseConfigured(): boolean {
 
 export function apiUrl(path: string): string {
   return resolveApiUrl(path)
+}
+
+/** 体験決済専用: 必ず現在サイトの `/api/writing/trial-payment/...`（Vercel `api/writing/...`）へ */
+export function trialPaymentApiUrl(path: string): string {
+  return normalizePath(path)
 }
 
 /** 開発中のみ: 実際に fetch する URL をコンソールに出す */

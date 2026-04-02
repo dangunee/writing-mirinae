@@ -8,6 +8,12 @@
     },
     "api/webhooks/stripe.ts": {
       "maxDuration": 30
+    },
+    "api/writing/trial-payment/create-checkout-session.ts": {
+      "maxDuration": 30
+    },
+    "api/writing/trial-payment/payment-result.ts": {
+      "maxDuration": 30
     }
   },
   "redirects": [
