@@ -50,9 +50,12 @@ export function parsePaymentCompleteNavigateState(raw: unknown): PaymentComplete
   const pm = o.paymentMethod
   if (pm !== 'card' && pm !== 'bank_transfer') return null
   const formData = o.formData
+  const tf = o.trialFlow
+  const trialFlow =
+    tf === 'entitlement' || tf === 'trial_lesson' ? tf : undefined
   if (pm === 'card') {
     const parsed = parseTrialPaymentCheckoutState(formData)
-    return parsed ? { paymentMethod: 'card', formData: parsed } : null
+    return parsed ? { paymentMethod: 'card', formData: parsed, trialFlow } : null
   }
   const parsed = parseBankTransferCompleteState(formData)
   return parsed ? { paymentMethod: 'bank_transfer', formData: parsed } : null

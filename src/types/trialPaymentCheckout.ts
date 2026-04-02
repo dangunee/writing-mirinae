@@ -25,10 +25,15 @@ export type TrialPaymentCheckoutState = {
   inquiry?: string
 }
 
+/** カード決済の Stripe metadata 由来（payment-result API） */
+export type TrialPaymentCheckoutTrialFlow = 'entitlement' | 'trial_lesson'
+
 /** React Router location.state — /writing/app/complete（カード・銀行振込共通） */
 export type PaymentCompleteNavigateState = {
   paymentMethod: 'card' | 'bank_transfer'
   formData: TrialPaymentCheckoutState | BankTransferCompleteState
+  /** カードのみ。entitlement のときはメールのトークンリンクが正規ルートのため /writing/app へ誘導しない */
+  trialFlow?: TrialPaymentCheckoutTrialFlow
 }
 
 export const TRIAL_PAYMENT_DRAFT_KEY = 'writing-trial-payment-draft'

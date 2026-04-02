@@ -56,6 +56,7 @@ export default function TrialPaymentCheckoutPage() {
   const [payError, setPayError] = useState<string | null>(null)
   const [hydrated, setHydrated] = useState(false)
   const [successResolved, setSuccessResolved] = useState<TrialPaymentCheckoutState | null>(null)
+  const [successTrialFlow, setSuccessTrialFlow] = useState<'entitlement' | 'trial_lesson' | null>(null)
   const [successResolveLoading, setSuccessResolveLoading] = useState(() => success && !!sessionId)
 
   useEffect(() => {
@@ -98,6 +99,7 @@ export default function TrialPaymentCheckoutPage() {
         if (!isApiBaseConfigured()) {
           if (!cancelled) {
             setSuccessResolved(fallback())
+            setSuccessTrialFlow(null)
             setSuccessResolveLoading(false)
           }
           return
@@ -106,24 +108,33 @@ export default function TrialPaymentCheckoutPage() {
         logApiFetch('GET', path)
         const res = await fetch(apiUrl(path))
         const text = await res.text()
-        let json: { ok?: boolean; student?: unknown } = {}
+        let json: { ok?: boolean; student?: unknown; trialFlow?: string } = {}
         try {
-          json = text ? (JSON.parse(text) as { ok?: boolean; student?: unknown }) : {}
+          json = text ? (JSON.parse(text) as { ok?: boolean; student?: unknown; trialFlow?: string }) : {}
         } catch {
           if (!cancelled) {
             setSuccessResolved(fallback())
+            setSuccessTrialFlow(null)
             setSuccessResolveLoading(false)
           }
           return
         }
         if (!cancelled) {
           const parsed = res.ok && json.ok ? parsePaymentResultStudent(json.student) : null
+          const flow =
+            json.trialFlow === 'entitlement'
+              ? ('entitlement' as const)
+              : json.trialFlow === 'trial_lesson'
+                ? ('trial_lesson' as const)
+                : null
+          setSuccessTrialFlow(flow)
           setSuccessResolved(parsed ?? fallback())
           setSuccessResolveLoading(false)
         }
       } catch {
         if (!cancelled) {
           setSuccessResolved(fallback())
+          setSuccessTrialFlow(null)
           setSuccessResolveLoading(false)
         }
       }
@@ -254,7 +265,11 @@ export default function TrialPaymentCheckoutPage() {
       <Navigate
         to="/writing/app/complete"
         replace
-        state={{ paymentMethod: 'card', formData: checkoutData }}
+        state={{
+          paymentMethod: 'card',
+          formData: checkoutData,
+          ...(successTrialFlow ? { trialFlow: successTrialFlow } : {}),
+        }}
       />
     )
   }

@@ -1,5 +1,9 @@
 import { Link } from 'react-router-dom'
-import type { BankTransferCompleteState, TrialPaymentCheckoutState } from '../../types/trialPaymentCheckout'
+import type {
+  BankTransferCompleteState,
+  TrialPaymentCheckoutState,
+  TrialPaymentCheckoutTrialFlow,
+} from '../../types/trialPaymentCheckout'
 
 const HERO_IMG =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuCxjqNfsVMm6O-CbvJXMYkxS9t2g1lFz2gLoCEjUFjoPqKH9BBhj4i5ousg7bOVoZ_TzwI4UQrv4WVq_jplz7gDDrCVt005HDAxUf5WzvR-3JhvqL3AmyEjI6LYudex2Y2koCVjWNNUKtE4-TlCUCfboF6Ypwd6zRKoSP3ADHlL2-FS3NWbs5libgbmLGScDGAykru7DnMfBxdz9hnK-m97IEvcDmBTu2-dF429eN_MRceiZnuHbkWA0UB3Iw8u-rceP-s3ty5QWzo'
@@ -7,6 +11,8 @@ const HERO_IMG =
 type Props = {
   paymentMethod: 'card' | 'bank_transfer'
   data: TrialPaymentCheckoutState | BankTransferCompleteState
+  /** カード決済かつ API が返したとき。entitlement はメールの /writing/trial/start リンクが本体 */
+  trialFlow?: TrialPaymentCheckoutTrialFlow
 }
 
 function displayInquiry(data: TrialPaymentCheckoutState | BankTransferCompleteState): string | undefined {
@@ -14,8 +20,9 @@ function displayInquiry(data: TrialPaymentCheckoutState | BankTransferCompleteSt
 }
 
 /** 体験レッスン決済完了 — Stitch 参照（カード / 銀行振込 UI 分岐） */
-export default function PaymentCompleteView({ paymentMethod, data }: Props) {
+export default function PaymentCompleteView({ paymentMethod, data, trialFlow }: Props) {
   const isCard = paymentMethod === 'card'
+  const isEntitlementCard = isCard && trialFlow === 'entitlement'
   const inquiry = displayInquiry(data)
 
   if (isCard) {
@@ -71,9 +78,19 @@ export default function PaymentCompleteView({ paymentMethod, data }: Props) {
                   決済が完了しました
                 </h1>
                 <p className="max-w-md text-lg leading-relaxed text-[#595c5e]">
-                  体験レッスンのご案内をメールでお送りしました。
-                  <br />
-                  すぐに課題作成を開始できます。
+                  {isEntitlementCard ? (
+                    <>
+                      体験開始用のリンクをメールでお送りしました。
+                      <br />
+                      メール内のリンクから体験を開始してください。
+                    </>
+                  ) : (
+                    <>
+                      体験レッスンのご案内をメールでお送りしました。
+                      <br />
+                      すぐに課題作成を開始できます。
+                    </>
+                  )}
                 </p>
               </div>
 
@@ -90,10 +107,10 @@ export default function PaymentCompleteView({ paymentMethod, data }: Props) {
 
               <div className="flex flex-col gap-4 pt-2 sm:flex-row">
                 <Link
-                  to="/writing/app"
+                  to={isEntitlementCard ? '/writing/course' : '/writing/app'}
                   className="group flex flex-1 items-center justify-center gap-2 rounded-full bg-[#ff9727] px-8 py-4 font-bold text-[#4c2700] [box-shadow:0_12px_24px_rgba(44,47,50,0.06)] transition-transform active:scale-95"
                 >
-                  <span>課題を作成する</span>
+                  <span>{isEntitlementCard ? 'コース・体験の流れを見る' : '課題を作成する'}</span>
                   <span className="material-symbols-outlined transition-transform group-hover:translate-x-1">arrow_forward</span>
                 </Link>
                 <Link

@@ -76,7 +76,13 @@ export default function WritingCompletePage() {
   }, [navigate, payment])
 
   if (payment) {
-    return <PaymentCompleteView paymentMethod={payment.paymentMethod} data={payment.formData} />
+    return (
+      <PaymentCompleteView
+        paymentMethod={payment.paymentMethod}
+        data={payment.formData}
+        trialFlow={payment.trialFlow}
+      />
+    )
   }
 
   return (
