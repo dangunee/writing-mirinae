@@ -10,6 +10,10 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 /**
  * POST /api/writing/trial-payment/create-checkout-session
  * 金額はサーバー固定 ¥1,800 のみ。クライアントからの金額フィールドは拒否。
+ *
+ * - `MIRINAE_API_BASE_URL` があれば mirinae-api `POST /api/trial/applications` にプロキシし、
+ *   Stripe metadata に `trial_entitlement` + `application_id` が付く（webhook でトークンリンクメール）。
+ * - 未設定時のみ従来の `trial_lesson` Checkout（ローカル開発用フォールバック）。
  */
 export async function POST(req: Request) {
   let body: Record<string, unknown> = {};
@@ -76,6 +80,70 @@ export async function POST(req: Request) {
   if (inquiry && inquiry.length > 2000) {
     return NextResponse.json({ error: "invalid_inquiry" }, { status: 400 });
   }
+
+  const inquiryParts = [
+    inquiry,
+    `開始日: ${startDateLabel} (${startDate})`,
+    furigana ? `ふりがな: ${furigana}` : null,
+  ].filter(Boolean) as string[];
+  const inquiryCombined = inquiryParts.join("\n\n");
+
+  const apiBase = process.env.MIRINAE_API_BASE_URL?.trim() ?? "";
+
+  if (apiBase) {
+    const target = `${apiBase.replace(/\/$/, "")}/api/trial/applications`;
+    console.info("trial_checkout_proxy_to_mirinae_api", {
+      targetHost: (() => {
+        try {
+          return new URL(target).host;
+        } catch {
+          return "invalid";
+        }
+      })(),
+      paymentFlow: "trial_entitlement",
+    });
+
+    try {
+      const res = await fetch(target, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: fullName,
+          email,
+          koreanLevel,
+          inquiry: inquiryCombined || undefined,
+          paymentMethod: "card",
+          successUrl,
+          cancelUrl,
+          startDate,
+          startDateLabel,
+          furigana,
+        }),
+      });
+      const text = await res.text();
+      let json: { ok?: boolean; checkoutUrl?: string; error?: string } = {};
+      try {
+        json = text ? (JSON.parse(text) as typeof json) : {};
+      } catch {
+        return NextResponse.json({ error: "checkout_failed" }, { status: 502 });
+      }
+      if (!res.ok || json.ok !== true || typeof json.checkoutUrl !== "string") {
+        console.error("trial_checkout_proxy_error", { status: res.status, body: text.slice(0, 400) });
+        return NextResponse.json(
+          { error: json.error ?? "checkout_failed" },
+          { status: res.status >= 400 ? res.status : 502 }
+        );
+      }
+      return NextResponse.json({ checkoutUrl: json.checkoutUrl });
+    } catch (e) {
+      console.error("trial_checkout_proxy_fetch_error", e);
+      return NextResponse.json({ error: "checkout_failed" }, { status: 502 });
+    }
+  }
+
+  console.warn("trial_checkout_fallback_legacy_trial_lesson", {
+    reason: "MIRINAE_API_BASE_URL missing",
+  });
 
   try {
     const { url } = await createTrialLessonCheckoutSession({

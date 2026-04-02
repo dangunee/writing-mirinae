@@ -2,9 +2,18 @@ import type { Stripe } from "stripe";
 
 import { TRIAL_LESSON_AMOUNT_JPY } from "../constants/trialLessonAmount";
 
+/** 学習者リンクは常に「サイトオリジン + /writing/app」。SITE_URL にパスが含まれると /writing/writing/app になるため origin のみ使う */
 function siteBaseUrl(): string {
-  const u = process.env.SITE_URL?.trim() || "https://writing-mirinae.vercel.app";
-  return u.replace(/\/$/, "");
+  const raw =
+    process.env.TRIAL_WRITING_SITE_URL?.trim() ||
+    process.env.SITE_URL?.trim() ||
+    "https://writing-mirinae.vercel.app";
+  try {
+    const u = new URL(raw.endsWith("/") ? raw : `${raw}/`);
+    return u.origin;
+  } catch {
+    return "https://writing-mirinae.vercel.app";
+  }
 }
 
 function mdEscape(s: string): string {
@@ -53,6 +62,11 @@ export async function sendTrialLessonEmailsFromStripeSession(session: Stripe.Che
     .join("\n");
 
   const base = siteBaseUrl();
+  const studentAppUrl = `${base}/writing/app`;
+  console.info("trial_lesson_student_link_built", {
+    linkKind: "legacy_app_link",
+    studentAppPath: "/writing/app",
+  });
   const studentSubject = "【ミリネ韓国語教室】体験レッスンのお申し込みが完了しました";
   const studentText = [
     `${fullName || "お客様"} 様`,
@@ -64,7 +78,7 @@ export async function sendTrialLessonEmailsFromStripeSession(session: Stripe.Che
     "下記リンクより、すぐに課題作成を開始していただけます。",
     "",
     "課題開始:",
-    `${base}/writing/app`,
+    studentAppUrl,
     "",
     "※ お支払い完了後の返金はできませんので、あらかじめご了承ください。",
     "",

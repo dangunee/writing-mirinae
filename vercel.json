@@ -5,6 +5,9 @@
   "functions": {
     "api/bank-transfer-notify.ts": {
       "maxDuration": 30
+    },
+    "api/webhooks/stripe.ts": {
+      "maxDuration": 30
     }
   },
   "redirects": [
