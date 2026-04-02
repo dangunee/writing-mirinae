@@ -2,7 +2,8 @@
  * BFF: ブラウザは TRIAL_ADMIN_SECRET を知らない。
  * TRIAL_ADMIN_BFF_TOKEN で BFF を通し、サーバーが MIRINAE_API_BASE_URL + TRIAL_ADMIN_SECRET で mirinae-api を呼ぶ。
  *
- * 配置: `api/lib/` — Vercel Serverless（`api/**/*.ts`）から import され、デプロイに含まれる。
+ * 配置: api/lib/ — Vercel Serverless（api 配下の *.ts から import、デプロイに含まれる）
+ * ※ ブロックコメント内に「*」「*」「/」の連続を書かない（コメント終端と解釈されるため）
  */
 
 function json(data: unknown, status: number): Response {
