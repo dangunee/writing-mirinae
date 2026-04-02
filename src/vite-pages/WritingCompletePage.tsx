@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
+import PaymentCompleteView from '../components/payment/PaymentCompleteView'
 import { apiUrl } from '../lib/apiUrl'
+import { parsePaymentCompleteNavigateState } from '../lib/paymentCompleteState'
 
 const POLL_MS = 2000
 const MAX_WAIT_MS = 60_000
@@ -8,12 +10,17 @@ const MAX_WAIT_MS = 60_000
 type UiState = 'pending' | 'unauthorized' | 'timeout'
 
 export default function WritingCompletePage() {
+  const location = useLocation()
   const navigate = useNavigate()
+  const payment = parsePaymentCompleteNavigateState(location.state)
+
   const [ui, setUi] = useState<UiState>('pending')
   const doneRef = useRef(false)
   const inFlightRef = useRef(false)
 
   useEffect(() => {
+    if (payment) return
+
     const intervalId = window.setInterval(() => {
       void poll()
     }, POLL_MS)
@@ -66,7 +73,11 @@ export default function WritingCompletePage() {
       window.clearInterval(intervalId)
       window.clearTimeout(timeoutId)
     }
-  }, [navigate])
+  }, [navigate, payment])
+
+  if (payment) {
+    return <PaymentCompleteView paymentMethod={payment.paymentMethod} data={payment.formData} />
+  }
 
   return (
     <div className="writing-page">

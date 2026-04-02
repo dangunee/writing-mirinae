@@ -25,6 +25,12 @@ export type TrialPaymentCheckoutState = {
   inquiry?: string
 }
 
+/** React Router location.state — /writing/app/complete（カード・銀行振込共通） */
+export type PaymentCompleteNavigateState = {
+  paymentMethod: 'card' | 'bank_transfer'
+  formData: TrialPaymentCheckoutState | BankTransferCompleteState
+}
+
 export const TRIAL_PAYMENT_DRAFT_KEY = 'writing-trial-payment-draft'
 
 /** チェックアウトから「戻る」等で trial-payment に戻ったときだけ draft を復元する（新規表示・F5 では復元しない） */

@@ -1,27 +1,12 @@
 import { useCallback, useMemo } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import LandingNav from '../components/landing/LandingNav'
+import { parseBankTransferCompleteState } from '../lib/paymentCompleteState'
 import '../landing.css'
 import '../bank-transfer-complete.css'
 import type { BankTransferCompleteState } from '../types/trialPaymentCheckout'
 
 const CONTACT_HREF = import.meta.env.VITE_INQUIRY_URL ?? 'https://mirinae.jp'
-
-function parseBankCompleteState(raw: unknown): BankTransferCompleteState | null {
-  if (!raw || typeof raw !== 'object') return null
-  const o = raw as Record<string, unknown>
-  const fullName = typeof o.fullName === 'string' ? o.fullName.trim() : ''
-  const email = typeof o.email === 'string' ? o.email.trim() : ''
-  const koreanLevel = typeof o.koreanLevel === 'string' ? o.koreanLevel.trim() : ''
-  const startDate = typeof o.startDate === 'string' ? o.startDate.trim() : ''
-  const startDateLabel = typeof o.startDateLabel === 'string' ? o.startDateLabel.trim() : ''
-  const inquiryRaw = o.inquiry
-  const inquiry =
-    typeof inquiryRaw === 'string' && inquiryRaw.trim().length > 0 ? inquiryRaw.trim() : undefined
-
-  if (!fullName || !email || !koreanLevel || !startDate || !startDateLabel) return null
-  return { fullName, email, koreanLevel, startDate, startDateLabel, inquiry }
-}
 
 function BankCompleteFallback({ goApp }: { goApp: () => void }) {
   const navigate = useNavigate()
@@ -350,7 +335,24 @@ export default function BankTransferCompletePage() {
     navigate('/writing/course')
   }, [navigate])
 
-  const data = parseBankCompleteState(location.state)
+  const rawState = location.state
+  const legacy = parseBankTransferCompleteState(rawState)
+  if (
+    legacy &&
+    rawState &&
+    typeof rawState === 'object' &&
+    !('paymentMethod' in rawState)
+  ) {
+    return (
+      <Navigate
+        to="/writing/app/complete"
+        replace
+        state={{ paymentMethod: 'bank_transfer', formData: legacy }}
+      />
+    )
+  }
+
+  const data = parseBankTransferCompleteState(rawState)
 
   if (!data) {
     return <BankCompleteFallback goApp={goApp} />

@@ -255,7 +255,7 @@ export default function PaymentPage() {
         )
         return
       }
-      navigate('/writing/bank-complete', { state })
+      navigate('/writing/app/complete', { state: { paymentMethod: 'bank_transfer', formData: state } })
     } catch (e: unknown) {
       const aborted =
         (e instanceof Error || e instanceof DOMException) && (e as { name?: string }).name === 'AbortError'

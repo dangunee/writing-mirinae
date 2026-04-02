@@ -1,45 +1,21 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import LandingNav from '../components/landing/LandingNav'
 import TrialPaymentCheckoutCanceled from '../components/payment/TrialPaymentCheckoutCanceled'
 import TrialPaymentCheckoutDesktop from '../components/payment/TrialPaymentCheckoutDesktop'
 import TrialPaymentCheckoutMobile from '../components/payment/TrialPaymentCheckoutMobile'
-import TrialPaymentCheckoutSuccess from '../components/payment/TrialPaymentCheckoutSuccess'
 import { apiUrl, isApiBaseConfigured, logApiFetch } from '../lib/apiUrl'
+import { parseTrialPaymentCheckoutState } from '../lib/paymentCompleteState'
 import '../landing.css'
 import '../trial-payment-checkout.css'
 import { TRIAL_PAYMENT_DRAFT_KEY, type TrialPaymentCheckoutState } from '../types/trialPaymentCheckout'
-
-function parseCheckoutState(raw: unknown): TrialPaymentCheckoutState | null {
-  if (!raw || typeof raw !== 'object') return null
-  const o = raw as Record<string, unknown>
-  if (
-    typeof o.startDate !== 'string' ||
-    typeof o.startDateLabel !== 'string' ||
-    typeof o.fullName !== 'string' ||
-    typeof o.furigana !== 'string' ||
-    typeof o.email !== 'string' ||
-    typeof o.koreanLevel !== 'string'
-  ) {
-    return null
-  }
-  return {
-    startDate: o.startDate,
-    startDateLabel: o.startDateLabel,
-    fullName: o.fullName,
-    furigana: o.furigana,
-    email: o.email,
-    koreanLevel: o.koreanLevel,
-    inquiry: typeof o.inquiry === 'string' ? o.inquiry : undefined,
-  }
-}
 
 function loadCheckoutFromStorage(): TrialPaymentCheckoutState | null {
   try {
     const raw = sessionStorage.getItem(TRIAL_PAYMENT_DRAFT_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw) as { checkout?: unknown }
-    return parseCheckoutState(parsed.checkout)
+    return parseTrialPaymentCheckoutState(parsed.checkout)
   } catch {
     return null
   }
@@ -48,7 +24,7 @@ function loadCheckoutFromStorage(): TrialPaymentCheckoutState | null {
 function parsePaymentResultStudent(raw: unknown): TrialPaymentCheckoutState | null {
   if (!raw || typeof raw !== 'object') return null
   const s = raw as Record<string, unknown>
-  return parseCheckoutState({
+  return parseTrialPaymentCheckoutState({
     startDate: s.startDate,
     startDateLabel: s.startDateLabel,
     fullName: s.fullName,
@@ -79,7 +55,7 @@ export default function TrialPaymentCheckoutPage() {
   const [successResolveLoading, setSuccessResolveLoading] = useState(() => success && !!sessionId)
 
   useEffect(() => {
-    const fromNav = parseCheckoutState(location.state)
+    const fromNav = parseTrialPaymentCheckoutState(location.state)
     if (fromNav) {
       setData(fromNav)
       setHydrated(true)
@@ -111,7 +87,7 @@ export default function TrialPaymentCheckoutPage() {
     setSuccessResolveLoading(true)
 
     const fallback = (): TrialPaymentCheckoutState | null =>
-      loadCheckoutFromStorage() || parseCheckoutState(location.state)
+      loadCheckoutFromStorage() || parseTrialPaymentCheckoutState(location.state)
 
     ;(async () => {
       try {
@@ -269,10 +245,11 @@ export default function TrialPaymentCheckoutPage() {
       )
     }
     return (
-      <>
-        <LandingNav goApp={goApp} anchorBase="/writing" />
-        <TrialPaymentCheckoutSuccess data={checkoutData} />
-      </>
+      <Navigate
+        to="/writing/app/complete"
+        replace
+        state={{ paymentMethod: 'card', formData: checkoutData }}
+      />
     )
   }
 
