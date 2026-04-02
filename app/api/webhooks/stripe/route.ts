@@ -1,4 +1,4 @@
-import { handleWritingStripeWebhookPost } from "../../../../server/services/writingStripeWebhook";
+import { handleWritingStripeWebhookPost } from "../../../../api/webhooks/stripe";
 
 export const runtime = "nodejs";
 
