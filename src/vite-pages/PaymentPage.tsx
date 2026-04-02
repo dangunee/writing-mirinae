@@ -239,9 +239,9 @@ export default function PaymentPage() {
       console.log('[bank-transfer] response status:', res.status)
       console.log('[bank-transfer] response content-type:', res.headers.get('content-type'))
       console.log('[bank-transfer] response body (text):', text)
-      let json: { ok?: boolean; error?: string } = {}
+      let json: { ok?: boolean; error?: string; applicationId?: string } = {}
       try {
-        json = text ? (JSON.parse(text) as { ok?: boolean; error?: string }) : {}
+        json = text ? (JSON.parse(text) as { ok?: boolean; error?: string; applicationId?: string }) : {}
       } catch {
         const looksLikeHtml = /^\s*</.test(text)
         setBankTransferError(
@@ -256,6 +256,9 @@ export default function PaymentPage() {
           'お申し込み通知の送信に失敗しました。しばらくしてから再度お試しください。'
         )
         return
+      }
+      if (json.applicationId) {
+        console.info('[bank-transfer] trial_application_id', json.applicationId)
       }
       navigate('/writing/app/complete', { state: { paymentMethod: 'bank_transfer', formData: state } })
     } catch (e: unknown) {

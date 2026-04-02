@@ -3,7 +3,7 @@ import { sendTrialLessonBankTransferEmails } from "./trialLessonBankTransferEmai
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export type BankTransferNotifyResult =
-  | { ok: true; status: 200; json: { ok: true } }
+  | { ok: true; status: 200; json: { ok: true; applicationId?: string } }
   | { ok: false; status: number; json: { error: string } };
 
 /**
@@ -53,6 +53,59 @@ export async function handleBankTransferNotifyPostJson(
     return { ok: false, status: 400, json: { error: "invalid_inquiry" } };
   }
 
+  const inquiryParts = [
+    inquiry,
+    `開始日: ${startDateLabel} (${startDate})`,
+    furigana ? `ふりがな: ${furigana}` : null,
+  ].filter(Boolean) as string[];
+  const inquiryCombined = inquiryParts.join("\n\n");
+
+  const mirinaeBase = process.env.MIRINAE_API_BASE_URL?.trim();
+  let applicationId: string | undefined;
+  if (mirinaeBase) {
+    const target = `${mirinaeBase.replace(/\/$/, "")}/api/trial/applications`;
+    try {
+      const res = await fetch(target, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: fullName,
+          email,
+          koreanLevel,
+          inquiry: inquiryCombined || undefined,
+          paymentMethod: "bank_transfer",
+          startDate,
+          startDateLabel,
+          furigana,
+        }),
+      });
+      const text = await res.text();
+      let parsed: { ok?: boolean; applicationId?: string } = {};
+      try {
+        parsed = text ? (JSON.parse(text) as typeof parsed) : {};
+      } catch {
+        return { ok: false, status: 502, json: { error: "upstream_invalid_json" } };
+      }
+      if (!res.ok || parsed.ok !== true || typeof parsed.applicationId !== "string") {
+        console.error("bank_transfer_trial_application_failed", { status: res.status, body: text.slice(0, 400) });
+        return { ok: false, status: res.status >= 400 && res.status < 600 ? res.status : 502, json: { error: "application_create_failed" } };
+      }
+      applicationId = parsed.applicationId;
+      console.info("bank_transfer_notify_trial_application", {
+        applicationId,
+        applicantEmail: email,
+        source: "writing_mirinae_edge",
+      });
+    } catch (e) {
+      console.error("bank_transfer_trial_application_fetch_error", e);
+      return { ok: false, status: 502, json: { error: "application_create_failed" } };
+    }
+  } else {
+    console.warn("bank_transfer_notify_no_mirinae_api", {
+      reason: "MIRINAE_API_BASE_URL missing; writing.trial_applications not created from this handler",
+    });
+  }
+
   await sendTrialLessonBankTransferEmails({
     fullName,
     furigana,
@@ -62,5 +115,5 @@ export async function handleBankTransferNotifyPostJson(
     startDateLabel,
     inquiry: inquiry || undefined,
   });
-  return { ok: true, status: 200, json: { ok: true } };
+  return { ok: true, status: 200, json: { ok: true, ...(applicationId ? { applicationId } : {}) } };
 }
