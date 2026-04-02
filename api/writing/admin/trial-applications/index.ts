@@ -3,7 +3,7 @@
  */
 import type { IncomingMessage, ServerResponse } from "http";
 
-import { handleTrialApplicationsListGet } from "../../../lib/trialAdminBff";
+import { handleTrialApplicationsListGet } from "../_lib/trialAdminBff";
 
 export const config = {
   runtime: "nodejs",

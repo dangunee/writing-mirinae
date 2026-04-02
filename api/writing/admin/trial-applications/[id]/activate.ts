@@ -3,7 +3,7 @@
  */
 import type { IncomingMessage, ServerResponse } from "http";
 
-import { handleTrialApplicationActivatePost } from "../../../../lib/trialAdminBff";
+import { handleTrialApplicationActivatePost } from "../../_lib/trialAdminBff";
 
 export const config = {
   runtime: "nodejs",

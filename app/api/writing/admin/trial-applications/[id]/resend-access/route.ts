@@ -1,4 +1,4 @@
-import { handleTrialApplicationResendPost } from "../../../../../../../api/lib/trialAdminBff";
+import { handleTrialApplicationResendPost } from "../../../../../../../api/writing/admin/_lib/trialAdminBff";
 
 export const runtime = "nodejs";
 
