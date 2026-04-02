@@ -5,17 +5,12 @@
  * Vercel Node ランタイムは `IncomingMessage` / `ServerResponse` を渡すことが多く、
  * Web `Request` の `arrayBuffer()` は存在しない → raw body を自前で読む。
  *
- * `server/` は serverless バンドルに含まれないため、webhook 処理はこのファイルに完結させる。
- * (constructEvent, trial_entitlement / trial_lesson / payment_order 分岐, internal fulfill, DB)
+ * `db/schema` や `server/` は serverless バンドルに含まれないため import しない。
+ * trial_lesson / payment_order の DB は `stripeCommerceSql.ts`（raw SQL）に分離。
  */
 import type { IncomingMessage, ServerResponse } from "http";
 
-import { eq } from "drizzle-orm";
-import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
 import Stripe from "stripe";
-
-import * as schema from "../../db/schema";
 
 export const config = {
   runtime: "nodejs",
@@ -24,26 +19,6 @@ export const config = {
     bodyParser: false,
   },
 };
-
-type Db = PostgresJsDatabase<typeof schema>;
-
-let _db: Db | null = null;
-
-function getDb(): Db {
-  const url = process.env.DATABASE_URL;
-  if (!url) {
-    throw new Error("DATABASE_URL is required for API routes");
-  }
-  if (!_db) {
-    const client = postgres(url, {
-      ssl: "require",
-      max: 1,
-      prepare: false,
-    });
-    _db = drizzle(client, { schema });
-  }
-  return _db;
-}
 
 /** 体験レッスン — サーバー固定金額（Stripe / メール共通）。 */
 const TRIAL_LESSON_AMOUNT_JPY = 1800;
@@ -197,121 +172,6 @@ async function sendTrialLessonEmailsFromStripeSession(session: Stripe.Checkout.S
   }
 }
 
-async function insertStripeWebhookEvent(
-  db: Db,
-  row: typeof schema.stripeWebhookEvents.$inferInsert
-): Promise<boolean> {
-  const inserted = await db
-    .insert(schema.stripeWebhookEvents)
-    .values(row)
-    .onConflictDoNothing({ target: schema.stripeWebhookEvents.stripeEventId })
-    .returning({ id: schema.stripeWebhookEvents.id });
-  return inserted.length > 0;
-}
-
-/**
- * Webhook-only fulfillment: idempotent via stripe_webhook_events + entitlements uniqueness.
- * Security: amount and metadata cross-checks; row lock on payment_orders for concurrent webhooks.
- */
-async function fulfillWritingPurchase(
-  db: Db,
-  input: {
-    paymentOrderId: string;
-    stripeEventId: string;
-    stripePaymentIntentId: string | null;
-    amountTotalYen: number;
-    metadataSupabaseUserId: string | null | undefined;
-  }
-): Promise<{ ok: true; skippedDuplicateEvent: boolean } | { ok: false; reason: string }> {
-  return db.transaction(async (tx) => {
-    const recorded = await insertStripeWebhookEvent(tx, {
-      stripeEventId: input.stripeEventId,
-      payloadHash: null,
-    });
-    if (!recorded) {
-      return { ok: true, skippedDuplicateEvent: true };
-    }
-
-    const orderRows = await tx
-      .select()
-      .from(schema.paymentOrders)
-      .where(eq(schema.paymentOrders.id, input.paymentOrderId))
-      .for("update")
-      .limit(1);
-    const order = orderRows[0] ?? null;
-    if (!order) {
-      return { ok: false, reason: "payment_order_not_found" };
-    }
-
-    if (order.status === "succeeded") {
-      return { ok: true, skippedDuplicateEvent: false };
-    }
-
-    if (order.status !== "pending") {
-      return { ok: false, reason: "order_not_pending" };
-    }
-
-    if (order.totalJpy !== input.amountTotalYen) {
-      return { ok: false, reason: "amount_mismatch_order" };
-    }
-
-    const [product] = await tx
-      .select()
-      .from(schema.products)
-      .where(eq(schema.products.id, order.productId))
-      .limit(1);
-    if (!product) {
-      return { ok: false, reason: "product_not_found" };
-    }
-    if (product.totalJpy !== input.amountTotalYen) {
-      return { ok: false, reason: "amount_mismatch_product" };
-    }
-
-    if (input.metadataSupabaseUserId && input.metadataSupabaseUserId !== order.userId) {
-      return { ok: false, reason: "metadata_user_mismatch" };
-    }
-
-    await tx
-      .update(schema.paymentOrders)
-      .set({
-        status: "succeeded",
-        paidAt: new Date(),
-        stripeEventId: input.stripeEventId,
-        stripePaymentIntentId: input.stripePaymentIntentId ?? null,
-      })
-      .where(eq(schema.paymentOrders.id, order.id));
-
-    const [entitlement] = await tx
-      .insert(schema.entitlements)
-      .values({
-        userId: order.userId,
-        productId: order.productId,
-        paymentOrderId: order.id,
-        app: "writing",
-        status: "active",
-        validFrom: new Date(),
-        validUntil: null,
-        metadata: {},
-      })
-      .returning();
-
-    if (!entitlement) {
-      return { ok: false, reason: "entitlement_insert_failed" };
-    }
-
-    await tx.insert(schema.writingCourses).values({
-      userId: order.userId,
-      entitlementId: entitlement.id,
-      status: "pending_setup",
-      startDate: null,
-      interval: null,
-      sessionCount: product.quantity,
-    });
-
-    return { ok: true, skippedDuplicateEvent: false };
-  });
-}
-
 /**
  * POST /api/webhooks/stripe — Vercel `api/webhooks/stripe.ts` と Next `app/api/...` の両方から呼ぶ。
  */
@@ -385,6 +245,7 @@ async function handleWritingStripeWebhookPostInner(req: Request): Promise<Respon
     metadata: metadataDebug(session.metadata),
   });
 
+  // --- trial_entitlement: DB なし。mirinae-api internal fulfill のみ（Vercel で最優先で動かす） ---
   if (session.metadata?.trial_entitlement === "true") {
     const applicationId =
       typeof session.metadata.application_id === "string" ? session.metadata.application_id.trim() : "";
@@ -469,6 +330,13 @@ async function handleWritingStripeWebhookPostInner(req: Request): Promise<Respon
     return empty(200);
   }
 
+  // trial_entitlement 以外のみ DB（raw SQL）を読み込む — チェックアウト体験は上記分岐だけで完結
+  const { insertStripeWebhookEventIdempotent, fulfillWritingPurchaseSql } = await import(
+    "./stripeCommerceSql"
+  );
+
+  // --- trial_lesson / payment_order（stripeCommerceSql） ---
+
   if (session.metadata?.trial_lesson === "true") {
     console.info("writing_webhook_branch_decision", { branch: "trial_lesson", sessionId: session.id });
 
@@ -489,18 +357,14 @@ async function handleWritingStripeWebhookPostInner(req: Request): Promise<Respon
       return json({ error: "amount_mismatch" }, 400);
     }
 
-    let db: Db;
+    let recorded: boolean;
     try {
-      db = getDb();
+      recorded = await insertStripeWebhookEventIdempotent(event.id);
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       console.error("writing_webhook_getdb_failed", { message });
       return json({ error: "database_unavailable" }, 500);
     }
-    const recorded = await insertStripeWebhookEvent(db, {
-      stripeEventId: event.id,
-      payloadHash: null,
-    });
     if (!recorded) {
       console.info("writing_webhook_trial_lesson_duplicate", { stripeEventId: event.id });
       return empty(200);
@@ -564,22 +428,20 @@ async function handleWritingStripeWebhookPostInner(req: Request): Promise<Respon
         ? session.payment_intent.id
         : null;
 
-  let db: Db;
+  let result: Awaited<ReturnType<typeof fulfillWritingPurchaseSql>>;
   try {
-    db = getDb();
+    result = await fulfillWritingPurchaseSql({
+      paymentOrderId,
+      stripeEventId: event.id,
+      stripePaymentIntentId: paymentIntentId,
+      amountTotalYen: amountTotal,
+      metadataSupabaseUserId: supabaseUserId,
+    });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     console.error("writing_webhook_getdb_failed", { message });
     return json({ error: "database_unavailable" }, 500);
   }
-
-  const result = await fulfillWritingPurchase(db, {
-    paymentOrderId,
-    stripeEventId: event.id,
-    stripePaymentIntentId: paymentIntentId,
-    amountTotalYen: amountTotal,
-    metadataSupabaseUserId: supabaseUserId,
-  });
 
   if (!result.ok) {
     console.error("fulfillment_failed", result.reason);
