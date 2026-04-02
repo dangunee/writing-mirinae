@@ -17,6 +17,7 @@ import PaymentPage from './vite-pages/PaymentPage'
 import TrialPaymentCheckoutPage from './vite-pages/TrialPaymentCheckoutPage'
 import BankTransferCompletePage from './vite-pages/BankTransferCompletePage'
 import TrialStartPage from './vite-pages/TrialStartPage'
+import TrialApplicationsAdminPage from './vite-pages/TrialApplicationsAdminPage'
 
 function App() {
   return (
@@ -30,6 +31,7 @@ function App() {
         <Route path="/writing/course" element={<CoursePage />} />
         <Route path="/writing/correction-detail" element={<CorrectionSystemDetailPage />} />
         <Route path="/writing/app/complete" element={<WritingCompletePage />} />
+        <Route path="/writing/admin/trial-applications" element={<TrialApplicationsAdminPage />} />
         <Route element={<StudentRouteGuard />}>
           <Route path="/writing/app/mypage" element={<MypagePage />} />
           <Route path="/writing/app/view/:submissionId" element={<ViewCorrectionPage />} />

@@ -112,53 +112,19 @@ function BankCompleteContent({ data, goApp }: { data: BankTransferCompleteState;
           </div>
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-            <div className="md:col-span-2 rounded-xl bg-white p-8 shadow-sm">
-              <h2 className="mb-6 flex items-center gap-2 text-xl font-bold">
+            <div className="md:col-span-2 rounded-xl border border-[#abadb0]/15 bg-white p-8 shadow-sm">
+              <h2 className="mb-5 flex items-center gap-2 text-xl font-bold text-[#2c2f32]">
                 <span className="material-symbols-outlined text-[#4052b6]">account_balance</span>
                 振込先情報
               </h2>
-              <div className="space-y-8">
-                <div>
-                  <div className="mb-3 flex items-center gap-1.5 text-xs font-bold text-[#4052b6]">
-                    <span className="h-1.5 w-1.5 rounded-full bg-[#4052b6]" />
-                    三井住友銀行
-                  </div>
-                  <div className="space-y-3 rounded-lg bg-[#eef1f4]/50 p-4">
-                    <div className="flex flex-col gap-1 sm:flex-row sm:justify-between sm:items-center">
-                      <span className="text-sm text-[#595c5e]">銀行名・支店</span>
-                      <span className="font-bold">三井住友銀行 日暮里支店</span>
-                    </div>
-                    <div className="flex flex-col gap-1 sm:flex-row sm:justify-between sm:items-center">
-                      <span className="text-sm text-[#595c5e]">口座種別・番号</span>
-                      <span className="font-bold tracking-widest">普通 7961777</span>
-                    </div>
-                    <div className="flex flex-col gap-1 sm:flex-row sm:justify-between sm:items-center">
-                      <span className="text-sm text-[#595c5e]">名義</span>
-                      <span className="font-bold">（株）カオンヌリ</span>
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <div className="mb-3 flex items-center gap-1.5 text-xs font-bold text-[#4052b6]">
-                    <span className="h-1.5 w-1.5 rounded-full bg-[#4052b6]" />
-                    ゆうちょ銀行
-                  </div>
-                  <div className="space-y-3 rounded-lg bg-[#eef1f4]/50 p-4">
-                    <div className="flex flex-col gap-1 sm:flex-row sm:justify-between sm:items-center">
-                      <span className="text-sm text-[#595c5e]">記号</span>
-                      <span className="font-bold tracking-widest">10190</span>
-                    </div>
-                    <div className="flex flex-col gap-1 sm:flex-row sm:justify-between sm:items-center">
-                      <span className="text-sm text-[#595c5e]">番号</span>
-                      <span className="font-bold tracking-widest">90647671</span>
-                    </div>
-                    <div className="flex flex-col gap-1 sm:flex-row sm:justify-between sm:items-center">
-                      <span className="text-sm text-[#595c5e]">名義</span>
-                      <span className="font-bold">カ）カオンヌリ</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="border-t border-[#abadb0]/30 pt-6">
+              <div className="space-y-4 text-[15px] font-medium leading-relaxed text-[#2c2f32]">
+                <p className="break-words">
+                  三井住友銀行　日暮里支店　普通 7961777　（株）カオンヌリ
+                </p>
+                <p className="break-words">
+                  ゆうちょ銀行　記号 10190　番号 90647671　カ）カオンヌリ
+                </p>
+                <div className="border-t border-[#abadb0]/30 pt-5">
                   <div className="flex flex-wrap items-end justify-between gap-2">
                     <span className="font-bold text-[#595c5e]">振込合計金額</span>
                     <span className="text-3xl font-extrabold text-[#4052b6]">
@@ -280,24 +246,18 @@ function BankCompleteContent({ data, goApp }: { data: BankTransferCompleteState;
           </div>
 
           <section className="space-y-4">
-            <div className="rounded-xl border border-[#abadb0]/15 bg-[#eef1f4] p-6">
-              <div className="mb-6 flex items-center gap-2">
+            <div className="rounded-xl border border-[#abadb0]/20 bg-white p-5 shadow-sm [box-shadow:0_8px_16px_rgba(44,47,50,0.05)]">
+              <div className="mb-4 flex items-center gap-2">
                 <span className="material-symbols-outlined text-[#4052b6]">account_balance</span>
                 <h3 className="bank-complete-headline text-lg font-bold text-[#2c2f32]">振込先情報</h3>
               </div>
-              <div className="space-y-8">
-                <div className="relative border-l-2 border-[#4052b6]/30 pl-4">
-                  <h4 className="mb-2 flex items-center justify-between font-bold text-[#4052b6]">
-                    三井住友銀行
-                  </h4>
-                  <p className="text-sm font-medium text-[#595c5e]">日暮里支店 / 普通 7961777</p>
-                  <p className="mt-1 text-sm font-bold text-[#2c2f32]">（株）カオンヌリ</p>
-                </div>
-                <div className="relative border-l-2 border-[#006a28]/30 pl-4">
-                  <h4 className="mb-2 font-bold text-[#006a28]">ゆうちょ銀行</h4>
-                  <p className="text-sm font-medium text-[#595c5e]">記号 10190 / 番号 90647671</p>
-                  <p className="mt-1 text-sm font-bold text-[#2c2f32]">カ）カオンヌリ</p>
-                </div>
+              <div className="space-y-3 text-sm font-medium leading-relaxed text-[#2c2f32]">
+                <p className="break-words">
+                  三井住友銀行　日暮里支店　普通 7961777　（株）カオンヌリ
+                </p>
+                <p className="break-words">
+                  ゆうちょ銀行　記号 10190　番号 90647671　カ）カオンヌリ
+                </p>
               </div>
             </div>
           </section>

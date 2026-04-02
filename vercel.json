@@ -14,6 +14,15 @@
     },
     "api/writing/trial-payment/payment-result.ts": {
       "maxDuration": 30
+    },
+    "api/writing/admin/trial-applications/index.ts": {
+      "maxDuration": 30
+    },
+    "api/writing/admin/trial-applications/[id]/activate.ts": {
+      "maxDuration": 30
+    },
+    "api/writing/admin/trial-applications/[id]/resend-access.ts": {
+      "maxDuration": 30
     }
   },
   "redirects": [

@@ -25,19 +25,41 @@ function parseCheckoutAllowlist(): string[] {
 function assertUrlAllowed(url: string, allowlist: string[]): void {
   const trimmed = url.trim();
   if (!trimmed) {
+    console.warn("checkout_redirect_rejected", { reason: "redirect_url_missing" });
     throw new Error("redirect_url_missing");
   }
   let parsed: URL;
   try {
     parsed = new URL(trimmed);
   } catch {
+    console.warn("checkout_redirect_rejected", {
+      reason: "redirect_url_invalid",
+      urlPreview: trimmed.slice(0, 120),
+    });
     throw new Error("redirect_url_invalid");
   }
   if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+    console.warn("checkout_redirect_rejected", {
+      reason: "redirect_url_invalid_protocol",
+      protocol: parsed.protocol,
+    });
     throw new Error("redirect_url_invalid_protocol");
+  }
+  if (allowlist.length === 0) {
+    console.warn("checkout_redirect_rejected", {
+      reason: "CHECKOUT_REDIRECT_ALLOWLIST_empty",
+      url: trimmed.slice(0, 200),
+      allowlistPrefixes: [] as string[],
+    });
+    throw new Error("redirect_url_not_allowlisted");
   }
   const ok = allowlist.some((prefix) => trimmed.startsWith(prefix));
   if (!ok) {
+    console.warn("checkout_redirect_rejected", {
+      reason: "no_prefix_match",
+      url: trimmed.slice(0, 200),
+      allowlistPrefixes: allowlist,
+    });
     throw new Error("redirect_url_not_allowlisted");
   }
 }
@@ -156,7 +178,14 @@ async function handleTrialCreateCheckoutSessionRequest(req: Request): Promise<Re
   try {
     assertUrlAllowed(successUrl, allowlist);
     assertUrlAllowed(cancelUrl, allowlist);
-  } catch {
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    console.warn("trial_checkout_redirect_validation_failed", {
+      requestedSuccessUrl: successUrl.slice(0, 220),
+      requestedCancelUrl: cancelUrl.slice(0, 220),
+      allowlistPrefixes: allowlist,
+      errorMessage: message,
+    });
     return json({ error: "invalid_redirect_urls" }, 400);
   }
 

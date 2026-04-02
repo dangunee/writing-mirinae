@@ -45,7 +45,14 @@ export async function handleTrialCreateCheckoutSessionRequest(req: Request): Pro
   try {
     assertUrlAllowed(successUrl, allowlist);
     assertUrlAllowed(cancelUrl, allowlist);
-  } catch {
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    console.warn("trial_checkout_redirect_validation_failed", {
+      requestedSuccessUrl: successUrl.slice(0, 220),
+      requestedCancelUrl: cancelUrl.slice(0, 220),
+      allowlistPrefixes: allowlist,
+      errorMessage: message,
+    });
     return json({ error: "invalid_redirect_urls" }, 400);
   }
 

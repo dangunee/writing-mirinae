@@ -210,27 +210,21 @@ export default function PaymentCompleteView({ paymentMethod, data, trialFlow }: 
               振込先情報
             </h2>
             <div className="w-full rounded-xl border border-[#abadb0]/20 bg-white p-4 shadow-sm [box-shadow:0_8px_16px_rgba(44,47,50,0.05)]">
-              <div className="flex flex-col gap-3 text-sm leading-relaxed text-[#2c2f32] md:flex-row md:flex-wrap md:items-center md:gap-x-5 md:gap-y-0">
-                <span className="text-xs font-bold uppercase tracking-wider text-[#595c5e] md:shrink-0">三井住友銀行</span>
-                <span>日暮里支店</span>
-                <span>普通 7961777</span>
-                <span>（株）カオンヌリ</span>
-              </div>
-            </div>
-            <div className="w-full rounded-xl border border-[#abadb0]/20 bg-white p-4 shadow-sm [box-shadow:0_8px_16px_rgba(44,47,50,0.05)]">
-              <div className="flex flex-col gap-3 text-sm leading-relaxed text-[#2c2f32] md:flex-row md:flex-wrap md:items-center md:gap-x-5 md:gap-y-0">
-                <span className="text-xs font-bold uppercase tracking-wider text-[#595c5e] md:shrink-0">ゆうちょ銀行</span>
-                <span>記号 10190</span>
-                <span>番号 90647671</span>
-                <span>カ）カオンヌリ</span>
-              </div>
-            </div>
-            <div className="w-full rounded-xl border border-[#abadb0]/20 bg-white px-4 py-3 shadow-sm [box-shadow:0_8px_16px_rgba(44,47,50,0.05)]">
-              <div className="flex flex-wrap items-end justify-between gap-2">
-                <span className="text-sm font-bold text-[#595c5e]">振込金額</span>
-                <span className="text-xl font-extrabold text-[#4052b6]">
-                  ¥1,800<span className="ml-1 text-xs font-normal text-[#595c5e]">（税込）</span>
-                </span>
+              <div className="space-y-3 text-sm leading-relaxed text-[#2c2f32]">
+                <p className="break-words text-[15px] font-medium">
+                  三井住友銀行　日暮里支店　普通 7961777　（株）カオンヌリ
+                </p>
+                <p className="break-words text-[15px] font-medium">
+                  ゆうちょ銀行　記号 10190　番号 90647671　カ）カオンヌリ
+                </p>
+                <div className="border-t border-[#abadb0]/25 pt-3">
+                  <div className="flex flex-wrap items-end justify-between gap-2">
+                    <span className="text-sm font-bold text-[#595c5e]">振込金額</span>
+                    <span className="text-xl font-extrabold text-[#4052b6]">
+                      ¥1,800<span className="ml-1 text-xs font-normal text-[#595c5e]">（税込）</span>
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
