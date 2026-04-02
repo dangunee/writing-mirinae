@@ -1,9 +1,8 @@
 /**
- * POST /api/writing/trial-payment/create-checkout-session
- * Next `app/api/...` と Vercel `api/writing/...` から共有（api/_lib のみ import — Vercel バンドル用）。
+ * POST /api/writing/trial-payment/create-checkout-session — Next `app/api` 用（server/ から import 可）
  */
 import { parseCheckoutAllowlist, assertUrlAllowed } from "./urls";
-import { createTrialLessonCheckoutSession } from "./trialLessonStripe";
+import { createTrialLessonCheckoutSession } from "../services/trialLessonStripe";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

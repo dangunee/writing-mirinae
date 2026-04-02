@@ -1,8 +1,7 @@
 /**
- * GET /api/writing/trial-payment/payment-result
- * api/_lib のみ import（Vercel バンドル用）。
+ * GET /api/writing/trial-payment/payment-result — Next `app/api` 用
  */
-import { getStripeClient, TRIAL_LESSON_AMOUNT_JPY } from "./trialLessonStripe";
+import { getStripeClient, TRIAL_LESSON_AMOUNT_JPY } from "../services/trialLessonStripe";
 
 function json(data: unknown, status: number): Response {
   return new Response(JSON.stringify(data), {
