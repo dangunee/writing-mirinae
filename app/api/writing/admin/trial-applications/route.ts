@@ -1,4 +1,4 @@
-import { handleTrialApplicationsListGet } from "../../../../../server/lib/trialAdminBff";
+import { handleTrialApplicationsListGet } from "../../../../../api/lib/trialAdminBff";
 
 export const runtime = "nodejs";
 

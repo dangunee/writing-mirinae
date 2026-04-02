@@ -1,4 +1,4 @@
-import { handleTrialApplicationActivatePost } from "../../../../../../../server/lib/trialAdminBff";
+import { handleTrialApplicationActivatePost } from "../../../../../../../api/lib/trialAdminBff";
 
 export const runtime = "nodejs";
 
