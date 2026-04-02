@@ -8,7 +8,11 @@ import { apiUrl, isApiBaseConfigured, logApiFetch } from '../lib/apiUrl'
 import { parseTrialPaymentCheckoutState } from '../lib/paymentCompleteState'
 import '../landing.css'
 import '../trial-payment-checkout.css'
-import { TRIAL_PAYMENT_DRAFT_KEY, type TrialPaymentCheckoutState } from '../types/trialPaymentCheckout'
+import {
+  TRIAL_PAYMENT_DRAFT_KEY,
+  TRIAL_PAYMENT_RESTORE_DRAFT_KEY,
+  type TrialPaymentCheckoutState,
+} from '../types/trialPaymentCheckout'
 
 function loadCheckoutFromStorage(): TrialPaymentCheckoutState | null {
   try {
@@ -244,6 +248,8 @@ export default function TrialPaymentCheckoutPage() {
         </>
       )
     }
+    sessionStorage.removeItem(TRIAL_PAYMENT_RESTORE_DRAFT_KEY)
+    sessionStorage.removeItem(TRIAL_PAYMENT_DRAFT_KEY)
     return (
       <Navigate
         to="/writing/app/complete"

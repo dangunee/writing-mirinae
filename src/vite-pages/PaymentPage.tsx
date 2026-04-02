@@ -162,6 +162,8 @@ export default function PaymentPage() {
     }
 
     persistDraft(checkout)
+    /** ブラウザ「戻る」で trial-payment に戻ったときも下書きを復元できるようにする（戻るボタンと同じキー） */
+    sessionStorage.setItem(TRIAL_PAYMENT_RESTORE_DRAFT_KEY, '1')
     navigate('/writing/trial-payment/checkout', { state: checkout })
   }, [desktopCal, mobileCal, form, navigate, persistDraft])
 
