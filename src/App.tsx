@@ -17,6 +17,7 @@ import PaymentPage from './vite-pages/PaymentPage'
 import TrialPaymentCheckoutPage from './vite-pages/TrialPaymentCheckoutPage'
 import BankTransferCompletePage from './vite-pages/BankTransferCompletePage'
 import TrialStartPage from './vite-pages/TrialStartPage'
+import TrialWritingPage from './vite-pages/TrialWritingPage'
 import TrialApplicationsAdminPage from './vite-pages/TrialApplicationsAdminPage'
 
 function App() {
@@ -27,6 +28,7 @@ function App() {
         <Route path="/writing/trial-payment/checkout" element={<TrialPaymentCheckoutPage />} />
         <Route path="/writing/bank-complete" element={<BankTransferCompletePage />} />
         <Route path="/writing/trial/start" element={<TrialStartPage />} />
+        <Route path="/writing/trial/submit" element={<TrialWritingPage />} />
         <Route path="/writing/trial-payment" element={<PaymentPage />} />
         <Route path="/writing/course" element={<CoursePage />} />
         <Route path="/writing/correction-detail" element={<CorrectionSystemDetailPage />} />
