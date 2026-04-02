@@ -13,8 +13,8 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  *
  * - `MIRINAE_API_BASE_URL` があれば mirinae-api `POST /api/trial/applications` にプロキシし、
  *   Stripe metadata に `trial_entitlement` + `application_id` が付く（webhook でトークンリンクメール）。
- * - 未設定時は writing-mirinae 側で Checkout を作成（metadata に `trial_entitlement: "true"` のみ。
- *   `application_id` は付かないため本番の internal fulfill には mirinae-api 経由を推奨）。
+ * - 本番（NODE_ENV=production）では `MIRINAE_API_BASE_URL` 必須。未設定は 500。
+ * - 非本番のみローカル Stripe（trialLessonStripe）フォールバック可。
  */
 export async function POST(req: Request) {
   let body: Record<string, unknown> = {};
@@ -89,10 +89,20 @@ export async function POST(req: Request) {
   ].filter(Boolean) as string[];
   const inquiryCombined = inquiryParts.join("\n\n");
 
-  const apiBase = process.env.MIRINAE_API_BASE_URL?.trim() ?? "";
+  const rawMirinae = process.env.MIRINAE_API_BASE_URL;
+  const mirinaeApiBaseUrl = typeof rawMirinae === "string" ? rawMirinae.trim() : "";
+  const isProduction = process.env.NODE_ENV === "production";
 
-  if (apiBase) {
-    const target = `${apiBase.replace(/\/$/, "")}/api/trial/applications`;
+  /** デプロイ先で env が効いているか・この Route が実行されているかの診断（値は出さない） */
+  console.info("trial_checkout_route_config", {
+    hasMirinaeApiBaseUrl: mirinaeApiBaseUrl.length > 0,
+    mirinaeApiBaseUrlLength: mirinaeApiBaseUrl.length,
+    nodeEnv: process.env.NODE_ENV,
+    vercelEnv: process.env.VERCEL_ENV ?? null,
+  });
+
+  if (mirinaeApiBaseUrl.length > 0) {
+    const target = `${mirinaeApiBaseUrl.replace(/\/$/, "")}/api/trial/applications`;
     console.info("trial_checkout_proxy_to_mirinae_api", {
       targetHost: (() => {
         try {
@@ -142,9 +152,17 @@ export async function POST(req: Request) {
     }
   }
 
+  if (isProduction) {
+    console.error("trial_checkout_misconfigured", {
+      reason: "MIRINAE_API_BASE_URL required in production",
+      hasMirinaeApiBaseUrl: false,
+    });
+    return NextResponse.json({ error: "server_misconfigured" }, { status: 500 });
+  }
+
   console.warn("trial_checkout_fallback_local_stripe", {
     reason: "MIRINAE_API_BASE_URL missing",
-    note: "trial_entitlement metadata without application_id; use mirinae-api proxy in production",
+    note: "development_only: local Stripe session without application_id",
   });
 
   try {
