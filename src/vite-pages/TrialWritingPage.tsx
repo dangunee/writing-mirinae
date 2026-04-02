@@ -1,7 +1,48 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import '../landing.css'
+import LandingNav from '../components/landing/LandingNav'
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024
 const ACCEPT = '.png,.jpg,.jpeg,.pdf'
+
+/** 右サイドバー: 指定月の全週グリッド（前月・翌月の埋め込み日付を含む）。`today` と同じ年月日は selected */
+function buildCalendarMonthCells(
+  year: number,
+  monthIndex: number,
+  today: Date
+): { key: string; day: number; muted: boolean; selected: boolean }[] {
+  const firstDow = new Date(year, monthIndex, 1).getDay()
+  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate()
+  const prevLast = new Date(year, monthIndex, 0).getDate()
+  const out: { key: string; day: number; muted: boolean; selected: boolean }[] = []
+
+  const isTodayInThisMonth = (d: number) =>
+    today.getFullYear() === year && today.getMonth() === monthIndex && today.getDate() === d
+
+  for (let i = 0; i < firstDow; i++) {
+    const day = prevLast - firstDow + i + 1
+    out.push({ key: `prev-${year}-${monthIndex}-${day}`, day, muted: true, selected: false })
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    out.push({
+      key: `cur-${year}-${monthIndex}-${d}`,
+      day: d,
+      muted: false,
+      selected: isTodayInThisMonth(d),
+    })
+  }
+  let next = 1
+  while (out.length % 7 !== 0) {
+    out.push({ key: `next-${year}-${monthIndex}-${next}`, day: next, muted: true, selected: false })
+    next++
+  }
+  return out
+}
+
+function formatYearMonthJa(year: number, monthIndex: number): string {
+  return `${year}年 ${monthIndex + 1}月`
+}
 
 function useNarrowScreen(): boolean {
   const [narrow, setNarrow] = useState(() =>
@@ -21,8 +62,23 @@ function useNarrowScreen(): boolean {
  * API・認証なし。ローカル state のみ。
  */
 export default function TrialWritingPage() {
+  const navigate = useNavigate()
+  const goApp = useCallback(() => {
+    navigate('/writing/course')
+  }, [navigate])
+
   const narrow = useNarrowScreen()
   const maxChars = narrow ? 1200 : 400
+
+  /** ページ表示時点の「今日」で右サイドバー暦を固定（マウント時の年月） */
+  const [calendarToday] = useState(() => new Date())
+  const calendarYear = calendarToday.getFullYear()
+  const calendarMonthIndex = calendarToday.getMonth()
+  const calendarTitle = formatYearMonthJa(calendarYear, calendarMonthIndex)
+  const calendarCells = useMemo(
+    () => buildCalendarMonthCells(calendarYear, calendarMonthIndex, calendarToday),
+    [calendarYear, calendarMonthIndex, calendarToday]
+  )
 
   const [text, setText] = useState('')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
@@ -73,47 +129,13 @@ export default function TrialWritingPage() {
         .trial-writing-scrollbar::-webkit-scrollbar-thumb { background: #e9e2d3; border-radius: 10px; }
       `}</style>
 
+      {/* /writing ランディングと同一ヘッダー */}
+      <div className="landing-stitch-root">
+        <LandingNav goApp={goApp} anchorBase="/writing" />
+      </div>
+
       {/* ——— Desktop (md+) ——— */}
       <div className="hidden md:block font-['Plus_Jakarta_Sans',sans-serif] text-[#1e1b13] bg-[#F5F5F5] min-h-screen trial-writing-scrollbar">
-        <header className="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-md flex items-center justify-between px-8 h-16 border-b border-[#1e1b13]/10">
-          <div className="flex items-center gap-8">
-            <span className="text-xl font-bold text-[#000666] tracking-tight font-['Manrope',sans-serif]">
-              学問のアトリエ
-            </span>
-            <nav className="hidden md:flex items-center gap-6">
-              <span className="text-[#1e1b13]/60 font-['Manrope',sans-serif] font-semibold tracking-[-0.02em] cursor-default">
-                ホーム
-              </span>
-              <span className="text-[#000666] border-b-2 border-[#000666] pb-1 font-['Manrope',sans-serif] font-semibold tracking-[-0.02em]">
-                課題
-              </span>
-              <span className="text-[#1e1b13]/60 font-['Manrope',sans-serif] font-semibold tracking-[-0.02em] cursor-default">
-                進捗
-              </span>
-              <span className="text-[#1e1b13]/60 font-['Manrope',sans-serif] font-semibold tracking-[-0.02em] cursor-default">
-                設定
-              </span>
-            </nav>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="relative flex items-center bg-[#f5edde] rounded-full px-4 py-1.5 border border-[#c6c5d4]/20">
-              <span className="material-symbols-outlined text-[#454652] mr-2 trial-writing-ms">search</span>
-              <input
-                className="bg-transparent border-none focus:ring-0 text-sm w-48 placeholder:text-[#454652]/50"
-                placeholder="検索..."
-                type="text"
-                readOnly
-              />
-            </div>
-            <button type="button" className="p-2 text-[#1e1b13]/70 hover:text-[#000666] transition-colors">
-              <span className="material-symbols-outlined trial-writing-ms">notifications</span>
-            </button>
-            <button type="button" className="p-2 text-[#1e1b13]/70 hover:text-[#000666] transition-colors">
-              <span className="material-symbols-outlined trial-writing-ms">account_circle</span>
-            </button>
-          </div>
-        </header>
-
         <aside className="h-full w-64 fixed left-0 top-0 pt-20 flex flex-col gap-2 z-40 bg-[#F5F5F5]">
           <div className="px-6 py-4 mb-4">
             <div className="flex items-center gap-3">
@@ -149,23 +171,10 @@ export default function TrialWritingPage() {
               <span className="material-symbols-outlined trial-writing-ms">calendar_month</span>
               <span>学習カレンダー</span>
             </span>
-            <span className="flex items-center gap-3 text-[#1e1b13]/70 ml-4 pl-4 py-3 rounded-l-full font-['Manrope',sans-serif] text-sm uppercase tracking-widest cursor-default">
-              <span className="material-symbols-outlined trial-writing-ms">menu_book</span>
-              <span>辞書</span>
-            </span>
-          </div>
-          <div className="mt-auto p-6">
-            <button
-              type="button"
-              className="w-full bg-[#000666] text-white py-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-[#1a237e] transition-colors"
-            >
-              <span className="material-symbols-outlined trial-writing-ms">add</span>
-              新規課題を作成
-            </button>
           </div>
         </aside>
 
-        <main className="ml-64 pt-16 min-h-screen bg-[#F5F5F5]">
+        <main className="ml-64 pt-20 min-h-screen bg-[#F5F5F5]">
           <div className="max-w-[1400px] mx-auto flex flex-col lg:flex-row">
             <div className="flex-1 p-8 lg:p-12">
               <div className="max-w-4xl mx-auto">
@@ -322,7 +331,7 @@ export default function TrialWritingPage() {
               <div className="sticky top-24 space-y-10">
                 <section className="bg-white p-6 rounded-2xl shadow-[0_10px_40px_rgba(30,27,19,0.04)]">
                   <div className="flex items-center justify-between mb-6">
-                    <h4 className="font-['Manrope',sans-serif] font-bold text-[#000666]">2023年 11月</h4>
+                    <h4 className="font-['Manrope',sans-serif] font-bold text-[#000666]">{calendarTitle}</h4>
                     <div className="flex gap-2">
                       <span className="material-symbols-outlined text-[#1e1b13]/40 cursor-pointer hover:text-[#000666] trial-writing-ms">
                         chevron_left
@@ -342,36 +351,30 @@ export default function TrialWritingPage() {
                     <span>Sat</span>
                   </div>
                   <div className="grid grid-cols-7 gap-y-2 text-center text-sm font-medium">
-                    <span className="p-2 text-[#1e1b13]/20">29</span>
-                    <span className="p-2 text-[#1e1b13]/20">30</span>
-                    <span className="p-2 hover:bg-[#f5edde] rounded-lg cursor-pointer">1</span>
-                    <span className="p-2 hover:bg-[#f5edde] rounded-lg cursor-pointer">2</span>
-                    <span className="p-2 hover:bg-[#f5edde] rounded-lg cursor-pointer">3</span>
-                    <span className="p-2 hover:bg-[#f5edde] rounded-lg cursor-pointer">4</span>
-                    <span className="p-2 hover:bg-[#f5edde] rounded-lg cursor-pointer">5</span>
-                    <span className="p-2 hover:bg-[#f5edde] rounded-lg cursor-pointer relative">
-                      6
-                      <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-[#1b6d24] rounded-full" />
-                    </span>
-                    <span className="p-2 bg-[#000666] text-white rounded-lg cursor-pointer relative">
-                      7
-                      <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-white rounded-full" />
-                    </span>
-                    <span className="p-2 hover:bg-[#f5edde] rounded-lg cursor-pointer">8</span>
-                    <span className="p-2 hover:bg-[#f5edde] rounded-lg cursor-pointer">9</span>
-                    <span className="p-2 hover:bg-[#f5edde] rounded-lg cursor-pointer">10</span>
-                    <span className="p-2 hover:bg-[#f5edde] rounded-lg cursor-pointer">11</span>
-                    <span className="p-2 hover:bg-[#f5edde] rounded-lg cursor-pointer">12</span>
-                    <span className="p-2 hover:bg-[#f5edde] rounded-lg cursor-pointer">13</span>
-                    <span className="p-2 hover:bg-[#f5edde] rounded-lg cursor-pointer">14</span>
-                    <span className="p-2 hover:bg-[#f5edde] rounded-lg cursor-pointer relative">
-                      15
-                      <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-[#1b6d24] rounded-full" />
-                    </span>
-                    <span className="p-2 hover:bg-[#f5edde] rounded-lg cursor-pointer">16</span>
-                    <span className="p-2 hover:bg-[#f5edde] rounded-lg cursor-pointer">17</span>
-                    <span className="p-2 hover:bg-[#f5edde] rounded-lg cursor-pointer">18</span>
-                    <span className="p-2 hover:bg-[#f5edde] rounded-lg cursor-pointer">19</span>
+                    {calendarCells.map((c) => {
+                      const base =
+                        'p-2 rounded-lg cursor-pointer relative flex flex-col items-center justify-center min-h-[2.25rem]'
+                      if (c.muted) {
+                        return (
+                          <span key={c.key} className={`${base} text-[#1e1b13]/20`}>
+                            {c.day}
+                          </span>
+                        )
+                      }
+                      if (c.selected) {
+                        return (
+                          <span key={c.key} className={`${base} bg-[#000666] text-white`}>
+                            {c.day}
+                            <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-white rounded-full" />
+                          </span>
+                        )
+                      }
+                      return (
+                        <span key={c.key} className={`${base} hover:bg-[#f5edde]`}>
+                          {c.day}
+                        </span>
+                      )
+                    })}
                   </div>
                 </section>
 
@@ -441,21 +444,7 @@ export default function TrialWritingPage() {
 
       {/* ——— Mobile (< md) ——— */}
       <div className="md:hidden bg-[#f5f5f5] font-['Plus_Jakarta_Sans',sans-serif] text-[#1e1b13] min-h-screen pb-28">
-        <header className="fixed top-0 w-full z-50 bg-[#f5f5f5]/80 backdrop-blur-xl shadow-[0_4px_20px_rgba(0,0,0,0.05)] flex items-center justify-between px-6 h-16">
-          <div className="flex items-center gap-4">
-            <span className="material-symbols-outlined text-[#000666] trial-writing-ms">menu</span>
-            <h1 className="font-['Manrope',sans-serif] tracking-tight font-bold text-lg text-[#000666]">添削ダッシュボード</h1>
-          </div>
-          <div className="w-8 h-8 rounded-full overflow-hidden bg-[#e1e1e1]">
-            <img
-              alt=""
-              className="w-full h-full object-cover"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuC6tOAHEb1LBEBvd-2uodzS3gY5WDlVeSXk1FmjtZsK7zPwhifu4fDkEIp027EQTCNL7KL0FjTvD2qNEbkcttWlNugiDaL8wsmRkwP5lDpLgIyTaP7Xeyd4VQjTSP2eK9cJhRMKyfRpaJDcAtaj65uvzuuDwDTy-SgmEs-wkJzoEanybvzWcfIqXGrq1a_dYHnEzHghns6wx04qEscI4Z7VouzFC83aJEmWCIsl_8cVPiidcujceToUFMfx1_8BgHWXvsR8atwjyJE"
-            />
-          </div>
-        </header>
-
-        <main className="pt-20 pb-24 px-4 min-h-screen">
+        <main className="pt-16 pb-24 px-4 min-h-screen">
           <div className="flex space-x-1 mb-8 bg-black/5 p-1 rounded-xl">
             <button type="button" className="flex-1 py-2.5 text-sm font-medium rounded-lg bg-[#000666] text-white shadow-sm">
               課題提出
