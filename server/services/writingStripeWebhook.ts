@@ -21,24 +21,60 @@ function empty(status: number): Response {
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+const INTERNAL_FULFILL_PATH = "/api/internal/trial/fulfill-checkout-session";
+
+/** トークン等をログに出さない — metadata はキーとフラグのみ */
+function metadataDebug(meta: Stripe.Metadata | null | undefined): Record<string, unknown> {
+  if (!meta || typeof meta !== "object") {
+    return { keys: [] as string[] };
+  }
+  const keys = Object.keys(meta).sort();
+  return {
+    keys,
+    trial_entitlement: meta.trial_entitlement === "true",
+    trial_lesson: meta.trial_lesson === "true",
+    has_application_id: typeof meta.application_id === "string" && meta.application_id.length > 0,
+    has_payment_order_id: typeof meta.payment_order_id === "string" && meta.payment_order_id.length > 0,
+  };
+}
+
 /**
  * POST /api/webhooks/stripe — Vercel `api/webhooks/stripe.ts` と Next `app/api/...` の両方から呼ぶ。
  */
 export async function handleWritingStripeWebhookPost(req: Request): Promise<Response> {
+  try {
+    return await handleWritingStripeWebhookPostInner(req);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    const stack = e instanceof Error ? e.stack : undefined;
+    console.error("writing_stripe_webhook_fatal", { message, stack });
+    return json({ error: "internal_error" }, 500);
+  }
+}
+
+async function handleWritingStripeWebhookPostInner(req: Request): Promise<Response> {
+  console.info("writing_stripe_webhook_entry", {
+    hasStripeSecretKey: Boolean(process.env.STRIPE_SECRET_KEY?.trim()),
+    hasStripeWebhookSecret: Boolean(process.env.STRIPE_WEBHOOK_SECRET?.trim()),
+    hasMirinaeApiBaseUrl: Boolean(process.env.MIRINAE_API_BASE_URL?.trim()),
+    hasTrialFulfillSecret: Boolean(process.env.TRIAL_FULFILL_WEBHOOK_SECRET?.trim()),
+  });
+
   const stripeKey = process.env.STRIPE_SECRET_KEY?.trim();
   if (!stripeKey) {
-    console.error("STRIPE_SECRET_KEY missing");
+    console.error("writing_stripe_webhook_env_missing", { key: "STRIPE_SECRET_KEY" });
     return json({ error: "server_misconfigured" }, 500);
   }
 
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!secret) {
-    console.error("STRIPE_WEBHOOK_SECRET missing");
+    console.error("writing_stripe_webhook_env_missing", { key: "STRIPE_WEBHOOK_SECRET" });
     return json({ error: "server_misconfigured" }, 500);
   }
 
   const signature = req.headers.get("stripe-signature");
   if (!signature) {
+    console.warn("writing_stripe_webhook_missing_signature_header");
     return json({ error: "missing_signature" }, 400);
   }
 
@@ -48,22 +84,28 @@ export async function handleWritingStripeWebhookPost(req: Request): Promise<Resp
   let event: Stripe.Event;
   try {
     event = stripe.webhooks.constructEvent(rawBody, signature, secret);
-  } catch {
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    console.error("writing_stripe_webhook_construct_event_failed", { message });
     return json({ error: "invalid_signature" }, 401);
   }
 
+  console.info("writing_stripe_webhook_event_parsed", {
+    eventType: event.type,
+    stripeEventId: event.id,
+  });
+
   if (event.type !== "checkout.session.completed") {
+    console.info("writing_stripe_webhook_event_ignored", { eventType: event.type, reason: "not_checkout_session_completed" });
     return empty(200);
   }
 
   const session = event.data.object as Stripe.Checkout.Session;
 
-  console.info("writing_stripe_webhook_checkout_completed", {
+  console.info("writing_stripe_webhook_checkout_session", {
     stripeEventId: event.id,
     sessionId: session.id,
-    metadataKeys: session.metadata ? Object.keys(session.metadata).sort() : [],
-    trialEntitlement: session.metadata?.trial_entitlement === "true",
-    trialLesson: session.metadata?.trial_lesson === "true",
+    metadata: metadataDebug(session.metadata),
   });
 
   if (session.metadata?.trial_entitlement === "true") {
@@ -79,6 +121,22 @@ export async function handleWritingStripeWebhookPost(req: Request): Promise<Resp
 
     const apiBase = process.env.MIRINAE_API_BASE_URL?.trim() ?? "";
     const fulfillSecret = process.env.TRIAL_FULFILL_WEBHOOK_SECRET?.trim() ?? "";
+    let fulfillHost = "";
+    try {
+      fulfillHost = apiBase ? new URL(apiBase.endsWith("/") ? apiBase : `${apiBase}/`).host : "";
+    } catch {
+      fulfillHost = "invalid_url";
+    }
+
+    console.info("writing_webhook_branch_decision", {
+      branch: "trial_entitlement",
+      sessionId: session.id,
+      mirinaeApiBaseUrlPresent: Boolean(apiBase),
+      mirinaeApiHost: fulfillHost || undefined,
+      trialFulfillSecretPresent: Boolean(fulfillSecret),
+      internalPath: INTERNAL_FULFILL_PATH,
+    });
+
     if (!apiBase || !fulfillSecret) {
       console.error("writing_webhook_trial_entitlement_misconfigured", {
         hasApiBase: Boolean(apiBase),
@@ -87,12 +145,11 @@ export async function handleWritingStripeWebhookPost(req: Request): Promise<Resp
       return json({ error: "server_misconfigured" }, 500);
     }
 
-    const url = `${apiBase.replace(/\/$/, "")}/api/internal/trial/fulfill-checkout-session`;
-    console.info("writing_webhook_branch", {
-      stripeEventId: event.id,
+    const url = `${apiBase.replace(/\/$/, "")}${INTERNAL_FULFILL_PATH}`;
+    console.info("writing_webhook_internal_fulfill_precall", {
       sessionId: session.id,
-      branch: "trial_entitlement_proxy",
-      target: "mirinae_api_fulfill_internal",
+      fulfillUrlHost: fulfillHost,
+      fulfillPath: INTERNAL_FULFILL_PATH,
     });
 
     try {
@@ -105,10 +162,16 @@ export async function handleWritingStripeWebhookPost(req: Request): Promise<Resp
         body: JSON.stringify({ sessionId: session.id }),
       });
       const text = await res.text();
+      console.info("writing_webhook_internal_fulfill_response", {
+        sessionId: session.id,
+        status: res.status,
+        responseBodyLength: text.length,
+        responseBodyPreview: text.slice(0, 2000),
+      });
       if (!res.ok) {
         console.error("writing_webhook_trial_entitlement_proxy_failed", {
           status: res.status,
-          body: text.slice(0, 500),
+          body: text.slice(0, 2000),
           sessionId: session.id,
         });
         return json({ error: "trial_entitlement_fulfill_failed" }, 502);
@@ -116,10 +179,10 @@ export async function handleWritingStripeWebhookPost(req: Request): Promise<Resp
       console.info("writing_webhook_trial_entitlement_proxy_ok", {
         stripeEventId: event.id,
         sessionId: session.id,
-        responsePreview: text.slice(0, 200),
       });
     } catch (e) {
-      console.error("writing_webhook_trial_entitlement_proxy_error", e);
+      const message = e instanceof Error ? e.message : String(e);
+      console.error("writing_webhook_trial_entitlement_proxy_error", { message, stack: e instanceof Error ? e.stack : undefined });
       return json({ error: "trial_entitlement_fulfill_failed" }, 502);
     }
 
@@ -127,6 +190,8 @@ export async function handleWritingStripeWebhookPost(req: Request): Promise<Resp
   }
 
   if (session.metadata?.trial_lesson === "true") {
+    console.info("writing_webhook_branch_decision", { branch: "trial_lesson", sessionId: session.id });
+
     const currency = (session.currency ?? "").toLowerCase();
     if (currency !== "jpy") {
       return json({ error: "unsupported_currency" }, 400);
@@ -148,7 +213,8 @@ export async function handleWritingStripeWebhookPost(req: Request): Promise<Resp
     try {
       db = getDb();
     } catch (e) {
-      console.error("writing_webhook_getdb_failed", e);
+      const message = e instanceof Error ? e.message : String(e);
+      console.error("writing_webhook_getdb_failed", { message });
       return json({ error: "database_unavailable" }, 500);
     }
     const recorded = await repo.insertStripeWebhookEvent(db, {
@@ -171,15 +237,14 @@ export async function handleWritingStripeWebhookPost(req: Request): Promise<Resp
     try {
       await sendTrialLessonEmailsFromStripeSession(session);
     } catch (e) {
-      console.error("trial_lesson_email_send_error", e);
+      const message = e instanceof Error ? e.message : String(e);
+      console.error("trial_lesson_email_send_error", { message });
     }
 
     console.info("trial_lesson_checkout_completed", {
       stripeEventId: event.id,
       sessionId: session.id,
-      customerEmail: session.customer_details?.email ?? session.customer_email,
       paymentStatus: session.payment_status,
-      metadata: session.metadata,
     });
     return empty(200);
   }
@@ -188,8 +253,15 @@ export async function handleWritingStripeWebhookPost(req: Request): Promise<Resp
   const supabaseUserId = session.metadata?.supabase_user_id ?? null;
 
   if (!paymentOrderId) {
+    console.warn("writing_webhook_branch_decision", {
+      branch: "none",
+      reason: "missing_payment_order_and_not_trial",
+      sessionId: session.id,
+    });
     return json({ error: "missing_payment_order" }, 400);
   }
+
+  console.info("writing_webhook_branch_decision", { branch: "payment_order", sessionId: session.id, hasPaymentOrderId: true });
 
   const currency = (session.currency ?? "").toLowerCase();
   if (currency !== "jpy") {
@@ -212,7 +284,8 @@ export async function handleWritingStripeWebhookPost(req: Request): Promise<Resp
   try {
     db = getDb();
   } catch (e) {
-    console.error("writing_webhook_getdb_failed", e);
+    const message = e instanceof Error ? e.message : String(e);
+    console.error("writing_webhook_getdb_failed", { message });
     return json({ error: "database_unavailable" }, 500);
   }
 

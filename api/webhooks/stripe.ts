@@ -29,6 +29,12 @@ function readRawBody(req: IncomingMessage): Promise<Buffer> {
 }
 
 export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  console.info("writing_stripe_webhook_vercel_handler_entry", {
+    method: req.method,
+    host: req.headers.host,
+    urlPath: req.url?.split("?")[0],
+  });
+
   try {
     if (req.method !== "POST") {
       res.statusCode = 405;
@@ -43,6 +49,11 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     const url = `https://${host}${path}${search}`;
 
     const rawBody = await readRawBody(req);
+    console.info("writing_stripe_webhook_raw_body", {
+      rawBodyByteLength: rawBody.length,
+      hasStripeSignatureHeader: Boolean(req.headers["stripe-signature"]),
+    });
+
     const webRequest = new Request(url, {
       method: "POST",
       headers: req.headers as HeadersInit,
@@ -51,6 +62,10 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
 
     const response = await handleWritingStripeWebhookPost(webRequest);
     const text = await response.text();
+    console.info("writing_stripe_webhook_handler_response", {
+      responseStatus: response.status,
+      responseBodyLength: text.length,
+    });
     res.statusCode = response.status;
     response.headers.forEach((value, key) => {
       if (key.toLowerCase() === "content-encoding") return;
@@ -58,7 +73,9 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     });
     res.end(text);
   } catch (e) {
-    console.error("writing_stripe_webhook_unhandled", e);
+    const message = e instanceof Error ? e.message : String(e);
+    const stack = e instanceof Error ? e.stack : undefined;
+    console.error("writing_stripe_webhook_unhandled", { message, stack });
     res.statusCode = 500;
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.end(JSON.stringify({ error: "internal_error" }));
