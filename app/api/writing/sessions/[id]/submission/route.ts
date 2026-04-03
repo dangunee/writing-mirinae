@@ -1,21 +1,30 @@
 import { NextResponse } from "next/server";
 
 import { getDb } from "../../../../../../server/db/client";
+import { parseRegularWritingGrantIdFromCookieHeader } from "../../../../../../server/lib/regularSessionCookie";
 import { getSessionUserId } from "../../../../../../server/lib/supabaseServer";
-import { saveOrSubmitSubmission } from "../../../../../../server/services/writingStudentService";
+import {
+  saveOrSubmitSubmission,
+  saveOrSubmitSubmissionForRegular,
+} from "../../../../../../server/services/writingStudentService";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
  * POST /api/writing/sessions/:id/submission
- * Security: identity from session; reject client-supplied userId/status/courseId.
+ * Security: identity from session or verified regular cookie; reject client-supplied userId/status/courseId.
  * Abuse mitigation: body size (platform + WRITING_MAX_BODY_TEXT_CHARS), MIME/size on images, unique index on active pipeline.
  */
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
   const userId = await getSessionUserId();
-  if (!userId) {
+  const grantId = parseRegularWritingGrantIdFromCookieHeader(req.headers.get("cookie"));
+
+  if (!userId && !grantId) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+  if (userId && grantId) {
+    return NextResponse.json({ error: "ambiguous_identity" }, { status: 400 });
   }
 
   const { id: sessionId } = await context.params;
@@ -54,14 +63,23 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   }
 
   const db = getDb();
-  const result = await saveOrSubmitSubmission(db, {
-    userId,
-    sessionId,
-    action,
-    bodyText,
-    imageBuffer,
-    imageMimeType,
-  });
+  const result = userId
+    ? await saveOrSubmitSubmission(db, {
+        userId,
+        sessionId,
+        action,
+        bodyText,
+        imageBuffer,
+        imageMimeType,
+      })
+    : await saveOrSubmitSubmissionForRegular(db, {
+        grantId: grantId!,
+        sessionId,
+        action,
+        bodyText,
+        imageBuffer,
+        imageMimeType,
+      });
 
   if (!result.ok) {
     return NextResponse.json({ error: result.code }, { status: result.status });

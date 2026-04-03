@@ -75,7 +75,7 @@ export async function getTeacherQueueGrouped(db: Db): Promise<QueueGroupedRespon
   const rows = await repo.listSubmissionQueue(db);
   const items: QueueItem[] = rows.map((r) => ({
     submissionId: r.submission.id,
-    studentUserId: r.submission.userId,
+    studentUserId: r.submission.userId ?? r.submission.regularAccessGrantId ?? "",
     status: r.submission.status,
     submittedAt: r.submission.submittedAt?.toISOString() ?? null,
     createdAt: r.submission.createdAt.toISOString(),
@@ -120,7 +120,9 @@ export async function getTeacherQueueGrouped(db: Db): Promise<QueueGroupedRespon
 export type TeacherSubmissionDetail = {
       submission: {
         id: string;
-        userId: string;
+        /** Logged-in student; null for mail-link regular access. */
+        userId: string | null;
+        regularAccessGrantId: string | null;
         status: string;
         bodyText: string | null;
         imageMimeType: string | null;
@@ -180,6 +182,7 @@ export async function getTeacherSubmissionDetail(
     submission: {
       id: row.submission.id,
       userId: row.submission.userId,
+      regularAccessGrantId: row.submission.regularAccessGrantId ?? null,
       status: row.submission.status,
       bodyText: row.submission.bodyText,
       imageMimeType: row.submission.imageMimeType,

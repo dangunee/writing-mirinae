@@ -4,9 +4,13 @@ import AssignmentSubmitScreen from '../components/writing/AssignmentSubmitScreen
 import { apiUrl } from '../lib/apiUrl'
 import type { AccessContext } from '../types/writingAccess'
 
-/** GET /api/writing/sessions/current 성공 본문 (서버 writingStudentService CurrentSessionResponse ok:true) */
+/** GET /api/writing/sessions/current — student / regular course session (unified) */
 type CurrentSessionOk = {
   ok: true
+  accessKind?: 'student' | 'regular'
+  grantId?: string
+  accessExpiresAt?: string | null
+  pendingSubmissionId?: string | null
   courseId: string
   mode: 'pipeline' | 'fresh' | 'all_done'
   session: {
@@ -49,12 +53,26 @@ export default function WritingPage() {
         setCurrent(null)
         return
       }
-      const data = (await res.json()) as CurrentSessionOk | { ok: false }
-      if (data && 'ok' in data && data.ok === true) {
-        setCurrent(data)
-      } else {
+      const data = (await res.json()) as
+        | CurrentSessionOk
+        | { ok: true; accessKind: 'trial'; applicationId: string; canSubmit: boolean; expiresAt: string | null }
+        | { ok: false }
+      if (data && 'ok' in data && data.ok === true && 'accessKind' in data && data.accessKind === 'trial') {
         setCurrent(null)
+        setAccessContext({ type: 'trial' })
+        return
       }
+      if (data && 'ok' in data && data.ok === true && 'courseId' in data && data.courseId) {
+        const d = data as CurrentSessionOk
+        setCurrent(d)
+        if (d.accessKind === 'regular') {
+          setAccessContext({ type: 'regular' })
+        } else {
+          setAccessContext({ type: 'student' })
+        }
+        return
+      }
+      setCurrent(null)
     } catch {
       setCurrent(null)
     } finally {
@@ -66,20 +84,28 @@ export default function WritingPage() {
     void loadCurrent()
   }, [loadCurrent])
 
+  /** When /sessions/current returned 404 (e.g. no course), still label trial/regular from dedicated cookies. */
   useEffect(() => {
     if (loading) return
-    if (current != null) {
-      setAccessContext({ type: 'student' })
-      return
-    }
+    if (current != null) return
     let cancelled = false
     ;(async () => {
       try {
         const r = await fetch(apiUrl('/api/writing/trial/session/current'), { credentials: 'include' })
         if (cancelled) return
-        if (!r.ok) return
-        const j = (await r.json()) as { ok?: boolean }
-        if (j?.ok === true) setAccessContext({ type: 'trial' })
+        if (r.ok) {
+          const j = (await r.json()) as { ok?: boolean }
+          if (j?.ok === true) {
+            setAccessContext({ type: 'trial' })
+            return
+          }
+        }
+        const rr = await fetch(apiUrl('/api/writing/regular/session/current'), { credentials: 'include' })
+        if (cancelled) return
+        if (rr.ok) {
+          const jr = (await rr.json()) as { ok?: boolean }
+          if (jr?.ok === true) setAccessContext({ type: 'regular' })
+        }
       } catch {
         /* ignore */
       }

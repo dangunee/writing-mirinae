@@ -46,7 +46,8 @@ export function validateImageUpload(params: {
 
 /** Safe object path under bucket; no user-controlled path segments except opaque ids. */
 export function buildStorageObjectKey(params: {
-  userId: string;
+  userId?: string;
+  regularAccessGrantId?: string;
   submissionId: string;
   mimeType: string;
 }): { storageKey: string; extension: string } {
@@ -56,6 +57,15 @@ export function buildStorageObjectKey(params: {
     throw new Error("invalid mime for storage key");
   }
   const rand = randomBytes(8).toString("hex");
-  const storageKey = `${params.userId}/${params.submissionId}/${rand}.${ext}`;
+  const prefix =
+    params.userId != null
+      ? params.userId
+      : params.regularAccessGrantId != null
+        ? `regular-grants/${params.regularAccessGrantId}`
+        : null;
+  if (!prefix) {
+    throw new Error("storage owner required");
+  }
+  const storageKey = `${prefix}/${params.submissionId}/${rand}.${ext}`;
   return { storageKey, extension: ext };
 }

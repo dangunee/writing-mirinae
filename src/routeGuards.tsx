@@ -31,6 +31,17 @@ export function StudentRouteGuard() {
             return
           }
         }
+        const regularRes = await fetch(apiUrl('/api/writing/regular/session/current'), {
+          credentials: 'include',
+        })
+        if (cancelled) return
+        if (regularRes.ok) {
+          const data = (await regularRes.json()) as { ok?: boolean }
+          if (data?.ok === true) {
+            setState('ok')
+            return
+          }
+        }
         setState('unauthorized')
       } catch {
         if (!cancelled) setState('error')

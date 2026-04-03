@@ -122,6 +122,36 @@ export default function TrialApplicationsAdminPage() {
     }
   }
 
+  const runExtend = async (days: number, id: string) => {
+    setBusyId(id)
+    setBanner(null)
+    try {
+      const res = await fetch(
+        trialAdminBffApiUrl(`/api/writing/admin/trial-applications/${encodeURIComponent(id)}/extend-access`),
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+          body: JSON.stringify({ days }),
+        }
+      )
+      const data = (await res.json()) as { ok?: boolean; accessExpiresAt?: string; error?: string }
+      if (!res.ok || data.ok !== true) {
+        setBanner({ kind: 'err', text: '延長に失敗しました。' })
+        return
+      }
+      const iso = data.accessExpiresAt
+      setBanner({
+        kind: 'ok',
+        text: iso ? `利用期限を延長しました（期限の目安: ${iso}）` : '利用期限を延長しました。',
+      })
+      await fetchList(token)
+    } catch {
+      setBanner({ kind: 'err', text: '通信に失敗しました。' })
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   const runResend = async (id: string) => {
     setBusyId(id)
     setBanner(null)
@@ -274,6 +304,16 @@ export default function TrialApplicationsAdminPage() {
                                 className="rounded-full border border-[#4052b6] bg-white px-3 py-1.5 text-xs font-bold text-[#4052b6] disabled:opacity-50"
                               >
                                 {busy ? '処理中…' : 'リンク再送信'}
+                              </button>
+                            ) : null}
+                            {showResend ? (
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => void runExtend(3, r.id)}
+                                className="rounded-full border border-[#abadb0]/50 bg-[#f8fafc] px-3 py-1.5 text-xs font-bold text-[#2c2f32] disabled:opacity-50"
+                              >
+                                {busy ? '処理中…' : '3日延長'}
                               </button>
                             ) : null}
                             {!showActivate && !showResend ? (

@@ -1,6 +1,6 @@
 /**
- * Vercel — POST /api/writing/trial/access/consume
- * Proxies to mirinae-api, sets httpOnly cookie from JSON (does not expose session value to client).
+ * Vercel — POST /api/writing/regular/access/consume
+ * Proxies to mirinae-api; sets httpOnly cookie from JSON body.
  */
 import type { IncomingMessage, ServerResponse } from "http";
 
@@ -32,7 +32,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   if (req.method !== "POST") {
     res.statusCode = 405;
     res.setHeader("Content-Type", "application/json; charset=utf-8");
-    res.end(JSON.stringify({ ok: false, error: "method_not_allowed" }));
+    res.end(JSON.stringify({ ok: false, code: "INVALID_TOKEN" }));
     return;
   }
 
@@ -40,7 +40,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   if (!base) {
     res.statusCode = 500;
     res.setHeader("Content-Type", "application/json; charset=utf-8");
-    res.end(JSON.stringify({ ok: false, error: "server_misconfigured" }));
+    res.end(JSON.stringify({ ok: false, code: "INVALID_TOKEN" }));
     return;
   }
 
@@ -50,12 +50,12 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   } catch {
     res.statusCode = 400;
     res.setHeader("Content-Type", "application/json; charset=utf-8");
-    res.end(JSON.stringify({ ok: false, error: "invalid_or_expired_access" }));
+    res.end(JSON.stringify({ ok: false, code: "INVALID_TOKEN" }));
     return;
   }
 
   try {
-    const upstream = await fetch(`${base}/api/writing/trial/access/consume`, {
+    const upstream = await fetch(`${base}/api/writing/regular/access/consume`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: bodyBuf.length > 0 ? bodyBuf : "{}",
@@ -66,32 +66,32 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       redirectTo?: string;
       sessionCookie?: string;
       sessionCookieMaxAgeSec?: number;
-      error?: string;
+      code?: string;
     } = {};
     try {
       json = text ? (JSON.parse(text) as typeof json) : {};
     } catch {
       res.statusCode = 502;
       res.setHeader("Content-Type", "application/json; charset=utf-8");
-      res.end(JSON.stringify({ ok: false, error: "invalid_or_expired_access" }));
+      res.end(JSON.stringify({ ok: false, code: "INVALID_TOKEN" }));
       return;
     }
 
     if (!json.ok) {
-      console.warn("trial_access_consume_bff_fail", { upstreamStatus: upstream.status });
+      console.warn("regular_access_consume_bff_fail", { upstreamStatus: upstream.status, code: json.code });
       res.statusCode = upstream.status >= 400 ? upstream.status : 400;
       res.setHeader("Content-Type", "application/json; charset=utf-8");
-      res.end(JSON.stringify({ ok: false, error: json.error ?? "invalid_or_expired_access" }));
+      res.end(JSON.stringify({ ok: false, code: json.code ?? "INVALID_TOKEN" }));
       return;
     }
 
     const redirectTo = typeof json.redirectTo === "string" ? json.redirectTo.trim() : "";
     const sessionCookie = typeof json.sessionCookie === "string" ? json.sessionCookie.trim() : "";
     if (!redirectTo || !sessionCookie) {
-      console.warn("trial_access_consume_bff_fail", { reason: "upstream_missing_fields" });
+      console.warn("regular_access_consume_bff_fail", { reason: "upstream_missing_fields" });
       res.statusCode = 502;
       res.setHeader("Content-Type", "application/json; charset=utf-8");
-      res.end(JSON.stringify({ ok: false, error: "invalid_or_expired_access" }));
+      res.end(JSON.stringify({ ok: false, code: "INVALID_TOKEN" }));
       return;
     }
 
@@ -101,7 +101,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
         ? Math.max(0, Math.floor(json.sessionCookieMaxAgeSec))
         : COOKIE_MAX_AGE_FALLBACK;
     const cookieParts = [
-      `writing_trial_access=${encodeURIComponent(sessionCookie)}`,
+      `writing_regular_access=${encodeURIComponent(sessionCookie)}`,
       "Path=/writing",
       `Max-Age=${maxAge}`,
       "HttpOnly",
@@ -110,14 +110,14 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     if (secure) cookieParts.push("Secure");
     res.setHeader("Set-Cookie", cookieParts.join("; "));
 
-    console.info("trial_access_consume_bff_ok", { secureCookie: secure });
+    console.info("regular_access_consume_bff_ok", { secureCookie: secure });
     res.statusCode = 200;
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.end(JSON.stringify({ ok: true, redirectTo }));
   } catch (e) {
-    console.error("trial_access_consume_bff_error", e);
+    console.error("regular_access_consume_bff_error", e);
     res.statusCode = 500;
     res.setHeader("Content-Type", "application/json; charset=utf-8");
-    res.end(JSON.stringify({ ok: false, error: "request_failed" }));
+    res.end(JSON.stringify({ ok: false, code: "INVALID_TOKEN" }));
   }
 }

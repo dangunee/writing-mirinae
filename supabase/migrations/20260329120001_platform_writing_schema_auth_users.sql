@@ -301,7 +301,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS writing_submissions_one_active_pipeline_per_us
   ON writing.submissions (user_id)
   WHERE status IN ('draft', 'submitted', 'in_review', 'corrected');
 
-COMMENT ON INDEX writing_submissions_one_active_pipeline_per_user IS 'At most one submission in draft..corrected per user platform-wide; excludes published.';
+COMMENT ON INDEX writing.writing_submissions_one_active_pipeline_per_user IS 'At most one submission in draft..corrected per user platform-wide; excludes published.';
 
 CREATE TABLE IF NOT EXISTS writing.corrections (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

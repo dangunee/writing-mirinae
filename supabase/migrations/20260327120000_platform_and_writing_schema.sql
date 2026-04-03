@@ -272,7 +272,7 @@ COMMENT ON FUNCTION entitlements_validate_app_matches_product() IS 'Keeps entitl
 -- -----------------------------------------------------------------------------
 -- Writing schema
 -- -----------------------------------------------------------------------------
-CREATE SCHEMA writing;
+CREATE SCHEMA IF NOT EXISTS writing;
 
 CREATE TABLE writing.courses (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -360,7 +360,7 @@ CREATE UNIQUE INDEX writing_submissions_one_active_pipeline_per_user
   ON writing.submissions (user_id)
   WHERE status IN ('draft', 'submitted', 'in_review', 'corrected');
 
-COMMENT ON INDEX writing_submissions_one_active_pipeline_per_user IS 'At most one submission in draft..corrected per user platform-wide; excludes published.';
+COMMENT ON INDEX writing.writing_submissions_one_active_pipeline_per_user IS 'At most one submission in draft..corrected per user platform-wide; excludes published.';
 
 CREATE TABLE writing.corrections (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -490,7 +490,7 @@ COMMENT ON FUNCTION writing.fn_corrections_after_publish_sync() IS 'Student subm
 -- -----------------------------------------------------------------------------
 -- Stripe webhook idempotency
 -- -----------------------------------------------------------------------------
-CREATE TABLE stripe_webhook_events (
+CREATE TABLE IF NOT EXISTS stripe_webhook_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   stripe_event_id text NOT NULL UNIQUE,
   processed_at timestamptz NOT NULL DEFAULT now(),

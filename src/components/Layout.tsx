@@ -27,6 +27,7 @@ export default function Layout({ children }: LayoutProps) {
     location.pathname === '/writing/bank-complete' ||
     location.pathname === '/writing/trial/start' ||
     location.pathname === '/writing/trial/access' ||
+    location.pathname === '/writing/regular/access' ||
     location.pathname === '/writing/app/complete' ||
     location.pathname === '/writing/admin/trial-applications'
   ) {

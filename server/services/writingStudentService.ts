@@ -26,6 +26,7 @@ const MAX_BODY_TEXT_CHARS = (() => {
 export type CurrentSessionResponse =
   | {
       ok: true;
+      accessKind: "student";
       courseId: string;
       mode: "pipeline" | "fresh" | "all_done";
       session: {
@@ -44,6 +45,36 @@ export type CurrentSessionResponse =
         submittedAt: string | null;
       } | null;
       /** Whether POST /submission may create/update draft or submit (business rules). */
+      canSubmit: boolean;
+      reasonIfNot?: string;
+    }
+  | {
+      ok: true;
+      accessKind: "regular";
+      grantId: string;
+      courseId: string;
+      accessExpiresAt: string | null;
+      /** Active pipeline submission id (draft..corrected), if any. */
+      pendingSubmissionId: string | null;
+      /** Set by GET /api/writing/sessions/current when grant auto-advanced to the next course. */
+      advancedToNextCourse?: boolean;
+      previousCourseId?: string | null;
+      mode: "pipeline" | "fresh" | "all_done";
+      session: {
+        id: string;
+        courseId: string;
+        index: number;
+        unlockAt: string;
+        status: string;
+      } | null;
+      submission: {
+        id: string;
+        status: string;
+        bodyText: string | null;
+        imageStorageKey: string | null;
+        imageMimeType: string | null;
+        submittedAt: string | null;
+      } | null;
       canSubmit: boolean;
       reasonIfNot?: string;
     }
@@ -69,6 +100,7 @@ export async function getCurrentSessionForStudent(
   if (pipeline) {
     return {
       ok: true,
+      accessKind: "student",
       courseId: course.id,
       mode: "pipeline",
       session: {
@@ -105,6 +137,7 @@ export async function getCurrentSessionForStudent(
       if (blocker) {
         return {
           ok: true,
+          accessKind: "student",
           courseId: course.id,
           mode: "fresh",
           session: {
@@ -125,6 +158,7 @@ export async function getCurrentSessionForStudent(
     if (!timeOk) {
       return {
         ok: true,
+        accessKind: "student",
         courseId: course.id,
         mode: "fresh",
         session: {
@@ -142,6 +176,7 @@ export async function getCurrentSessionForStudent(
 
     return {
       ok: true,
+      accessKind: "student",
       courseId: course.id,
       mode: "fresh",
       session: {
@@ -158,7 +193,156 @@ export async function getCurrentSessionForStudent(
 
   return {
     ok: true,
+    accessKind: "student",
     courseId: course.id,
+    mode: "all_done",
+    session: null,
+    submission: null,
+    canSubmit: false,
+    reasonIfNot: "all_sessions_completed",
+  };
+}
+
+/**
+ * Mail-link regular access: same session progression as student, keyed by regular_access_grant_id.
+ * Security: grantId must come from verified cookie; caller validates cookie before calling.
+ */
+export async function getCurrentSessionForRegularGrant(db: Db, grantId: string): Promise<CurrentSessionResponse> {
+  const row = await repo.getRegularGrantWithCourse(db, grantId);
+  if (!row) {
+    return { ok: false, error: "no_active_course" };
+  }
+  const { grant, course } = row;
+  if (!grant.accessEnabled) {
+    return { ok: false, error: "no_active_course" };
+  }
+  const now = new Date();
+  if (grant.accessExpiresAt != null && grant.accessExpiresAt <= now) {
+    return { ok: false, error: "no_active_course" };
+  }
+  if (!grant.courseId) {
+    return { ok: false, error: "no_active_course" };
+  }
+  if (course.status !== "active") {
+    return { ok: false, error: "no_active_course" };
+  }
+
+  await repo.lazyUnlockDueSessions(db, course.id);
+  const sessions = await repo.listSessionsForCourseOrdered(db, course.id);
+
+  const pipeline = await repo.findActivePipelineSubmissionForGrant(db, grantId);
+  if (pipeline) {
+    return {
+      ok: true,
+      accessKind: "regular",
+      grantId,
+      courseId: course.id,
+      accessExpiresAt: grant.accessExpiresAt?.toISOString() ?? null,
+      pendingSubmissionId: pipeline.submission.id,
+      mode: "pipeline",
+      session: {
+        id: pipeline.session.id,
+        courseId: pipeline.session.courseId,
+        index: pipeline.session.index,
+        unlockAt: pipeline.session.unlockAt.toISOString(),
+        status: pipeline.session.status,
+      },
+      submission: {
+        id: pipeline.submission.id,
+        status: pipeline.submission.status,
+        bodyText: pipeline.submission.bodyText,
+        imageStorageKey: pipeline.submission.imageStorageKey,
+        imageMimeType: pipeline.submission.imageMimeType,
+        submittedAt: pipeline.submission.submittedAt?.toISOString() ?? null,
+      },
+      canSubmit: pipeline.submission.status === "draft",
+      reasonIfNot:
+        pipeline.submission.status === "draft"
+          ? undefined
+          : "pipeline_in_review_wait_for_result",
+    };
+  }
+
+  for (const s of sessions) {
+    if (s.status === "completed") continue;
+
+    const lower = sessions.filter((x) => x.index < s.index);
+    const prevAllCompleted = lower.every((x) => x.status === "completed");
+    if (!prevAllCompleted) {
+      const blocker = lower.find((x) => x.status !== "completed");
+      if (blocker) {
+        return {
+          ok: true,
+          accessKind: "regular",
+          grantId,
+          courseId: course.id,
+          accessExpiresAt: grant.accessExpiresAt?.toISOString() ?? null,
+          pendingSubmissionId: null,
+          mode: "fresh",
+          session: {
+            id: blocker.id,
+            courseId: blocker.courseId,
+            index: blocker.index,
+            unlockAt: blocker.unlockAt.toISOString(),
+            status: blocker.status,
+          },
+          submission: null,
+          canSubmit: false,
+          reasonIfNot: "complete_previous_sessions_first",
+        };
+      }
+    }
+
+    const timeOk = s.unlockAt <= now;
+    if (!timeOk) {
+      return {
+        ok: true,
+        accessKind: "regular",
+        grantId,
+        courseId: course.id,
+        accessExpiresAt: grant.accessExpiresAt?.toISOString() ?? null,
+        pendingSubmissionId: null,
+        mode: "fresh",
+        session: {
+          id: s.id,
+          courseId: s.courseId,
+          index: s.index,
+          unlockAt: s.unlockAt.toISOString(),
+          status: s.status,
+        },
+        submission: null,
+        canSubmit: false,
+        reasonIfNot: "session_not_unlocked_yet",
+      };
+    }
+
+    return {
+      ok: true,
+      accessKind: "regular",
+      grantId,
+      courseId: course.id,
+      accessExpiresAt: grant.accessExpiresAt?.toISOString() ?? null,
+      pendingSubmissionId: null,
+      mode: "fresh",
+      session: {
+        id: s.id,
+        courseId: s.courseId,
+        index: s.index,
+        unlockAt: s.unlockAt.toISOString(),
+        status: s.status,
+      },
+      submission: null,
+      canSubmit: true,
+    };
+  }
+
+  return {
+    ok: true,
+    accessKind: "regular",
+    grantId,
+    courseId: course.id,
+    accessExpiresAt: grant.accessExpiresAt?.toISOString() ?? null,
+    pendingSubmissionId: null,
     mode: "all_done",
     session: null,
     submission: null,
@@ -176,6 +360,15 @@ function hasSubstantiveContent(bodyText: string | null | undefined, imageKey: st
 
 export type SaveSubmissionInput = {
   userId: string;
+  sessionId: string;
+  action: "save" | "submit";
+  bodyText: string | null;
+  imageBuffer: Buffer | null;
+  imageMimeType: string | null;
+};
+
+export type SaveSubmissionRegularInput = {
+  grantId: string;
   sessionId: string;
   action: "save" | "submit";
   bodyText: string | null;
@@ -403,6 +596,227 @@ export async function saveOrSubmitSubmission(
   }
 }
 
+/**
+ * Regular mail-link access: grantId from verified cookie only; session/course enforced server-side.
+ */
+export async function saveOrSubmitSubmissionForRegular(
+  db: Db,
+  input: SaveSubmissionRegularInput
+): Promise<SaveSubmissionResult> {
+  const lenErr = assertBodyTextLength(input.bodyText);
+  if (lenErr) return lenErr;
+
+  const grantRow = await repo.getRegularGrantWithCourse(db, input.grantId);
+  if (!grantRow) {
+    return { ok: false, status: 404, code: "session_not_found" };
+  }
+  const { grant, course } = grantRow;
+  if (!grant.accessEnabled) {
+    return { ok: false, status: 403, code: "access_disabled" };
+  }
+  const nowCheck = new Date();
+  if (grant.accessExpiresAt != null && grant.accessExpiresAt <= nowCheck) {
+    return { ok: false, status: 403, code: "access_expired" };
+  }
+  if (!grant.courseId || course.id !== grant.courseId) {
+    return { ok: false, status: 404, code: "session_not_found" };
+  }
+
+  const row = await repo.getSessionByIdWithCourse(db, input.sessionId);
+  if (!row || row.course.id !== course.id) {
+    return { ok: false, status: 404, code: "session_not_found" };
+  }
+  if (row.course.status !== "active") {
+    return { ok: false, status: 409, code: "course_not_active" };
+  }
+
+  await repo.lazyUnlockDueSessions(db, row.course.id);
+  const refreshed = await repo.getSessionByIdWithCourse(db, input.sessionId);
+  if (!refreshed) {
+    return { ok: false, status: 404, code: "session_not_found" };
+  }
+  const session = refreshed.session;
+
+  const now = new Date();
+  if (session.status === "completed") {
+    return { ok: false, status: 409, code: "session_completed" };
+  }
+  if (session.unlockAt > now) {
+    return { ok: false, status: 409, code: "session_locked" };
+  }
+
+  const sessions = await repo.listSessionsForCourseOrdered(db, row.course.id);
+  const lower = sessions.filter((x) => x.index < session.index);
+  if (!lower.every((x) => x.status === "completed")) {
+    return { ok: false, status: 409, code: "complete_previous_sessions_first" };
+  }
+
+  const pipeline = await repo.findActivePipelineSubmissionForGrant(db, input.grantId);
+  if (pipeline && pipeline.session.id !== input.sessionId) {
+    return { ok: false, status: 409, code: "active_submission_on_other_session" };
+  }
+
+  let existing = await repo.getSubmissionBySessionIdForGrant(db, input.sessionId, input.grantId);
+  if (!existing && pipeline && pipeline.session.id === input.sessionId) {
+    existing = pipeline.submission;
+  }
+
+  if (existing && existing.regularAccessGrantId !== input.grantId) {
+    return { ok: false, status: 403, code: "forbidden" };
+  }
+
+  if (existing && existing.status !== "draft") {
+    return { ok: false, status: 409, code: "submission_not_editable" };
+  }
+
+  let imageKey = existing?.imageStorageKey ?? null;
+  let imageMime = existing?.imageMimeType ?? null;
+
+  if (input.imageBuffer && input.imageMimeType) {
+    const v = validateImageUpload({
+      mimeType: input.imageMimeType,
+      byteLength: input.imageBuffer.length,
+    });
+    if (!v.ok) {
+      return { ok: false, status: 400, code: v.reason };
+    }
+  }
+
+  try {
+    return await db.transaction(async (tx) => {
+      let submissionId = existing?.id;
+
+      if (input.imageBuffer && input.imageMimeType) {
+        const v = validateImageUpload({
+          mimeType: input.imageMimeType,
+          byteLength: input.imageBuffer.length,
+        });
+        if (!v.ok) {
+          return { ok: false, status: 400, code: v.reason };
+        }
+
+        if (!submissionId) {
+          try {
+            const ins = await repo.insertSubmission(tx, {
+              sessionId: input.sessionId,
+              courseId: row.course.id,
+              userId: null,
+              regularAccessGrantId: input.grantId,
+              status: "draft",
+              bodyText: input.bodyText,
+              imageStorageKey: null,
+              imageMimeType: null,
+              submittedAt: null,
+            });
+            submissionId = ins.id;
+          } catch (e) {
+            if (e instanceof PostgresError && e.code === "23505") {
+              return { ok: false, status: 409, code: "active_submission_conflict" };
+            }
+            throw e;
+          }
+        }
+
+        const { storageKey } = buildStorageObjectKey({
+          regularAccessGrantId: input.grantId,
+          submissionId: submissionId!,
+          mimeType: input.imageMimeType,
+        });
+
+        const supabase = getServiceRoleClient();
+        const up = await supabase.storage
+          .from(BUCKET)
+          .upload(storageKey, input.imageBuffer, {
+            contentType: input.imageMimeType.split(";")[0]?.trim(),
+            upsert: false,
+          });
+        if (up.error) {
+          console.error("storage_upload_failed", up.error.message);
+          return { ok: false, status: 500, code: "storage_upload_failed" };
+        }
+
+        imageKey = storageKey;
+        imageMime = input.imageMimeType.split(";")[0]?.trim() ?? input.imageMimeType;
+
+        const updated = await repo.updateSubmissionDraftForGrant(tx, submissionId!, input.grantId, {
+          bodyText: input.bodyText,
+          imageStorageKey: imageKey,
+          imageMimeType: imageMime,
+        });
+        if (!updated) {
+          return { ok: false, status: 409, code: "submission_not_editable" };
+        }
+
+        if (input.action === "submit") {
+          if (!hasSubstantiveContent(updated.bodyText, updated.imageStorageKey)) {
+            return { ok: false, status: 422, code: "empty_submission" };
+          }
+          const fin = await repo.submitSubmissionFinalForGrant(tx, submissionId!, input.grantId);
+          if (!fin) {
+            return { ok: false, status: 409, code: "submit_failed" };
+          }
+          return { ok: true, submissionId: fin.id, status: fin.status };
+        }
+        return { ok: true, submissionId: updated.id, status: updated.status };
+      }
+
+      if (!submissionId) {
+        try {
+          const ins = await repo.insertSubmission(tx, {
+            sessionId: input.sessionId,
+            courseId: row.course.id,
+            userId: null,
+            regularAccessGrantId: input.grantId,
+            status: "draft",
+            bodyText: input.bodyText,
+            imageStorageKey: imageKey,
+            imageMimeType: imageMime,
+            submittedAt: null,
+          });
+          submissionId = ins.id;
+        } catch (e) {
+          if (e instanceof PostgresError && e.code === "23505") {
+            return { ok: false, status: 409, code: "active_submission_conflict" };
+          }
+          throw e;
+        }
+      } else {
+        const updated = await repo.updateSubmissionDraftForGrant(tx, submissionId, input.grantId, {
+          bodyText: input.bodyText,
+          imageStorageKey: imageKey,
+          imageMimeType: imageMime,
+        });
+        if (!updated) {
+          return { ok: false, status: 409, code: "submission_not_editable" };
+        }
+      }
+
+      const sub = await repo.getSubmissionByIdForGrant(tx, submissionId!, input.grantId);
+      if (!sub) {
+        return { ok: false, status: 500, code: "submission_missing" };
+      }
+
+      if (input.action === "submit") {
+        if (!hasSubstantiveContent(sub.bodyText, sub.imageStorageKey)) {
+          return { ok: false, status: 422, code: "empty_submission" };
+        }
+        const fin = await repo.submitSubmissionFinalForGrant(tx, submissionId!, input.grantId);
+        if (!fin) {
+          return { ok: false, status: 409, code: "submit_failed" };
+        }
+        return { ok: true, submissionId: fin.id, status: fin.status };
+      }
+
+      return { ok: true, submissionId: sub.id, status: sub.status };
+    });
+  } catch (e) {
+    if (e instanceof PostgresError && e.code === "23505") {
+      return { ok: false, status: 409, code: "active_submission_conflict" };
+    }
+    throw e;
+  }
+}
+
 export async function getSignedImageUrl(storageKey: string, expiresSec = 3600): Promise<string | null> {
   const supabase = getServiceRoleClient();
   const { data, error } = await supabase.storage
@@ -440,9 +854,67 @@ export async function getSubmissionDetailForStudent(
   };
 }
 
+export async function getSubmissionDetailForRegularGrant(
+  db: Db,
+  grantId: string,
+  submissionId: string
+) {
+  const sub = await repo.getSubmissionByIdForGrant(db, submissionId, grantId);
+  if (!sub) return null;
+  let imageUrl: string | null = null;
+  if (sub.imageStorageKey) {
+    imageUrl = await getSignedImageUrl(sub.imageStorageKey);
+  }
+  return {
+    id: sub.id,
+    sessionId: sub.sessionId,
+    courseId: sub.courseId,
+    status: sub.status,
+    bodyText: sub.bodyText,
+    imageMimeType: sub.imageMimeType,
+    imageUrl,
+    submittedAt: sub.submittedAt?.toISOString() ?? null,
+    createdAt: sub.createdAt.toISOString(),
+    updatedAt: sub.updatedAt.toISOString(),
+  };
+}
+
 /** Published correction + fragments + scores only (draft corrections invisible). */
 export async function getPublishedStudentResult(db: Db, userId: string, submissionId: string) {
   const row = await repo.getPublishedResultForSubmission(db, submissionId, userId);
+  if (!row) return null;
+  const fragments = await repo.listFragmentsForCorrection(db, row.correction.id);
+  const evaluationRow = await repo.getEvaluationForSubmission(db, submissionId);
+  return {
+    submissionId: row.submission.id,
+    submission: {
+      bodyText: row.submission.bodyText,
+      submittedAt: row.submission.submittedAt?.toISOString() ?? null,
+    },
+    correction: {
+      polishedSentence: row.correction.polishedSentence,
+      modelAnswer: row.correction.modelAnswer,
+      teacherComment: row.correction.teacherComment,
+      publishedAt: row.correction.publishedAt?.toISOString() ?? null,
+    },
+    fragments: fragments.map((f) => ({
+      orderIndex: f.orderIndex,
+      originalText: f.originalText,
+      correctedText: f.correctedText,
+      category: f.category,
+    })),
+    evaluation: evaluationRow
+      ? {
+          grammarAccuracy: evaluationRow.grammarAccuracy,
+          vocabularyUsage: evaluationRow.vocabularyUsage,
+          contextualFluency: evaluationRow.contextualFluency,
+        }
+      : null,
+  };
+}
+
+export async function getPublishedRegularResult(db: Db, grantId: string, submissionId: string) {
+  const row = await repo.getPublishedResultForSubmissionGrant(db, submissionId, grantId);
   if (!row) return null;
   const fragments = await repo.listFragmentsForCorrection(db, row.correction.id);
   const evaluationRow = await repo.getEvaluationForSubmission(db, submissionId);

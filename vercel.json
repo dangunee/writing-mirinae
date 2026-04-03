@@ -24,11 +24,32 @@
     "api/writing/admin/trial-applications/[id]/resend-access.ts": {
       "maxDuration": 30
     },
+    "api/writing/admin/trial-applications/[id]/extend-access.ts": {
+      "maxDuration": 30
+    },
+    "api/writing/admin/regular-access-grants/[id]/set-enabled.ts": {
+      "maxDuration": 30
+    },
+    "api/writing/admin/regular-access-grants/[id]/set-access-expiry.ts": {
+      "maxDuration": 30
+    },
+    "api/writing/admin/regular-access-grants/[id]/resend-access.ts": {
+      "maxDuration": 30
+    },
     "api/writing/trial/access/consume.ts": {
       "maxDuration": 30
     },
     "api/writing/trial/session/current.ts": {
       "maxDuration": 15
+    },
+    "api/writing/regular/access/consume.ts": {
+      "maxDuration": 30
+    },
+    "api/writing/regular/session/current.ts": {
+      "maxDuration": 15
+    },
+    "api/writing/regular/access/dev-seed.ts": {
+      "maxDuration": 30
     }
   },
   "redirects": [

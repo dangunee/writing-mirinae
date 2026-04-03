@@ -222,6 +222,48 @@ export const writingCourses = writing.table(
   ]
 );
 
+/** Mail-link regular access: one grant ↔ one course; submissions may use regular_access_grant_id instead of user_id. */
+export const regularAccessGrants = writing.table(
+  "regular_access_grants",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    studentName: text("student_name").notNull(),
+    studentEmail: text("student_email").notNull(),
+    note: text("note"),
+    accessEnabled: boolean("access_enabled").notNull().default(true),
+    accessReadyAt: timestamp("access_ready_at", { withTimezone: true }),
+    accessExpiresAt: timestamp("access_expires_at", { withTimezone: true }),
+    lastAccessAt: timestamp("last_access_at", { withTimezone: true }),
+    courseId: uuid("course_id").references(() => writingCourses.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("regular_access_grants_student_email_idx").on(t.studentEmail),
+    index("regular_access_grants_course_id_idx").on(t.courseId),
+  ]
+);
+
+export const regularAccessTokens = writing.table(
+  "regular_access_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    regularAccessGrantId: uuid("regular_access_grant_id")
+      .notNull()
+      .references(() => regularAccessGrants.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("regular_access_tokens_token_hash_unique").on(t.tokenHash),
+    index("regular_access_tokens_grant_id_idx").on(t.regularAccessGrantId),
+  ]
+);
+
 export const writingSessions = writing.table(
   "sessions",
   {
@@ -254,9 +296,10 @@ export const writingSubmissions = writing.table(
     courseId: uuid("course_id")
       .notNull()
       .references(() => writingCourses.id, { onDelete: "cascade" }),
-    userId: uuid("user_id")
-      .notNull()
-      .references(() => authUsers.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").references(() => authUsers.id, { onDelete: "cascade" }),
+    regularAccessGrantId: uuid("regular_access_grant_id").references(() => regularAccessGrants.id, {
+      onDelete: "cascade",
+    }),
     status: submissionStatusEnum("status").notNull().default("draft"),
     bodyText: text("body_text"),
     imageStorageKey: text("image_storage_key"),
@@ -269,9 +312,20 @@ export const writingSubmissions = writing.table(
     unique("writing_submissions_one_per_session").on(t.sessionId),
     index("idx_writing_submissions_user_status").on(t.userId, t.status),
     index("idx_writing_submissions_course_status").on(t.courseId, t.status),
+    check(
+      "writing_submissions_user_or_grant_xor",
+      sql`(user_id IS NOT NULL AND regular_access_grant_id IS NULL) OR (user_id IS NULL AND regular_access_grant_id IS NOT NULL)`
+    ),
     uniqueIndex("writing_submissions_one_active_pipeline_per_user")
       .on(t.userId)
-      .where(sql`status IN ('draft', 'submitted', 'in_review', 'corrected')`),
+      .where(
+        sql`user_id IS NOT NULL AND status IN ('draft', 'submitted', 'in_review', 'corrected')`
+      ),
+    uniqueIndex("writing_submissions_one_active_pipeline_per_grant")
+      .on(t.regularAccessGrantId)
+      .where(
+        sql`regular_access_grant_id IS NOT NULL AND status IN ('draft', 'submitted', 'in_review', 'corrected')`
+      ),
   ]
 );
 
@@ -401,6 +455,22 @@ export const writingCoursesRelations = relations(writingCourses, ({ one, many })
   }),
   sessions: many(writingSessions),
   submissions: many(writingSubmissions),
+  regularAccessGrants: many(regularAccessGrants),
+}));
+
+export const regularAccessGrantsRelations = relations(regularAccessGrants, ({ one, many }) => ({
+  course: one(writingCourses, {
+    fields: [regularAccessGrants.courseId],
+    references: [writingCourses.id],
+  }),
+  submissions: many(writingSubmissions),
+}));
+
+export const regularAccessTokensRelations = relations(regularAccessTokens, ({ one }) => ({
+  grant: one(regularAccessGrants, {
+    fields: [regularAccessTokens.regularAccessGrantId],
+    references: [regularAccessGrants.id],
+  }),
 }));
 
 export const writingSessionsRelations = relations(writingSessions, ({ one, many }) => ({
@@ -421,6 +491,10 @@ export const writingSubmissionsRelations = relations(writingSubmissions, ({ one 
     references: [writingCourses.id],
   }),
   user: one(authUsers, { fields: [writingSubmissions.userId], references: [authUsers.id] }),
+  regularAccessGrant: one(regularAccessGrants, {
+    fields: [writingSubmissions.regularAccessGrantId],
+    references: [regularAccessGrants.id],
+  }),
   correction: one(writingCorrections, {
     fields: [writingSubmissions.id],
     references: [writingCorrections.submissionId],
