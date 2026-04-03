@@ -37,6 +37,13 @@ function mirinaeBaseAndSecret(): { base: string; secret: string } | null {
   return { base: base.replace(/\/$/, ""), secret };
 }
 
+/** Logs only; does not log Authorization or secrets. Truncates long bodies. */
+function logUpstreamBody(raw: string): string {
+  const max = 4000;
+  if (raw.length <= max) return raw;
+  return `${raw.slice(0, max)}…`;
+}
+
 async function handleTrialApplicationActivatePost(req: Request, id: string): Promise<Response> {
   try {
     assertTrialAdminBff(req);
@@ -66,7 +73,12 @@ async function handleTrialApplicationActivatePost(req: Request, id: string): Pro
     body = undefined;
   }
 
+  const bodyLen = body?.length ?? 0;
+  console.info("[trial activate bff] request start", { applicationId, bodyLength: bodyLen });
+
   const upstreamUrl = `${cfg.base}/api/admin/trial-applications/${encodeURIComponent(applicationId)}/activate`;
+  console.info("[trial activate bff] upstream url", upstreamUrl);
+
   try {
     const res = await fetch(upstreamUrl, {
       method: "POST",
@@ -77,13 +89,41 @@ async function handleTrialApplicationActivatePost(req: Request, id: string): Pro
       body: body ?? "{}",
     });
     const text = await res.text();
-    return new Response(text, {
+    console.info("[trial activate bff] upstream status", res.status);
+    console.info("[trial activate bff] upstream raw body", logUpstreamBody(text));
+
+    let outText = text;
+    const st = res.status;
+    if (st >= 400 && !text.trim()) {
+      outText = JSON.stringify({ ok: false, error: `upstream_${st}` });
+    } else if (st >= 400) {
+      try {
+        const parsed = JSON.parse(text) as { ok?: boolean; error?: string };
+        if (parsed && typeof parsed === "object" && parsed.ok === false && typeof parsed.error !== "string") {
+          outText = JSON.stringify({ ...parsed, ok: false, error: `upstream_${st}` });
+        }
+      } catch {
+        outText = JSON.stringify({ ok: false, error: `upstream_${st}`, detail: "non_json_upstream" });
+      }
+    }
+
+    console.info("[trial activate bff] response sent", {
+      status: st,
+      bodyLength: outText.length,
+    });
+
+    return new Response(outText, {
       status: res.status,
       headers: { "Content-Type": "application/json; charset=utf-8" },
     });
   } catch (e) {
-    console.error("trial_admin_bff_activate_fetch_error", e);
-    return json({ ok: false, error: "upstream_error" }, 502);
+    console.error("[trial activate bff] fetch error", e);
+    const errBody = JSON.stringify({ ok: false, error: "upstream_unavailable" });
+    console.info("[trial activate bff] response sent", { status: 502, bodyLength: errBody.length });
+    return new Response(errBody, {
+      status: 502,
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+    });
   }
 }
 
