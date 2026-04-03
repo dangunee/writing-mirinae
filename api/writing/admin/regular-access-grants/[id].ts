@@ -1,9 +1,10 @@
 /**
- * Vercel Serverless — POST /api/writing/admin/regular-access-grants/:id/resend-access
+ * Vercel Serverless — POST /api/writing/admin/regular-access-grants/:id
+ * body.action: set_enabled | set_expiry | resend_access, or id=dev-seed (dev seed proxy).
  */
 import type { IncomingMessage, ServerResponse } from "http";
 
-import { handleRegularGrantResendAccess } from "../../../../../server/admin/regularGrantAdminPostHandlers";
+import { handleRegularGrantUnifiedPost } from "../../../../server/admin/regularGrantAdminPostHandlers";
 
 export const config = {
   runtime: "nodejs",
@@ -23,7 +24,7 @@ function readRawBody(req: IncomingMessage): Promise<Buffer> {
 
 function extractId(req: IncomingMessage): string {
   const u = req.url ?? "";
-  const m = u.match(/\/regular-access-grants\/([^/]+)\/resend-access(?:\?|$)/);
+  const m = u.match(/\/regular-access-grants\/([^/?]+)/);
   return m?.[1]?.trim() ?? "";
 }
 
@@ -37,7 +38,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
 
   const id = extractId(req);
   const host = req.headers.host ?? "localhost";
-  const path = req.url?.split("?")[0] ?? `/api/writing/admin/regular-access-grants/${id}/resend-access`;
+  const path = req.url?.split("?")[0] ?? `/api/writing/admin/regular-access-grants/${id}`;
   const search = req.url?.includes("?") ? `?${req.url.split("?")[1]}` : "";
   const url = `https://${host}${path}${search}`;
 
@@ -48,7 +49,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       headers: req.headers as HeadersInit,
       body: rawBody.length > 0 ? rawBody : undefined,
     });
-    const response = await handleRegularGrantResendAccess(webRequest, id);
+    const response = await handleRegularGrantUnifiedPost(webRequest, id);
     const text = await response.text();
     res.statusCode = response.status;
     response.headers.forEach((value, key) => {
@@ -57,7 +58,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     });
     res.end(text);
   } catch (e) {
-    console.error("regular_admin_resend_access_vercel_unhandled", e);
+    console.error("regular_admin_unified_vercel_unhandled", e);
     res.statusCode = 500;
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.end(JSON.stringify({ ok: false, error: "internal_error" }));

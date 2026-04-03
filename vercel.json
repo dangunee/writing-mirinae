@@ -27,29 +27,17 @@
     "api/writing/admin/trial-applications/[id]/extend-access.ts": {
       "maxDuration": 30
     },
-    "api/writing/admin/regular-access-grants/[id]/set-enabled.ts": {
+    "api/writing/admin/regular-access-grants/[id].ts": {
       "maxDuration": 30
     },
-    "api/writing/admin/regular-access-grants/[id]/set-access-expiry.ts": {
+    "api/writing/trial/bff.ts": {
       "maxDuration": 30
-    },
-    "api/writing/admin/regular-access-grants/[id]/resend-access.ts": {
-      "maxDuration": 30
-    },
-    "api/writing/trial/access/consume.ts": {
-      "maxDuration": 30
-    },
-    "api/writing/trial/session/current.ts": {
-      "maxDuration": 15
     },
     "api/writing/regular/access/consume.ts": {
       "maxDuration": 30
     },
     "api/writing/regular/session/current.ts": {
       "maxDuration": 15
-    },
-    "api/writing/regular/access/dev-seed.ts": {
-      "maxDuration": 30
     }
   },
   "redirects": [
@@ -65,6 +53,18 @@
     }
   ],
   "rewrites": [
+    {
+      "source": "/api/writing/trial/session/current",
+      "destination": "/api/writing/trial/bff?op=session_current"
+    },
+    {
+      "source": "/api/writing/trial/access/consume",
+      "destination": "/api/writing/trial/bff?op=access_consume"
+    },
+    {
+      "source": "/api/writing/regular/access/dev-seed",
+      "destination": "/api/writing/admin/regular-access-grants/dev-seed"
+    },
     {
       "source": "/((?!api/).*)",
       "destination": "/index.html"

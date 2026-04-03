@@ -1,6 +1,6 @@
 /**
- * Vercel — POST /api/writing/trial/access/consume
- * Proxies to mirinae-api, sets httpOnly cookie from JSON (does not expose session value to client).
+ * Vercel — unified trial BFF (session/current GET + access/consume POST).
+ * Rewrites from /api/writing/trial/session/current and /api/writing/trial/access/consume preserve public URLs.
  */
 import type { IncomingMessage, ServerResponse } from "http";
 
@@ -28,7 +28,54 @@ function readRawBody(req: IncomingMessage): Promise<Buffer> {
   });
 }
 
-export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
+function opFromUrl(req: IncomingMessage): "session_current" | "access_consume" | null {
+  const u = req.url ?? "";
+  const q = u.includes("?") ? u.split("?")[1] : "";
+  const params = new URLSearchParams(q);
+  const op = params.get("op")?.trim();
+  if (op === "session_current" || op === "access_consume") return op;
+  return null;
+}
+
+async function handleSessionCurrent(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  if (req.method !== "GET") {
+    res.statusCode = 405;
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.end(JSON.stringify({ ok: false }));
+    return;
+  }
+
+  const base = mirinaeBase();
+  if (!base) {
+    res.statusCode = 500;
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.end(JSON.stringify({ ok: false }));
+    return;
+  }
+
+  const cookie = req.headers.cookie ?? "";
+
+  try {
+    const upstream = await fetch(`${base}/api/writing/trial/session/current`, {
+      method: "GET",
+      headers: cookie ? { Cookie: cookie } : {},
+    });
+    const text = await upstream.text();
+    res.statusCode = upstream.status;
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    if (upstream.status >= 500) {
+      console.warn("trial_session_current_bff_upstream", { status: upstream.status });
+    }
+    res.end(text);
+  } catch (e) {
+    console.error("trial_session_current_bff_error", e);
+    res.statusCode = 500;
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.end(JSON.stringify({ ok: false }));
+  }
+}
+
+async function handleAccessConsume(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (req.method !== "POST") {
     res.statusCode = 405;
     res.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -120,4 +167,20 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.end(JSON.stringify({ ok: false, error: "request_failed" }));
   }
+}
+
+export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const op = opFromUrl(req);
+  if (op === "session_current") {
+    await handleSessionCurrent(req, res);
+    return;
+  }
+  if (op === "access_consume") {
+    await handleAccessConsume(req, res);
+    return;
+  }
+
+  res.statusCode = 400;
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  res.end(JSON.stringify({ ok: false, error: "invalid_request" }));
 }
