@@ -48,6 +48,18 @@
   ],
   "rewrites": [
     {
+      "source": "^/api/writing/admin/trial-applications/([^/]+)/extend-access/?$",
+      "destination": "/api/writing/admin/bff?__trial_admin_op=extend&id=$1"
+    },
+    {
+      "source": "^/api/writing/admin/trial-applications/([^/]+)/resend-access/?$",
+      "destination": "/api/writing/admin/bff?__trial_admin_op=resend&id=$1"
+    },
+    {
+      "source": "^/api/writing/admin/trial-applications/([^/]+)/activate/?$",
+      "destination": "/api/writing/admin/bff?__trial_admin_op=activate&id=$1"
+    },
+    {
       "source": "/api/writing/trial/session/current",
       "destination": "/api/writing/trial/bff?op=session_current"
     },
@@ -62,18 +74,6 @@
     {
       "source": "/api/writing/trial/reissue-link",
       "destination": "/api/writing/trial/bff?op=reissue_link"
-    },
-    {
-      "source": "/api/writing/admin/trial-applications/:id/extend-access",
-      "destination": "/api/writing/admin/bff?__trial_admin_op=extend&id=:id"
-    },
-    {
-      "source": "/api/writing/admin/trial-applications/:id/resend-access",
-      "destination": "/api/writing/admin/bff?__trial_admin_op=resend&id=:id"
-    },
-    {
-      "source": "/api/writing/admin/trial-applications/:id/activate",
-      "destination": "/api/writing/admin/bff?__trial_admin_op=activate&id=:id"
     },
     {
       "source": "/api/writing/regular/access/dev-seed",
