@@ -1,3 +1,9 @@
+/**
+ * 体験申込管理:
+ * - リンク再送: paymentStatus・accessStatus・submissionStatus を併せて判断（提出の SoT は submissions）。
+ * - 24時間前リマインド: reminderBefore24h*（送信ログ trial_reminder_logs）— リンク再送可否とは別概念だが、
+ *   どちらも未提出(submissionStatus=not_submitted)が前提になりやすい。
+ */
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { trialAdminBffApiUrl } from '../lib/apiUrl'
@@ -13,6 +19,10 @@ const REASON_OPTIONS: { value: string; label: string }[] = [
   { value: 'other', label: 'その他（詳細必須）' },
 ]
 
+type SubmissionStatus = 'not_submitted' | 'submitted' | 'correcting' | 'completed'
+
+type ReminderBefore24hStatus = 'not_sent' | 'sent' | 'failed'
+
 type Row = {
   id: string
   applicantName: string
@@ -25,6 +35,12 @@ type Row = {
   accessExpiresAt?: string | null
   lastExtendedAt?: string | null
   extendCount?: number
+  submissionStatus: SubmissionStatus
+  submittedAt?: string | null
+  submissionId?: string | null
+  reminderBefore24hSent?: boolean
+  reminderBefore24hSentAt?: string | null
+  reminderBefore24hStatus?: ReminderBefore24hStatus
 }
 
 type PaymentMethodFilter = 'all' | 'card' | 'bank_transfer'
@@ -46,6 +62,46 @@ function paymentMethodLabel(m: string): string {
   if (x === 'card') return 'カード'
   if (x === 'bank_transfer' || x === 'bank') return '銀行振込'
   return m
+}
+
+function normalizeTrialAdminRow(item: Row): Row {
+  return {
+    ...item,
+    submissionStatus: item.submissionStatus ?? 'not_submitted',
+    submittedAt: item.submittedAt ?? null,
+    submissionId: item.submissionId ?? null,
+    reminderBefore24hSent: item.reminderBefore24hSent ?? false,
+    reminderBefore24hSentAt: item.reminderBefore24hSentAt ?? null,
+    reminderBefore24hStatus: item.reminderBefore24hStatus ?? 'not_sent',
+  }
+}
+
+function reminderBefore24hLabel(s: ReminderBefore24hStatus): string {
+  switch (s) {
+    case 'not_sent':
+      return '未送信'
+    case 'sent':
+      return '送信済み'
+    case 'failed':
+      return '送信失敗'
+    default:
+      return '—'
+  }
+}
+
+function submissionStatusLabel(s: SubmissionStatus): string {
+  switch (s) {
+    case 'not_submitted':
+      return '未提出'
+    case 'submitted':
+      return '提出済み'
+    case 'correcting':
+      return '添削中'
+    case 'completed':
+      return '完了'
+    default:
+      return '—'
+  }
 }
 
 type ExtensionLogItem = {
@@ -83,7 +139,7 @@ function trialAdminFetch(input: string, init?: RequestInit): Promise<Response> {
   if (import.meta.env.DEV) {
     console.debug('[trial-admin]', init?.method ?? 'GET', input)
   }
-  return fetch(input, init)
+  return fetch(input, { ...init, credentials: init?.credentials ?? 'include' })
 }
 
 function formatJaDate(iso: string): string {
@@ -107,7 +163,13 @@ function mailStatusLabel(log: ExtensionLogItem): string {
 
 export default function TrialApplicationsAdminPage() {
   const [tokenInput, setTokenInput] = useState('')
-  const [token, setToken] = useState('')
+  const [token, setToken] = useState(() => {
+    try {
+      return sessionStorage.getItem(STORAGE_KEY)?.trim() ?? ''
+    } catch {
+      return ''
+    }
+  })
   const [rows, setRows] = useState<Row[] | null>(null)
   const [loading, setLoading] = useState(false)
   const [listError, setListError] = useState<string | null>(null)
@@ -145,11 +207,6 @@ export default function TrialApplicationsAdminPage() {
     return () => window.clearTimeout(id)
   }, [searchInput])
 
-  useEffect(() => {
-    const t = sessionStorage.getItem(STORAGE_KEY)?.trim() ?? ''
-    setToken(t)
-  }, [])
-
   const fetchList = useCallback(async (t: string, pageForRequest: number) => {
     setLoading(true)
     setListError(null)
@@ -168,6 +225,7 @@ export default function TrialApplicationsAdminPage() {
       const listUrl = `/api/writing/admin/trial-applications?${qs}`
       const res = await trialAdminFetch(trialAdminBffApiUrl(listUrl), {
         headers: { ...authHeaders(t) },
+        credentials: 'include',
       })
       const data = (await res.json()) as {
         ok?: boolean
@@ -177,22 +235,25 @@ export default function TrialApplicationsAdminPage() {
         error?: string
       }
       if (res.status === 401 || res.status === 403) {
+        console.error('[trial-admin] list unauthorized', res.status, data)
         setListError('認証に失敗しました。トークンを確認してください。')
         setRows(null)
         setPagination(null)
         return
       }
       if (!res.ok || data.ok !== true || !Array.isArray(data.items) || !data.pagination) {
+        console.error('[trial-admin] list error', res.status, data)
         setListError(data.error === 'server_misconfigured' ? 'サーバー設定を確認してください。' : '一覧の取得に失敗しました。')
         setRows(null)
         setPagination(null)
         return
       }
-      setRows(data.items)
+      setRows(data.items.map(normalizeTrialAdminRow))
       setPagination(data.pagination)
-      const sig = `${debouncedSearch}|${paymentMethodFilter}|${sort}|${pageForRequest}`
+      const sig = `${t}|${debouncedSearch}|${paymentMethodFilter}|${sort}|${pageForRequest}`
       lastFetchedSigRef.current = sig
-    } catch {
+    } catch (e) {
+      console.error('[trial-admin] GET /api/writing/admin/trial-applications failed', e)
       setListError('通信に失敗しました。')
       setRows(null)
       setPagination(null)
@@ -202,12 +263,6 @@ export default function TrialApplicationsAdminPage() {
   }, [paymentMethodFilter, debouncedSearch, sort])
 
   useEffect(() => {
-    if (!token) {
-      setRows(null)
-      setPagination(null)
-      lastFetchedSigRef.current = null
-      return
-    }
     const prev = filterKeyRef.current
     const filtersChanged =
       prev.debouncedSearch !== debouncedSearch ||
@@ -217,13 +272,13 @@ export default function TrialApplicationsAdminPage() {
     if (filtersChanged) {
       filterKeyRef.current = { debouncedSearch, paymentMethodFilter, sort }
       if (page !== 1) setPage(1)
-      const sig = `${debouncedSearch}|${paymentMethodFilter}|${sort}|1`
+      const sig = `${token}|${debouncedSearch}|${paymentMethodFilter}|${sort}|1`
       if (lastFetchedSigRef.current === sig) return
       void fetchList(token, 1)
       return
     }
 
-    const sig = `${debouncedSearch}|${paymentMethodFilter}|${sort}|${page}`
+    const sig = `${token}|${debouncedSearch}|${paymentMethodFilter}|${sort}|${page}`
     if (lastFetchedSigRef.current === sig) return
     void fetchList(token, page)
   }, [token, page, debouncedSearch, paymentMethodFilter, sort, fetchList])
@@ -265,6 +320,7 @@ export default function TrialApplicationsAdminPage() {
     const t = tokenInput.trim()
     if (!t) return
     sessionStorage.setItem(STORAGE_KEY, t)
+    lastFetchedSigRef.current = null
     setToken(t)
     setTokenInput('')
     setBanner(null)
@@ -519,7 +575,7 @@ export default function TrialApplicationsAdminPage() {
           </div>
         ) : null}
 
-        {token && listError ? (
+        {listError ? (
           <div className="rounded-lg bg-[#fde8e8] px-4 py-3 text-sm text-[#8b1a1a]">{listError}</div>
         ) : null}
 
@@ -582,25 +638,27 @@ export default function TrialApplicationsAdminPage() {
           <div
             className={`overflow-x-auto rounded-xl border border-[#abadb0]/15 bg-white shadow-sm ${loading ? 'opacity-[0.72]' : ''}`}
           >
-            <table className="min-w-[960px] table-fixed text-left text-sm">
+            <table className="min-w-[1180px] table-fixed text-left text-sm">
               <thead className="border-b border-[#eef1f4] bg-[#f8fafc] text-xs font-bold uppercase tracking-wider text-[#595c5e]">
                 <tr>
-                  <th className="w-[9%] whitespace-nowrap px-2 py-2">お名前</th>
-                  <th className="w-[18%] whitespace-nowrap px-2 py-2">メール</th>
-                  <th className="w-[7%] whitespace-nowrap px-2 py-2">韓国語</th>
-                  <th className="w-[14%] whitespace-nowrap px-2 py-2">申込日</th>
-                  <th className="w-[8%] whitespace-nowrap px-2 py-2">支払方法</th>
-                  <th className="w-[14%] whitespace-nowrap px-2 py-2">利用期限</th>
-                  <th className="w-[6%] whitespace-nowrap px-2 py-2">延長</th>
-                  <th className="w-[7%] whitespace-nowrap px-2 py-2">支払</th>
-                  <th className="w-[7%] whitespace-nowrap px-2 py-2">access</th>
-                  <th className="w-[10%] whitespace-nowrap px-2 py-2">操作</th>
+                  <th className="w-[7%] whitespace-nowrap px-2 py-2">お名前</th>
+                  <th className="w-[15%] whitespace-nowrap px-2 py-2">メール</th>
+                  <th className="w-[5%] whitespace-nowrap px-2 py-2">韓国語</th>
+                  <th className="w-[11%] whitespace-nowrap px-2 py-2">申込日</th>
+                  <th className="w-[6%] whitespace-nowrap px-2 py-2">支払方法</th>
+                  <th className="w-[11%] whitespace-nowrap px-2 py-2">利用期限</th>
+                  <th className="w-[7%] whitespace-nowrap px-2 py-2">提出状況</th>
+                  <th className="w-[8%] whitespace-nowrap px-2 py-2">24時間前通知</th>
+                  <th className="w-[4%] whitespace-nowrap px-2 py-2">延長</th>
+                  <th className="w-[5%] whitespace-nowrap px-2 py-2">支払</th>
+                  <th className="w-[5%] whitespace-nowrap px-2 py-2">access</th>
+                  <th className="w-[16%] whitespace-nowrap px-2 py-2">操作</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#eef1f4]">
                 {pagination.totalItems === 0 ? (
                   <tr>
-                    <td colSpan={10} className="px-4 py-8 text-center text-[#595c5e]">
+                    <td colSpan={12} className="px-4 py-8 text-center text-[#595c5e]">
                       該当するデータがありません
                     </td>
                   </tr>
@@ -609,7 +667,10 @@ export default function TrialApplicationsAdminPage() {
                     const pm = r.paymentMethod?.trim().toLowerCase() ?? ''
                     const isBank = pm === 'bank_transfer' || pm === 'bank'
                     const showActivate = isBank && r.paymentStatus === 'pending'
-                    const showResend = r.paymentStatus === 'paid' && r.accessStatus === 'ready'
+                    const showTrialOps = r.paymentStatus === 'paid' && r.accessStatus === 'ready'
+                    const canResendLink = showTrialOps && r.submissionStatus === 'not_submitted'
+                    const resendBlockedReason =
+                      showTrialOps && !canResendLink ? 'すでに提出済みのため再送は不要です' : undefined
                     const showHistory = r.paymentStatus === 'paid'
                     const busy = busyId === r.id
                     const logsEntry = logsByAppId[r.id]
@@ -636,6 +697,35 @@ export default function TrialApplicationsAdminPage() {
                           <td className="whitespace-nowrap px-2 py-1.5 text-[#595c5e]">
                             {r.accessExpiresAt ? formatJaDate(r.accessExpiresAt) : '—'}
                           </td>
+                          <td
+                            className="truncate px-2 py-1.5 text-[#595c5e]"
+                            title={
+                              r.submittedAt && r.submissionStatus !== 'not_submitted'
+                                ? formatJaDate(r.submittedAt)
+                                : submissionStatusLabel(r.submissionStatus)
+                            }
+                          >
+                            <span className="inline-block rounded border border-[#eef1f4] bg-[#f8fafc] px-1.5 py-0.5 text-[11px] font-semibold">
+                              {submissionStatusLabel(r.submissionStatus)}
+                            </span>
+                            {r.submittedAt ? (
+                              <span className="mt-0.5 block text-[10px] leading-tight text-[#95999c]">
+                                提出: {formatJaDate(r.submittedAt)}
+                              </span>
+                            ) : null}
+                          </td>
+                          <td
+                            className="truncate px-2 py-1.5 text-[#595c5e]"
+                            title={
+                              r.reminderBefore24hStatus === 'sent' && r.reminderBefore24hSentAt
+                                ? formatJaDate(r.reminderBefore24hSentAt)
+                                : reminderBefore24hLabel(r.reminderBefore24hStatus ?? 'not_sent')
+                            }
+                          >
+                            <span className="inline-block rounded border border-[#eef1f4] bg-[#f8fafc] px-1.5 py-0.5 text-[11px] font-semibold text-[#595c5e]">
+                              {reminderBefore24hLabel(r.reminderBefore24hStatus ?? 'not_sent')}
+                            </span>
+                          </td>
                           <td className="whitespace-nowrap px-2 py-1.5 font-mono text-xs text-[#595c5e]">
                             {typeof r.extendCount === 'number' ? r.extendCount : '—'}
                           </td>
@@ -657,21 +747,23 @@ export default function TrialApplicationsAdminPage() {
                                   {busy ? '処理中…' : '入金確認'}
                                 </button>
                               ) : null}
-                              {showResend ? (
+                              {showTrialOps ? (
                                 <button
                                   type="button"
-                                  disabled={busy || loading}
+                                  disabled={busy || loading || !canResendLink}
+                                  title={resendBlockedReason}
                                   onClick={(e) => {
                                     e.preventDefault()
                                     e.stopPropagation()
+                                    if (!canResendLink) return
                                     void runResend(r.id)
                                   }}
-                                  className="shrink-0 rounded-full border border-[#4052b6] bg-white px-2 py-1 text-[11px] font-bold leading-tight text-[#4052b6] disabled:opacity-50"
+                                  className="shrink-0 rounded-full border border-[#4052b6] bg-white px-2 py-1 text-[11px] font-bold leading-tight text-[#4052b6] disabled:cursor-not-allowed disabled:opacity-45"
                                 >
                                   {busy ? '処理中…' : 'リンク再送信'}
                                 </button>
                               ) : null}
-                              {showResend ? (
+                              {showTrialOps ? (
                                 <button
                                   type="button"
                                   disabled={busy || loading}
@@ -699,7 +791,7 @@ export default function TrialApplicationsAdminPage() {
                                   履歴
                                 </button>
                               ) : null}
-                              {!showActivate && !showResend && !showHistory ? (
+                              {!showActivate && !showTrialOps && !showHistory ? (
                                 <span className="text-[11px] text-[#95999c]">—</span>
                               ) : null}
                             </div>
@@ -707,7 +799,7 @@ export default function TrialApplicationsAdminPage() {
                         </tr>
                         {historyOpen ? (
                           <tr className="bg-[#f8fafc]">
-                            <td colSpan={10} className="px-3 py-2 text-xs text-[#2c2f32]">
+                            <td colSpan={12} className="px-3 py-2 text-xs text-[#2c2f32]">
                               <p className="mb-2 font-bold text-[#595c5e]">延長履歴</p>
                               {logsEntry === 'loading' ? (
                                 <p className="text-[#595c5e]">読み込み中…</p>
