@@ -34,6 +34,8 @@ export type PaymentCompleteNavigateState = {
   formData: TrialPaymentCheckoutState | BankTransferCompleteState
   /** カードのみ。entitlement のときはメールのトークンリンクが正規ルートのため /writing/app へ誘導しない */
   trialFlow?: TrialPaymentCheckoutTrialFlow
+  /** カード決済の Stripe Checkout Session ID（体験開始リンク再発行 API 用。サーバー検証のみ） */
+  stripeSessionId?: string
 }
 
 export const TRIAL_PAYMENT_DRAFT_KEY = 'writing-trial-payment-draft'

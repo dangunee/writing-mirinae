@@ -15,6 +15,9 @@
     "api/writing/trial-payment/payment-result.ts": {
       "maxDuration": 30
     },
+    "api/writing/trial/start-link.ts": {
+      "maxDuration": 30
+    },
     "api/writing/admin/trial-applications/index.ts": {
       "maxDuration": 30
     },

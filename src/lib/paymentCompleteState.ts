@@ -53,9 +53,13 @@ export function parsePaymentCompleteNavigateState(raw: unknown): PaymentComplete
   const tf = o.trialFlow
   const trialFlow =
     tf === 'entitlement' || tf === 'trial_lesson' ? tf : undefined
+  const stripeSessionId =
+    typeof o.stripeSessionId === 'string' && o.stripeSessionId.trim().length > 0
+      ? o.stripeSessionId.trim()
+      : undefined
   if (pm === 'card') {
     const parsed = parseTrialPaymentCheckoutState(formData)
-    return parsed ? { paymentMethod: 'card', formData: parsed, trialFlow } : null
+    return parsed ? { paymentMethod: 'card', formData: parsed, trialFlow, stripeSessionId } : null
   }
   const parsed = parseBankTransferCompleteState(formData)
   return parsed ? { paymentMethod: 'bank_transfer', formData: parsed } : null

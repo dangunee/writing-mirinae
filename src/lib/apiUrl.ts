@@ -31,7 +31,7 @@ export function apiUrl(path: string): string {
   return resolveApiUrl(path)
 }
 
-/** 体験決済専用: 必ず現在サイトの `/api/writing/trial-payment/...`（Vercel `api/writing/...`）へ */
+/** 体験決済・体験開始リンク専用: 必ず現在サイトの `/api/writing/trial-payment/...` または `/api/writing/trial/...`（Vercel `api/writing/...`）へ */
 export function trialPaymentApiUrl(path: string): string {
   return normalizePath(path)
 }

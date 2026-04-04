@@ -81,6 +81,7 @@ export default function WritingCompletePage() {
         paymentMethod={payment.paymentMethod}
         data={payment.formData}
         trialFlow={payment.trialFlow}
+        stripeSessionId={payment.stripeSessionId}
       />
     )
   }

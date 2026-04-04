@@ -262,6 +262,7 @@ export default function TrialPaymentCheckoutPage() {
           paymentMethod: 'card',
           formData: checkoutData,
           ...(successTrialFlow ? { trialFlow: successTrialFlow } : {}),
+          ...(sessionId ? { stripeSessionId: sessionId } : {}),
         }}
       />
     )

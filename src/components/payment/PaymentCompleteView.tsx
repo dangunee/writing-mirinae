@@ -1,9 +1,15 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { trialPaymentApiUrl } from '../../lib/apiUrl'
 import type {
   BankTransferCompleteState,
   TrialPaymentCheckoutState,
   TrialPaymentCheckoutTrialFlow,
 } from '../../types/trialPaymentCheckout'
+
+type TrialStartLinkResponse =
+  | { ok: true; redirectTo: string }
+  | { ok: false; code: 'NOT_FOUND' | 'NOT_PAID' | 'EXPIRED' | 'REQUEST_FAILED' }
 
 const HERO_IMG =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuCxjqNfsVMm6O-CbvJXMYkxS9t2g1lFz2gLoCEjUFjoPqKH9BBhj4i5ousg7bOVoZ_TzwI4UQrv4WVq_jplz7gDDrCVt005HDAxUf5WzvR-3JhvqL3AmyEjI6LYudex2Y2koCVjWNNUKtE4-TlCUCfboF6Ypwd6zRKoSP3ADHlL2-FS3NWbs5libgbmLGScDGAykru7DnMfBxdz9hnK-m97IEvcDmBTu2-dF429eN_MRceiZnuHbkWA0UB3Iw8u-rceP-s3ty5QWzo'
@@ -13,17 +19,71 @@ type Props = {
   data: TrialPaymentCheckoutState | BankTransferCompleteState
   /** カード決済かつ API が返したとき。entitlement はメールの /writing/trial/start リンクが本体 */
   trialFlow?: TrialPaymentCheckoutTrialFlow
+  /** Stripe Checkout Session ID（体験開始リンク API 用。カード entitlement のみ） */
+  stripeSessionId?: string
 }
 
 function displayInquiry(data: TrialPaymentCheckoutState | BankTransferCompleteState): string | undefined {
   return data.inquiry?.trim() ? data.inquiry.trim() : undefined
 }
 
+function trialStartLinkErrorMessage(
+  code: Extract<TrialStartLinkResponse, { ok: false }>['code']
+): string {
+  const messages: Record<typeof code, string> = {
+    NOT_FOUND: 'リンクを発行できませんでした。時間をおいて再度お試しください。',
+    NOT_PAID: '決済の反映を待っています。しばらくしてから再度お試しください。',
+    EXPIRED: '体験の有効期限が切れています。サポートへお問い合わせください。',
+    REQUEST_FAILED: '接続に失敗しました。時間をおいて再度お試しください。',
+  }
+  return messages[code]
+}
+
 /** 体験レッスン決済完了 — Stitch 参照（カード / 銀行振込 UI 分岐） */
-export default function PaymentCompleteView({ paymentMethod, data, trialFlow }: Props) {
+export default function PaymentCompleteView({ paymentMethod, data, trialFlow, stripeSessionId }: Props) {
   const isCard = paymentMethod === 'card'
   const isEntitlementCard = isCard && trialFlow === 'entitlement'
   const inquiry = displayInquiry(data)
+  const [trialStartLoading, setTrialStartLoading] = useState(false)
+  const [trialStartError, setTrialStartError] = useState<string | null>(null)
+
+  const showTrialStartCta = Boolean(isEntitlementCard && stripeSessionId?.trim())
+
+  async function onStartTrialClick() {
+    const sid = stripeSessionId?.trim()
+    if (!sid) return
+    setTrialStartError(null)
+    setTrialStartLoading(true)
+    try {
+      const res = await fetch(trialPaymentApiUrl('/api/writing/trial/start-link'), {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sid }),
+      })
+      let json: TrialStartLinkResponse = { ok: false, code: 'REQUEST_FAILED' }
+      try {
+        const text = await res.text()
+        json = text ? (JSON.parse(text) as TrialStartLinkResponse) : json
+      } catch {
+        setTrialStartError(trialStartLinkErrorMessage('REQUEST_FAILED'))
+        return
+      }
+      if (!json.ok || !('redirectTo' in json) || !json.redirectTo) {
+        const code = json.ok === false ? json.code : 'REQUEST_FAILED'
+        setTrialStartError(trialStartLinkErrorMessage(code))
+        return
+      }
+      const dest = json.redirectTo
+      window.location.href = dest.startsWith('http')
+        ? dest
+        : new URL(dest, window.location.origin).href
+    } catch {
+      setTrialStartError(trialStartLinkErrorMessage('REQUEST_FAILED'))
+    } finally {
+      setTrialStartLoading(false)
+    }
+  }
 
   if (isCard) {
     return (
@@ -80,9 +140,11 @@ export default function PaymentCompleteView({ paymentMethod, data, trialFlow }: 
                 <p className="max-w-md text-lg leading-relaxed text-[#595c5e]">
                   {isEntitlementCard ? (
                     <>
-                      体験開始用のリンクをメールでお送りしました。
+                      下のボタンからすぐに体験を開始できます。
                       <br />
-                      メール内のリンクから体験を開始してください。
+                      <span className="text-base text-[#595c5e]/90">
+                        確認メールにも同様の手順をお送りしています（バックアップ用）。
+                      </span>
                     </>
                   ) : (
                     <>
@@ -105,13 +167,42 @@ export default function PaymentCompleteView({ paymentMethod, data, trialFlow }: 
                 </div>
               </div>
 
+              {showTrialStartCta ? (
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    disabled={trialStartLoading}
+                    onClick={() => void onStartTrialClick()}
+                    className="group flex w-full items-center justify-center gap-2 rounded-full bg-[#ff9727] px-8 py-4 font-bold text-[#4c2700] [box-shadow:0_12px_24px_rgba(44,47,50,0.06)] transition-transform active:scale-95 disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    <span>{trialStartLoading ? '準備中…' : '体験を開始する'}</span>
+                    {!trialStartLoading ? (
+                      <span className="material-symbols-outlined transition-transform group-hover:translate-x-1">
+                        arrow_forward
+                      </span>
+                    ) : null}
+                  </button>
+                  {trialStartError ? (
+                    <p className="mt-3 text-center text-sm font-medium text-[#b42318]" role="alert">
+                      {trialStartError}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+
               <div className="flex flex-col gap-4 pt-2 sm:flex-row">
                 <Link
                   to={isEntitlementCard ? '/writing/course' : '/writing/app'}
-                  className="group flex flex-1 items-center justify-center gap-2 rounded-full bg-[#ff9727] px-8 py-4 font-bold text-[#4c2700] [box-shadow:0_12px_24px_rgba(44,47,50,0.06)] transition-transform active:scale-95"
+                  className={
+                    isEntitlementCard && showTrialStartCta
+                      ? 'group flex flex-1 items-center justify-center gap-2 rounded-full bg-[#dfe3e7] px-8 py-4 font-semibold text-[#2c2f32] transition-colors hover:bg-[#d9dde1]'
+                      : 'group flex flex-1 items-center justify-center gap-2 rounded-full bg-[#ff9727] px-8 py-4 font-bold text-[#4c2700] [box-shadow:0_12px_24px_rgba(44,47,50,0.06)] transition-transform active:scale-95'
+                  }
                 >
                   <span>{isEntitlementCard ? 'コース・体験の流れを見る' : '課題を作成する'}</span>
-                  <span className="material-symbols-outlined transition-transform group-hover:translate-x-1">arrow_forward</span>
+                  <span className="material-symbols-outlined transition-transform group-hover:translate-x-1">
+                    arrow_forward
+                  </span>
                 </Link>
                 <Link
                   to="/writing/app/mypage"
@@ -124,8 +215,8 @@ export default function PaymentCompleteView({ paymentMethod, data, trialFlow }: 
               <div className="flex items-start gap-3 rounded-xl bg-[#4052b6]/5 p-4">
                 <span className="material-symbols-outlined text-[#4052b6]">mail</span>
                 <div className="text-sm text-[#595c5e]">
-                  <span className="font-bold text-[#2c2f32]">登録メールに案内を送信済み:</span>
-                  ご登録いただいたメールアドレスに、詳細な手順を記載した確認メールを送信しました。
+                  <span className="font-bold text-[#2c2f32]">確認メール:</span>
+                  ご登録のメールアドレスにも手順をお送りしています。ボタンが使えない場合はメール内のリンクをご利用ください。
                 </div>
               </div>
             </div>
