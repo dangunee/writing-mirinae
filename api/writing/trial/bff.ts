@@ -1,5 +1,8 @@
 /**
- * Vercel — trial BFF 単一 Serverless Function（処理は api/writing/trial/_lib/* に同梱）
+ * Vercel — trial BFF 単一 Serverless Function（処理は api/writing/trial/lib/* に同梱）
+ *
+ * 注意: ディレクトリ名は `_lib` ではなく `lib`（Vercel/Node ESM で `_` 配下が含まれない事例を避ける）。
+ * 相対 import は `.js` 拡張子で ESM 解決を明示（Linux/Vercel）。
  *
  * vercel.json rewrite（外部 URL 不変）:
  * - /api/writing/trial/session/current → ?op=session_current
@@ -9,11 +12,11 @@
  */
 import type { IncomingMessage, ServerResponse } from "http";
 
-import { handleAccessConsume } from "./_lib/handlers/consume";
-import { handleReissueLink } from "./_lib/handlers/reissueLink";
-import { handleSessionCurrent } from "./_lib/handlers/sessionCurrent";
-import { handleStartLink } from "./_lib/handlers/startLink";
-import { parseTrialBffOp } from "./_lib/utils/validation";
+import { handleAccessConsume } from "./lib/handlers/consume.js";
+import { handleReissueLink } from "./lib/handlers/reissueLink.js";
+import { handleSessionCurrent } from "./lib/handlers/sessionCurrent.js";
+import { handleStartLink } from "./lib/handlers/startLink.js";
+import { parseTrialBffOp } from "./lib/utils/validation.js";
 
 export const config = {
   runtime: "nodejs",

@@ -4,7 +4,7 @@ import {
   COOKIE_MAX_AGE_FALLBACK,
   getMirinaeBase,
   readRawBody,
-} from "../services/trialService";
+} from "../services/trialService.js";
 
 export async function handleAccessConsume(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (req.method !== "POST") {

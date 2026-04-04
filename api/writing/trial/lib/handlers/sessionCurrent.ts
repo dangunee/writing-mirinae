@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "http";
 
-import { getMirinaeBase } from "../services/trialService";
+import { getMirinaeBase } from "../services/trialService.js";
 
 export async function handleSessionCurrent(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (req.method !== "GET") {
