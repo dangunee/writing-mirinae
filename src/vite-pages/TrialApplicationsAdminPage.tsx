@@ -29,6 +29,17 @@ type Row = {
 
 type PaymentMethodFilter = 'all' | 'card' | 'bank_transfer'
 
+const DEFAULT_PAGE_SIZE = 10
+
+type SortKey = 'created_desc' | 'expires_asc' | 'extended_desc'
+
+type PaginationState = {
+  page: number
+  pageSize: number
+  totalItems: number
+  totalPages: number
+}
+
 function paymentMethodLabel(m: string): string {
   const x = m.trim().toLowerCase()
   if (!x) return '—'
@@ -116,6 +127,16 @@ export default function TrialApplicationsAdminPage() {
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<PaymentMethodFilter>('all')
   const [searchInput, setSearchInput] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [sort, setSort] = useState<SortKey>('created_desc')
+  const [pagination, setPagination] = useState<PaginationState | null>(null)
+
+  const filterKeyRef = useRef({
+    debouncedSearch: '',
+    paymentMethodFilter: 'all' as PaymentMethodFilter,
+    sort: 'created_desc' as SortKey,
+  })
+  const lastFetchedSigRef = useRef<string | null>(null)
 
   useEffect(() => {
     const id = window.setTimeout(() => {
@@ -129,7 +150,7 @@ export default function TrialApplicationsAdminPage() {
     setToken(t)
   }, [])
 
-  const fetchList = useCallback(async (t: string) => {
+  const fetchList = useCallback(async (t: string, pageForRequest: number) => {
     setLoading(true)
     setListError(null)
     try {
@@ -140,38 +161,72 @@ export default function TrialApplicationsAdminPage() {
       if (debouncedSearch.length > 0) {
         q.set('query', debouncedSearch)
       }
+      q.set('page', String(pageForRequest))
+      q.set('pageSize', String(DEFAULT_PAGE_SIZE))
+      q.set('sort', sort)
       const qs = q.toString()
-      const listUrl = `/api/writing/admin/trial-applications${qs ? `?${qs}` : ''}`
+      const listUrl = `/api/writing/admin/trial-applications?${qs}`
       const res = await trialAdminFetch(trialAdminBffApiUrl(listUrl), {
         headers: { ...authHeaders(t) },
       })
-      const data = (await res.json()) as { ok?: boolean; items?: Row[]; error?: string }
+      const data = (await res.json()) as {
+        ok?: boolean
+        items?: Row[]
+        pagination?: PaginationState
+        sort?: string
+        error?: string
+      }
       if (res.status === 401 || res.status === 403) {
         setListError('認証に失敗しました。トークンを確認してください。')
         setRows(null)
+        setPagination(null)
         return
       }
-      if (!res.ok || data.ok !== true || !Array.isArray(data.items)) {
+      if (!res.ok || data.ok !== true || !Array.isArray(data.items) || !data.pagination) {
         setListError(data.error === 'server_misconfigured' ? 'サーバー設定を確認してください。' : '一覧の取得に失敗しました。')
         setRows(null)
+        setPagination(null)
         return
       }
       setRows(data.items)
+      setPagination(data.pagination)
+      const sig = `${debouncedSearch}|${paymentMethodFilter}|${sort}|${pageForRequest}`
+      lastFetchedSigRef.current = sig
     } catch {
       setListError('通信に失敗しました。')
       setRows(null)
+      setPagination(null)
     } finally {
       setLoading(false)
     }
-  }, [paymentMethodFilter, debouncedSearch])
+  }, [paymentMethodFilter, debouncedSearch, sort])
 
   useEffect(() => {
     if (!token) {
       setRows(null)
+      setPagination(null)
+      lastFetchedSigRef.current = null
       return
     }
-    void fetchList(token)
-  }, [token, fetchList])
+    const prev = filterKeyRef.current
+    const filtersChanged =
+      prev.debouncedSearch !== debouncedSearch ||
+      prev.paymentMethodFilter !== paymentMethodFilter ||
+      prev.sort !== sort
+
+    if (filtersChanged) {
+      filterKeyRef.current = { debouncedSearch, paymentMethodFilter, sort }
+      if (page !== 1) setPage(1)
+      const sig = `${debouncedSearch}|${paymentMethodFilter}|${sort}|1`
+      if (lastFetchedSigRef.current === sig) return
+      void fetchList(token, 1)
+      return
+    }
+
+    const sig = `${debouncedSearch}|${paymentMethodFilter}|${sort}|${page}`
+    if (lastFetchedSigRef.current === sig) return
+    void fetchList(token, page)
+  }, [token, page, debouncedSearch, paymentMethodFilter, sort, fetchList])
 
   const fetchExtensionLogs = useCallback(
     async (applicationId: string, t: string) => {
@@ -219,10 +274,18 @@ export default function TrialApplicationsAdminPage() {
     sessionStorage.removeItem(STORAGE_KEY)
     setToken('')
     setRows(null)
+    setPagination(null)
     setListError(null)
     setBanner(null)
     setHistoryOpenId(null)
     setLogsByAppId({})
+    setPage(1)
+    lastFetchedSigRef.current = null
+    filterKeyRef.current = {
+      debouncedSearch: '',
+      paymentMethodFilter: 'all',
+      sort: 'created_desc',
+    }
   }
 
   const runActivate = async (id: string) => {
@@ -242,7 +305,8 @@ export default function TrialApplicationsAdminPage() {
         return
       }
       setBanner({ kind: 'ok', text: '入金確認が完了しました。' })
-      await fetchList(token)
+      lastFetchedSigRef.current = null
+      await fetchList(token, page)
     } catch {
       setBanner({ kind: 'err', text: '通信に失敗しました。' })
     } finally {
@@ -307,7 +371,8 @@ export default function TrialApplicationsAdminPage() {
       }
       setBanner({ kind: 'ok', text })
       setLogsByAppId({})
-      await fetchList(token)
+      lastFetchedSigRef.current = null
+      await fetchList(token, page)
     } catch {
       setBanner({ kind: 'err', text: '通信に失敗しました。' })
     } finally {
@@ -332,7 +397,8 @@ export default function TrialApplicationsAdminPage() {
         return
       }
       setBanner({ kind: 'ok', text: 'リンクを再送信しました。' })
-      await fetchList(token)
+      lastFetchedSigRef.current = null
+      await fetchList(token, page)
     } catch {
       setBanner({ kind: 'err', text: '通信に失敗しました。' })
     } finally {
@@ -410,9 +476,24 @@ export default function TrialApplicationsAdminPage() {
                 <option value="bank_transfer">銀行振込</option>
               </select>
             </label>
+            <label className="flex items-center gap-2 text-sm text-[#595c5e]">
+              <span className="whitespace-nowrap font-semibold">並び順</span>
+              <select
+                value={sort}
+                onChange={(e) => setSort(e.target.value as SortKey)}
+                className="max-w-[min(100%,14rem)] rounded-lg border border-[#abadb0]/40 bg-white px-2 py-1.5 text-sm outline-none focus:border-[#4052b6]"
+              >
+                <option value="created_desc">申込日が新しい順</option>
+                <option value="expires_asc">利用期限が近い順</option>
+                <option value="extended_desc">最近延長した順</option>
+              </select>
+            </label>
             <button
               type="button"
-              onClick={() => void fetchList(token)}
+              onClick={() => {
+                lastFetchedSigRef.current = null
+                void fetchList(token, page)
+              }}
               disabled={loading}
               className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#2c2f32] shadow-sm ring-1 ring-[#abadb0]/30 disabled:opacity-50"
             >
@@ -497,25 +578,27 @@ export default function TrialApplicationsAdminPage() {
           </div>
         ) : null}
 
-        {token && !listError && rows ? (
-          <div className="overflow-x-auto rounded-xl border border-[#abadb0]/15 bg-white shadow-sm">
-            <table className="min-w-full text-left text-sm">
+        {token && !listError && rows !== null && pagination !== null ? (
+          <div
+            className={`overflow-x-auto rounded-xl border border-[#abadb0]/15 bg-white shadow-sm ${loading ? 'opacity-[0.72]' : ''}`}
+          >
+            <table className="min-w-[960px] table-fixed text-left text-sm">
               <thead className="border-b border-[#eef1f4] bg-[#f8fafc] text-xs font-bold uppercase tracking-wider text-[#595c5e]">
                 <tr>
-                  <th className="whitespace-nowrap px-4 py-3">お名前</th>
-                  <th className="whitespace-nowrap px-4 py-3">メール</th>
-                  <th className="whitespace-nowrap px-4 py-3">韓国語</th>
-                  <th className="whitespace-nowrap px-4 py-3">申込日</th>
-                  <th className="whitespace-nowrap px-4 py-3">支払方法</th>
-                  <th className="whitespace-nowrap px-4 py-3">利用期限</th>
-                  <th className="whitespace-nowrap px-4 py-3">延長回数</th>
-                  <th className="whitespace-nowrap px-4 py-3">支払状態</th>
-                  <th className="whitespace-nowrap px-4 py-3">access</th>
-                  <th className="whitespace-nowrap px-4 py-3">操作</th>
+                  <th className="w-[9%] whitespace-nowrap px-2 py-2">お名前</th>
+                  <th className="w-[18%] whitespace-nowrap px-2 py-2">メール</th>
+                  <th className="w-[7%] whitespace-nowrap px-2 py-2">韓国語</th>
+                  <th className="w-[14%] whitespace-nowrap px-2 py-2">申込日</th>
+                  <th className="w-[8%] whitespace-nowrap px-2 py-2">支払方法</th>
+                  <th className="w-[14%] whitespace-nowrap px-2 py-2">利用期限</th>
+                  <th className="w-[6%] whitespace-nowrap px-2 py-2">延長</th>
+                  <th className="w-[7%] whitespace-nowrap px-2 py-2">支払</th>
+                  <th className="w-[7%] whitespace-nowrap px-2 py-2">access</th>
+                  <th className="w-[10%] whitespace-nowrap px-2 py-2">操作</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#eef1f4]">
-                {rows.length === 0 ? (
+                {pagination.totalItems === 0 ? (
                   <tr>
                     <td colSpan={10} className="px-4 py-8 text-center text-[#595c5e]">
                       該当するデータがありません
@@ -533,34 +616,43 @@ export default function TrialApplicationsAdminPage() {
                     const historyOpen = historyOpenId === r.id
                     return (
                       <Fragment key={r.id}>
-                        <tr className="align-top">
-                          <td className="px-4 py-3 font-medium">{r.applicantName}</td>
-                          <td className="max-w-[200px] break-all px-4 py-3 text-[#595c5e]">{r.applicantEmail}</td>
-                          <td className="px-4 py-3 text-[#595c5e]">{r.koreanLevel ?? '—'}</td>
-                          <td className="whitespace-nowrap px-4 py-3 text-[#595c5e]">{formatJaDate(r.createdAt)}</td>
-                          <td className="whitespace-nowrap px-4 py-3 text-[#595c5e]">
+                        <tr className="align-middle">
+                          <td className="truncate px-2 py-1.5 font-medium" title={r.applicantName}>
+                            {r.applicantName}
+                          </td>
+                          <td
+                            className="max-w-0 overflow-hidden text-ellipsis whitespace-nowrap px-2 py-1.5 text-[#595c5e]"
+                            title={r.applicantEmail}
+                          >
+                            {r.applicantEmail}
+                          </td>
+                          <td className="truncate px-2 py-1.5 text-[#595c5e]" title={r.koreanLevel ?? ''}>
+                            {r.koreanLevel ?? '—'}
+                          </td>
+                          <td className="whitespace-nowrap px-2 py-1.5 text-[#595c5e]">{formatJaDate(r.createdAt)}</td>
+                          <td className="whitespace-nowrap px-2 py-1.5 text-[#595c5e]">
                             {paymentMethodLabel(r.paymentMethod ?? '')}
                           </td>
-                          <td className="whitespace-nowrap px-4 py-3 text-[#595c5e]">
+                          <td className="whitespace-nowrap px-2 py-1.5 text-[#595c5e]">
                             {r.accessExpiresAt ? formatJaDate(r.accessExpiresAt) : '—'}
                           </td>
-                          <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-[#595c5e]">
+                          <td className="whitespace-nowrap px-2 py-1.5 font-mono text-xs text-[#595c5e]">
                             {typeof r.extendCount === 'number' ? r.extendCount : '—'}
                           </td>
-                          <td className="px-4 py-3 font-mono text-xs">{r.paymentStatus}</td>
-                          <td className="px-4 py-3 font-mono text-xs">{r.accessStatus}</td>
-                          <td className="px-4 py-3">
-                            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                          <td className="truncate px-2 py-1.5 font-mono text-xs">{r.paymentStatus}</td>
+                          <td className="truncate px-2 py-1.5 font-mono text-xs">{r.accessStatus}</td>
+                          <td className="px-2 py-1.5">
+                            <div className="flex flex-row flex-wrap items-center gap-1">
                               {showActivate ? (
                                 <button
                                   type="button"
-                                  disabled={busy}
+                                  disabled={busy || loading}
                                   onClick={(e) => {
                                     e.preventDefault()
                                     e.stopPropagation()
                                     void runActivate(r.id)
                                   }}
-                                  className="rounded-full bg-[#4052b6] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50"
+                                  className="shrink-0 rounded-full bg-[#4052b6] px-2 py-1 text-[11px] font-bold leading-tight text-white disabled:opacity-50"
                                 >
                                   {busy ? '処理中…' : '入金確認'}
                                 </button>
@@ -568,13 +660,13 @@ export default function TrialApplicationsAdminPage() {
                               {showResend ? (
                                 <button
                                   type="button"
-                                  disabled={busy}
+                                  disabled={busy || loading}
                                   onClick={(e) => {
                                     e.preventDefault()
                                     e.stopPropagation()
                                     void runResend(r.id)
                                   }}
-                                  className="rounded-full border border-[#4052b6] bg-white px-3 py-1.5 text-xs font-bold text-[#4052b6] disabled:opacity-50"
+                                  className="shrink-0 rounded-full border border-[#4052b6] bg-white px-2 py-1 text-[11px] font-bold leading-tight text-[#4052b6] disabled:opacity-50"
                                 >
                                   {busy ? '処理中…' : 'リンク再送信'}
                                 </button>
@@ -582,13 +674,13 @@ export default function TrialApplicationsAdminPage() {
                               {showResend ? (
                                 <button
                                   type="button"
-                                  disabled={busy}
+                                  disabled={busy || loading}
                                   onClick={(e) => {
                                     e.preventDefault()
                                     e.stopPropagation()
                                     openExtendModal(r)
                                   }}
-                                  className="rounded-full border border-[#abadb0]/50 bg-[#f8fafc] px-3 py-1.5 text-xs font-bold text-[#2c2f32] disabled:opacity-50"
+                                  className="shrink-0 rounded-full border border-[#abadb0]/50 bg-[#f8fafc] px-2 py-1 text-[11px] font-bold leading-tight text-[#2c2f32] disabled:opacity-50"
                                 >
                                   延長
                                 </button>
@@ -596,26 +688,26 @@ export default function TrialApplicationsAdminPage() {
                               {showHistory ? (
                                 <button
                                   type="button"
-                                  disabled={busy}
+                                  disabled={busy || loading}
                                   onClick={(e) => {
                                     e.preventDefault()
                                     e.stopPropagation()
                                     toggleHistory(r.id)
                                   }}
-                                  className="rounded-full border border-[#abadb0]/40 bg-white px-3 py-1.5 text-xs font-semibold text-[#595c5e] disabled:opacity-50"
+                                  className="shrink-0 rounded-full border border-[#abadb0]/40 bg-white px-2 py-1 text-[11px] font-semibold leading-tight text-[#595c5e] disabled:opacity-50"
                                 >
                                   履歴
                                 </button>
                               ) : null}
                               {!showActivate && !showResend && !showHistory ? (
-                                <span className="text-xs text-[#95999c]">—</span>
+                                <span className="text-[11px] text-[#95999c]">—</span>
                               ) : null}
                             </div>
                           </td>
                         </tr>
                         {historyOpen ? (
                           <tr className="bg-[#f8fafc]">
-                            <td colSpan={10} className="px-4 py-3 text-xs text-[#2c2f32]">
+                            <td colSpan={10} className="px-3 py-2 text-xs text-[#2c2f32]">
                               <p className="mb-2 font-bold text-[#595c5e]">延長履歴</p>
                               {logsEntry === 'loading' ? (
                                 <p className="text-[#595c5e]">読み込み中…</p>
@@ -675,10 +767,58 @@ export default function TrialApplicationsAdminPage() {
                 )}
               </tbody>
             </table>
+            {pagination.totalPages > 0 ? (
+              <div className="flex flex-col gap-3 border-t border-[#eef1f4] px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-center text-sm text-[#595c5e] sm:text-left">
+                  全{pagination.totalItems}件 · {pagination.page}/{pagination.totalPages}ページ
+                </p>
+                <div className="flex flex-wrap items-center justify-center gap-1 sm:justify-end">
+                  <button
+                    type="button"
+                    disabled={loading || pagination.page <= 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    className="rounded-full border border-[#abadb0]/40 bg-white px-3 py-1.5 text-xs font-semibold text-[#2c2f32] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    前へ
+                  </button>
+                  {pagination.totalPages <= 10
+                    ? Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((n) =>
+                        n === pagination.page ? (
+                          <span
+                            key={n}
+                            aria-current="page"
+                            className="min-w-[2rem] rounded-full bg-[#4052b6] px-2 py-1.5 text-center text-xs font-semibold text-white"
+                          >
+                            {n}
+                          </span>
+                        ) : (
+                          <button
+                            key={n}
+                            type="button"
+                            disabled={loading}
+                            onClick={() => setPage(n)}
+                            className="min-w-[2rem] rounded-full border border-[#abadb0]/30 bg-white px-2 py-1.5 text-xs font-semibold text-[#2c2f32] hover:bg-[#f8fafc] disabled:opacity-50"
+                          >
+                            {n}
+                          </button>
+                        )
+                      )
+                    : null}
+                  <button
+                    type="button"
+                    disabled={loading || pagination.page >= pagination.totalPages}
+                    onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
+                    className="rounded-full border border-[#abadb0]/40 bg-white px-3 py-1.5 text-xs font-semibold text-[#2c2f32] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    次へ
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </div>
         ) : null}
 
-        {token && loading && !rows ? (
+        {token && loading && rows === null ? (
           <p className="text-center text-sm text-[#595c5e]">読み込み中…</p>
         ) : null}
       </div>
