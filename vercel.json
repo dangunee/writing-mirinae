@@ -18,7 +18,7 @@
     "api/writing/admin/trial-applications/index.ts": {
       "maxDuration": 30
     },
-    "api/writing/admin/trial-applications/[id]/activate.ts": {
+    "api/writing/admin/bff.ts": {
       "maxDuration": 30
     },
     "api/writing/admin/regular-access-grants/[id].ts": {
@@ -65,11 +65,15 @@
     },
     {
       "source": "/api/writing/admin/trial-applications/:id/extend-access",
-      "destination": "/api/writing/admin/trial-applications/:id/activate?__trial_admin_op=extend"
+      "destination": "/api/writing/admin/bff?__trial_admin_op=extend&id=:id"
     },
     {
       "source": "/api/writing/admin/trial-applications/:id/resend-access",
-      "destination": "/api/writing/admin/trial-applications/:id/activate?__trial_admin_op=resend"
+      "destination": "/api/writing/admin/bff?__trial_admin_op=resend&id=:id"
+    },
+    {
+      "source": "/api/writing/admin/trial-applications/:id/activate",
+      "destination": "/api/writing/admin/bff?__trial_admin_op=activate&id=:id"
     },
     {
       "source": "/api/writing/regular/access/dev-seed",

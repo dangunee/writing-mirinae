@@ -1,12 +1,12 @@
 /**
- * Vercel Serverless — trial admin by application id（単一 Function）
+ * Vercel — trial admin 単一 Serverless（activate / extend / resend を集約）
  *
- * 外部 URL（フロントは変更なし）:
- * - POST .../activate
- * - POST .../resend-access  → rewrite で本ハンドラへ
- * - POST .../extend-access → rewrite で本ハンドラへ
+ * vercel.json rewrite（外部 URL は従来どおり）:
+ * - POST .../trial-applications/:id/activate      → 本ハンドラ + ?__trial_admin_op=activate&id=:id
+ * - POST .../trial-applications/:id/extend-access → 同上 extend
+ * - POST .../trial-applications/:id/resend-access → 同上 resend
  *
- * mirinae-api upstream は従来どおり /api/admin/trial-applications/:id/{activate|resend-access|extend-access}
+ * mirinae-api upstream は変更なし: /api/admin/trial-applications/:id/{activate|resend-access|extend-access}
  */
 import type { IncomingMessage, ServerResponse } from "http";
 
@@ -57,6 +57,7 @@ function adminOpFromRequest(req: Request): AdminOp {
     const q = u.searchParams.get("__trial_admin_op")?.trim();
     if (q === "extend") return "extend";
     if (q === "resend") return "resend";
+    if (q === "activate") return "activate";
     const p = u.pathname;
     if (p.endsWith("/extend-access")) return "extend";
     if (p.endsWith("/resend-access")) return "resend";
@@ -199,13 +200,14 @@ async function handleTrialAdminByIdPost(req: Request, id: string): Promise<Respo
   }
 
   const op = adminOpFromRequest(req);
-  if (op === "extend") {
-    return handleExtendUpstream(req, applicationId);
+  switch (op) {
+    case "extend":
+      return handleExtendUpstream(req, applicationId);
+    case "resend":
+      return handleResendUpstream(req, applicationId);
+    default:
+      return handleActivateUpstream(req, applicationId);
   }
-  if (op === "resend") {
-    return handleResendUpstream(req, applicationId);
-  }
-  return handleActivateUpstream(req, applicationId);
 }
 
 function readRawBody(req: IncomingMessage): Promise<Buffer> {
@@ -219,12 +221,13 @@ function readRawBody(req: IncomingMessage): Promise<Buffer> {
   });
 }
 
-/**
- * vercel.json の rewrite で .../activate?__trial_admin_op=... になる場合と、
- * 開発環境などで .../extend-access | .../resend-access のまま届く場合の両方から id を取る。
- */
+/** rewrite 先の ?id= または従来パス .../trial-applications/:id/activate 等 */
 function extractId(req: IncomingMessage): string {
   const u = req.url ?? "";
+  const q = u.includes("?") ? u.split("?")[1] : "";
+  const params = new URLSearchParams(q);
+  const fromQuery = params.get("id")?.trim();
+  if (fromQuery) return fromQuery;
   const m = u.match(
     /\/trial-applications\/([^/]+)\/(?:activate|extend-access|resend-access)(?:\?|$)/
   );
@@ -241,7 +244,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
 
   const id = extractId(req);
   const host = req.headers.host ?? "localhost";
-  const path = req.url?.split("?")[0] ?? `/api/writing/admin/trial-applications/${id}/activate`;
+  const path = req.url?.split("?")[0] ?? "/api/writing/admin/bff";
   const search = req.url?.includes("?") ? `?${req.url.split("?")[1]}` : "";
   const url = `https://${host}${path}${search}`;
 
@@ -261,7 +264,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     });
     res.end(text);
   } catch (e) {
-    console.error("trial_admin_by_id_vercel_unhandled", e);
+    console.error("trial_admin_bff_unhandled", e);
     res.statusCode = 500;
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.end(JSON.stringify({ ok: false, error: "internal_error" }));
