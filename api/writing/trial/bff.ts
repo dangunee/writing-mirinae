@@ -1,5 +1,5 @@
 /**
- * Vercel — trial BFF 単一 Serverless Function（エントリのみ。処理は server/trial/*）
+ * Vercel — trial BFF 単一 Serverless Function（処理は api/writing/trial/_lib/* に同梱）
  *
  * vercel.json rewrite（外部 URL 不変）:
  * - /api/writing/trial/session/current → ?op=session_current
@@ -9,11 +9,11 @@
  */
 import type { IncomingMessage, ServerResponse } from "http";
 
-import { handleAccessConsume } from "../../../server/trial/handlers/consume";
-import { handleReissueLink } from "../../../server/trial/handlers/reissueLink";
-import { handleSessionCurrent } from "../../../server/trial/handlers/sessionCurrent";
-import { handleStartLink } from "../../../server/trial/handlers/startLink";
-import { parseTrialBffOp } from "../../../server/trial/utils/validation";
+import { handleAccessConsume } from "./_lib/handlers/consume";
+import { handleReissueLink } from "./_lib/handlers/reissueLink";
+import { handleSessionCurrent } from "./_lib/handlers/sessionCurrent";
+import { handleStartLink } from "./_lib/handlers/startLink";
+import { parseTrialBffOp } from "./_lib/utils/validation";
 
 export const config = {
   runtime: "nodejs",
