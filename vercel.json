@@ -6,9 +6,6 @@
   "functions": {
     "api/**/*.ts": {
       "maxDuration": 30
-    },
-    "api/writing/regular/session/current.ts": {
-      "maxDuration": 15
     }
   },
   "redirects": [
