@@ -1,8 +1,9 @@
 /**
- * Vercel — trial BFF 単一 Serverless Function（処理は api/writing/trial/lib/* に同梱）
+ * Vercel — trial BFF 単一 Serverless Function（実装は server/writing-trial-bff/*）
  *
- * 注意: ディレクトリ名は `_lib` ではなく `lib`（Vercel/Node ESM で `_` 配下が含まれない事例を避ける）。
- * 相対 import は `.js` 拡張子で ESM 解決を明示（Linux/Vercel）。
+ * 実装を api/ 配下に置かないこと（Vercel Hobby は Serverless 関数 12 個まで。
+ * api 配下の各 .ts が 1 関数として数えられるため）。
+ * 相対 import は `.js` で ESM 解決を明示。
  *
  * vercel.json rewrite（外部 URL 不変）:
  * - /api/writing/trial/session/current → ?op=session_current
@@ -12,11 +13,11 @@
  */
 import type { IncomingMessage, ServerResponse } from "http";
 
-import { handleAccessConsume } from "./lib/handlers/consume.js";
-import { handleReissueLink } from "./lib/handlers/reissueLink.js";
-import { handleSessionCurrent } from "./lib/handlers/sessionCurrent.js";
-import { handleStartLink } from "./lib/handlers/startLink.js";
-import { parseTrialBffOp } from "./lib/utils/validation.js";
+import { handleAccessConsume } from "../../../server/writing-trial-bff/handlers/consume.js";
+import { handleReissueLink } from "../../../server/writing-trial-bff/handlers/reissueLink.js";
+import { handleSessionCurrent } from "../../../server/writing-trial-bff/handlers/sessionCurrent.js";
+import { handleStartLink } from "../../../server/writing-trial-bff/handlers/startLink.js";
+import { parseTrialBffOp } from "../../../server/writing-trial-bff/utils/validation.js";
 
 export const config = {
   runtime: "nodejs",
