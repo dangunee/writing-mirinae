@@ -1,6 +1,12 @@
 /**
- * Vercel Serverless — POST /api/writing/admin/trial-applications/:id/activate
- * Self-contained (no shared helper imports) for reliable Vercel bundling.
+ * Vercel Serverless — trial admin by application id（単一 Function）
+ *
+ * 外部 URL（フロントは変更なし）:
+ * - POST .../activate
+ * - POST .../resend-access  → rewrite で本ハンドラへ
+ * - POST .../extend-access → rewrite で本ハンドラへ
+ *
+ * mirinae-api upstream は従来どおり /api/admin/trial-applications/:id/{activate|resend-access|extend-access}
  */
 import type { IncomingMessage, ServerResponse } from "http";
 
@@ -37,29 +43,27 @@ function mirinaeBaseAndSecret(): { base: string; secret: string } | null {
   return { base: base.replace(/\/$/, ""), secret };
 }
 
-/** Logs only; does not log Authorization or secrets. Truncates long bodies. */
 function logUpstreamBody(raw: string): string {
   const max = 4000;
   if (raw.length <= max) return raw;
   return `${raw.slice(0, max)}…`;
 }
 
-async function handleTrialApplicationActivatePost(req: Request, id: string): Promise<Response> {
+type AdminOp = "activate" | "resend" | "extend";
+
+function adminOpFromRequest(req: Request): AdminOp {
   try {
-    assertTrialAdminBff(req);
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "";
-    if (msg === "bff_misconfigured") {
-      return json({ ok: false, error: "server_misconfigured" }, 500);
-    }
-    return json({ ok: false, error: "request_failed" }, 401);
+    const u = new URL(req.url);
+    const q = u.searchParams.get("__trial_admin_op")?.trim();
+    if (q === "extend") return "extend";
+    if (q === "resend") return "resend";
+  } catch {
+    /* fall through */
   }
+  return "activate";
+}
 
-  const applicationId = id?.trim() ?? "";
-  if (!applicationId) {
-    return json({ ok: false, error: "invalid_request" }, 400);
-  }
-
+async function handleActivateUpstream(req: Request, applicationId: string): Promise<Response> {
   const cfg = mirinaeBaseAndSecret();
   if (!cfg) {
     return json({ ok: false, error: "server_misconfigured" }, 500);
@@ -74,11 +78,9 @@ async function handleTrialApplicationActivatePost(req: Request, id: string): Pro
   }
 
   const bodyLen = body?.length ?? 0;
-  console.info("[trial activate bff] request start", { applicationId, bodyLength: bodyLen });
+  console.info("[trial admin bff] activate start", { applicationId, bodyLength: bodyLen });
 
   const upstreamUrl = `${cfg.base}/api/admin/trial-applications/${encodeURIComponent(applicationId)}/activate`;
-  console.info("[trial activate bff] upstream url", upstreamUrl);
-
   try {
     const res = await fetch(upstreamUrl, {
       method: "POST",
@@ -89,8 +91,8 @@ async function handleTrialApplicationActivatePost(req: Request, id: string): Pro
       body: body ?? "{}",
     });
     const text = await res.text();
-    console.info("[trial activate bff] upstream status", res.status);
-    console.info("[trial activate bff] upstream raw body", logUpstreamBody(text));
+    console.info("[trial admin bff] activate upstream status", res.status);
+    console.info("[trial admin bff] activate upstream raw", logUpstreamBody(text));
 
     let outText = text;
     const st = res.status;
@@ -107,24 +109,100 @@ async function handleTrialApplicationActivatePost(req: Request, id: string): Pro
       }
     }
 
-    console.info("[trial activate bff] response sent", {
-      status: st,
-      bodyLength: outText.length,
-    });
-
     return new Response(outText, {
       status: res.status,
       headers: { "Content-Type": "application/json; charset=utf-8" },
     });
   } catch (e) {
-    console.error("[trial activate bff] fetch error", e);
-    const errBody = JSON.stringify({ ok: false, error: "upstream_unavailable" });
-    console.info("[trial activate bff] response sent", { status: 502, bodyLength: errBody.length });
-    return new Response(errBody, {
+    console.error("[trial admin bff] activate fetch error", e);
+    return new Response(JSON.stringify({ ok: false, error: "upstream_unavailable" }), {
       status: 502,
       headers: { "Content-Type": "application/json; charset=utf-8" },
     });
   }
+}
+
+async function handleResendUpstream(_req: Request, applicationId: string): Promise<Response> {
+  const cfg = mirinaeBaseAndSecret();
+  if (!cfg) {
+    return json({ ok: false, error: "server_misconfigured" }, 500);
+  }
+
+  const upstreamUrl = `${cfg.base}/api/admin/trial-applications/${encodeURIComponent(applicationId)}/resend-access`;
+  try {
+    const res = await fetch(upstreamUrl, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${cfg.secret}` },
+    });
+    const text = await res.text();
+    return new Response(text, {
+      status: res.status,
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+    });
+  } catch (e) {
+    console.error("trial_admin_bff_resend_fetch_error", e);
+    return json({ ok: false, error: "upstream_error" }, 502);
+  }
+}
+
+async function handleExtendUpstream(req: Request, applicationId: string): Promise<Response> {
+  const cfg = mirinaeBaseAndSecret();
+  if (!cfg) {
+    return json({ ok: false, error: "server_misconfigured" }, 500);
+  }
+
+  let bodyText = "{}";
+  try {
+    bodyText = await req.text();
+  } catch {
+    bodyText = "{}";
+  }
+
+  const upstreamUrl = `${cfg.base}/api/admin/trial-applications/${encodeURIComponent(applicationId)}/extend-access`;
+  try {
+    const res = await fetch(upstreamUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${cfg.secret}`,
+        "Content-Type": "application/json",
+      },
+      body: bodyText || "{}",
+    });
+    const text = await res.text();
+    return new Response(text, {
+      status: res.status,
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+    });
+  } catch (e) {
+    console.error("trial_admin_bff_extend_fetch_error", e);
+    return json({ ok: false, error: "upstream_error" }, 502);
+  }
+}
+
+async function handleTrialAdminByIdPost(req: Request, id: string): Promise<Response> {
+  try {
+    assertTrialAdminBff(req);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "";
+    if (msg === "bff_misconfigured") {
+      return json({ ok: false, error: "server_misconfigured" }, 500);
+    }
+    return json({ ok: false, error: "request_failed" }, 401);
+  }
+
+  const applicationId = id?.trim() ?? "";
+  if (!applicationId) {
+    return json({ ok: false, error: "invalid_request" }, 400);
+  }
+
+  const op = adminOpFromRequest(req);
+  if (op === "extend") {
+    return handleExtendUpstream(req, applicationId);
+  }
+  if (op === "resend") {
+    return handleResendUpstream(req, applicationId);
+  }
+  return handleActivateUpstream(req, applicationId);
 }
 
 function readRawBody(req: IncomingMessage): Promise<Buffer> {
@@ -138,6 +216,7 @@ function readRawBody(req: IncomingMessage): Promise<Buffer> {
   });
 }
 
+/** rewrite 後は常に .../activate になる想定で id を取る */
 function extractId(req: IncomingMessage): string {
   const u = req.url ?? "";
   const m = u.match(/\/trial-applications\/([^/]+)\/activate(?:\?|$)/);
@@ -165,7 +244,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       headers: req.headers as HeadersInit,
       body: rawBody.length > 0 ? rawBody : "{}",
     });
-    const response = await handleTrialApplicationActivatePost(webRequest, id);
+    const response = await handleTrialAdminByIdPost(webRequest, id);
     const text = await response.text();
     res.statusCode = response.status;
     response.headers.forEach((value, key) => {
@@ -174,7 +253,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     });
     res.end(text);
   } catch (e) {
-    console.error("trial_admin_activate_vercel_unhandled", e);
+    console.error("trial_admin_by_id_vercel_unhandled", e);
     res.statusCode = 500;
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.end(JSON.stringify({ ok: false, error: "internal_error" }));
