@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { trialAdminBffApiUrl } from '../lib/apiUrl'
 
@@ -29,6 +29,14 @@ function trialAdminBffPostUrl(op: 'activate' | 'extend' | 'resend', applicationI
   return trialAdminBffApiUrl(`/api/writing/admin/bff?${q.toString()}`)
 }
 
+/** 단일 진입 보장 + DEV 에서만 요청 URL 로그 */
+function trialAdminFetch(input: string, init?: RequestInit): Promise<Response> {
+  if (import.meta.env.DEV) {
+    console.debug('[trial-admin]', init?.method ?? 'GET', input)
+  }
+  return fetch(input, init)
+}
+
 function formatJaDate(iso: string): string {
   try {
     const d = new Date(iso)
@@ -50,6 +58,8 @@ export default function TrialApplicationsAdminPage() {
   const [listError, setListError] = useState<string | null>(null)
   const [banner, setBanner] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
+  /** 연속 클릭·StrictMode 등으로 동일 뮤테이션이 2번 도는 것 방지 (POST /bff 단 1회) */
+  const mutationInFlightRef = useRef(false)
 
   useEffect(() => {
     const t = sessionStorage.getItem(STORAGE_KEY)?.trim() ?? ''
@@ -60,7 +70,7 @@ export default function TrialApplicationsAdminPage() {
     setLoading(true)
     setListError(null)
     try {
-      const res = await fetch(trialAdminBffApiUrl('/api/writing/admin/trial-applications'), {
+      const res = await trialAdminFetch(trialAdminBffApiUrl('/api/writing/admin/trial-applications'), {
         headers: { ...authHeaders(t) },
       })
       const data = (await res.json()) as { ok?: boolean; items?: Row[]; error?: string }
@@ -109,10 +119,12 @@ export default function TrialApplicationsAdminPage() {
   }
 
   const runActivate = async (id: string) => {
+    if (mutationInFlightRef.current) return
+    mutationInFlightRef.current = true
     setBusyId(id)
     setBanner(null)
     try {
-      const res = await fetch(trialAdminBffPostUrl('activate', id), {
+      const res = await trialAdminFetch(trialAdminBffPostUrl('activate', id), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
         body: JSON.stringify({}),
@@ -127,15 +139,18 @@ export default function TrialApplicationsAdminPage() {
     } catch {
       setBanner({ kind: 'err', text: '通信に失敗しました。' })
     } finally {
+      mutationInFlightRef.current = false
       setBusyId(null)
     }
   }
 
   const runExtend = async (days: number, id: string) => {
+    if (mutationInFlightRef.current) return
+    mutationInFlightRef.current = true
     setBusyId(id)
     setBanner(null)
     try {
-      const res = await fetch(trialAdminBffPostUrl('extend', id), {
+      const res = await trialAdminFetch(trialAdminBffPostUrl('extend', id), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
         body: JSON.stringify({ days }),
@@ -154,15 +169,18 @@ export default function TrialApplicationsAdminPage() {
     } catch {
       setBanner({ kind: 'err', text: '通信に失敗しました。' })
     } finally {
+      mutationInFlightRef.current = false
       setBusyId(null)
     }
   }
 
   const runResend = async (id: string) => {
+    if (mutationInFlightRef.current) return
+    mutationInFlightRef.current = true
     setBusyId(id)
     setBanner(null)
     try {
-      const res = await fetch(trialAdminBffPostUrl('resend', id), {
+      const res = await trialAdminFetch(trialAdminBffPostUrl('resend', id), {
         method: 'POST',
         headers: { ...authHeaders(token) },
       })
@@ -176,6 +194,7 @@ export default function TrialApplicationsAdminPage() {
     } catch {
       setBanner({ kind: 'err', text: '通信に失敗しました。' })
     } finally {
+      mutationInFlightRef.current = false
       setBusyId(null)
     }
   }
@@ -296,7 +315,11 @@ export default function TrialApplicationsAdminPage() {
                               <button
                                 type="button"
                                 disabled={busy}
-                                onClick={() => void runActivate(r.id)}
+                                onClick={(e) => {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  void runActivate(r.id)
+                                }}
                                 className="rounded-full bg-[#4052b6] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50"
                               >
                                 {busy ? '処理中…' : '入金確認'}
@@ -306,7 +329,11 @@ export default function TrialApplicationsAdminPage() {
                               <button
                                 type="button"
                                 disabled={busy}
-                                onClick={() => void runResend(r.id)}
+                                onClick={(e) => {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  void runResend(r.id)
+                                }}
                                 className="rounded-full border border-[#4052b6] bg-white px-3 py-1.5 text-xs font-bold text-[#4052b6] disabled:opacity-50"
                               >
                                 {busy ? '処理中…' : 'リンク再送信'}
@@ -316,7 +343,11 @@ export default function TrialApplicationsAdminPage() {
                               <button
                                 type="button"
                                 disabled={busy}
-                                onClick={() => void runExtend(3, r.id)}
+                                onClick={(e) => {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  void runExtend(3, r.id)
+                                }}
                                 className="rounded-full border border-[#abadb0]/50 bg-[#f8fafc] px-3 py-1.5 text-xs font-bold text-[#2c2f32] disabled:opacity-50"
                               >
                                 {busy ? '処理中…' : '3日延長'}

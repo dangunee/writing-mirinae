@@ -147,6 +147,7 @@ async function handleResendUpstream(_req: Request, applicationId: string): Promi
 }
 
 async function handleExtendUpstream(req: Request, applicationId: string): Promise<Response> {
+  console.log("extend handler start", { applicationId });
   const cfg = mirinaeBaseAndSecret();
   if (!cfg) {
     return json({ ok: false, error: "server_misconfigured" }, 500);
@@ -160,6 +161,7 @@ async function handleExtendUpstream(req: Request, applicationId: string): Promis
   }
 
   const upstreamUrl = `${cfg.base}/api/admin/trial-applications/${encodeURIComponent(applicationId)}/extend-access`;
+  console.log("before upstream fetch (mirinae-api extend-access)", { upstreamUrl, bodyLen: bodyText.length });
   try {
     const res = await fetch(upstreamUrl, {
       method: "POST",
@@ -170,6 +172,10 @@ async function handleExtendUpstream(req: Request, applicationId: string): Promis
       body: bodyText || "{}",
     });
     const text = await res.text();
+    console.log("[trial admin bff] extend upstream response", {
+      status: res.status,
+      bodyPreview: text.length > 800 ? `${text.slice(0, 800)}…` : text,
+    });
     return new Response(text, {
       status: res.status,
       headers: { "Content-Type": "application/json; charset=utf-8" },
@@ -197,6 +203,14 @@ async function handleTrialAdminByIdPost(req: Request, id: string): Promise<Respo
   }
 
   const op = adminOpFromRequest(req);
+  try {
+    const qOp = new URL(req.url).searchParams.get("__trial_admin_op");
+    console.log("op:", qOp ?? op);
+  } catch {
+    console.log("op:", op);
+  }
+  console.log("id:", applicationId);
+
   switch (op) {
     case "extend":
       return handleExtendUpstream(req, applicationId);
