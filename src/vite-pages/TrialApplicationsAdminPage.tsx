@@ -19,11 +19,22 @@ type Row = {
   applicantEmail: string
   koreanLevel: string | null
   createdAt: string
+  paymentMethod?: string
   paymentStatus: string
   accessStatus: string
   accessExpiresAt?: string | null
   lastExtendedAt?: string | null
   extendCount?: number
+}
+
+type PaymentMethodFilter = 'all' | 'card' | 'bank_transfer'
+
+function paymentMethodLabel(m: string): string {
+  const x = m.trim().toLowerCase()
+  if (!x) return '—'
+  if (x === 'card') return 'カード'
+  if (x === 'bank_transfer' || x === 'bank') return '銀行振込'
+  return m
 }
 
 type ExtensionLogItem = {
@@ -102,6 +113,7 @@ export default function TrialApplicationsAdminPage() {
 
   const [historyOpenId, setHistoryOpenId] = useState<string | null>(null)
   const [logsByAppId, setLogsByAppId] = useState<Record<string, ExtensionLogItem[] | 'loading' | 'error'>>({})
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState<PaymentMethodFilter>('all')
 
   useEffect(() => {
     const t = sessionStorage.getItem(STORAGE_KEY)?.trim() ?? ''
@@ -112,7 +124,13 @@ export default function TrialApplicationsAdminPage() {
     setLoading(true)
     setListError(null)
     try {
-      const res = await trialAdminFetch(trialAdminBffApiUrl('/api/writing/admin/trial-applications'), {
+      const q = new URLSearchParams()
+      if (paymentMethodFilter !== 'all') {
+        q.set('paymentMethod', paymentMethodFilter)
+      }
+      const qs = q.toString()
+      const listUrl = `/api/writing/admin/trial-applications${qs ? `?${qs}` : ''}`
+      const res = await trialAdminFetch(trialAdminBffApiUrl(listUrl), {
         headers: { ...authHeaders(t) },
       })
       const data = (await res.json()) as { ok?: boolean; items?: Row[]; error?: string }
@@ -133,7 +151,7 @@ export default function TrialApplicationsAdminPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [paymentMethodFilter])
 
   useEffect(() => {
     if (!token) {
@@ -317,8 +335,10 @@ export default function TrialApplicationsAdminPage() {
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-[#595c5e]">Admin</p>
-            <h1 className="font-['Plus_Jakarta_Sans'] text-2xl font-extrabold text-[#2c2f32]">銀行振込 · 体験申込</h1>
-            <p className="mt-1 text-sm text-[#595c5e]">入金確認とアクセスリンク再送信</p>
+            <h1 className="font-['Plus_Jakarta_Sans'] text-2xl font-extrabold text-[#2c2f32]">体験申込 · アクセス管理</h1>
+            <p className="mt-1 text-sm text-[#595c5e]">
+              カード・銀行振込を問わず、体験アクセスの再送・延長・履歴を管理します。
+            </p>
           </div>
           <Link
             to="/writing"
@@ -355,6 +375,18 @@ export default function TrialApplicationsAdminPage() {
           </div>
         ) : (
           <div className="mb-6 flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-sm text-[#595c5e]">
+              <span className="whitespace-nowrap font-semibold">支払方法</span>
+              <select
+                value={paymentMethodFilter}
+                onChange={(e) => setPaymentMethodFilter(e.target.value as PaymentMethodFilter)}
+                className="rounded-lg border border-[#abadb0]/40 bg-white px-2 py-1.5 text-sm outline-none focus:border-[#4052b6]"
+              >
+                <option value="all">すべて</option>
+                <option value="card">カード</option>
+                <option value="bank_transfer">銀行振込</option>
+              </select>
+            </label>
             <button
               type="button"
               onClick={() => void fetchList(token)}
@@ -451,9 +483,10 @@ export default function TrialApplicationsAdminPage() {
                   <th className="whitespace-nowrap px-4 py-3">メール</th>
                   <th className="whitespace-nowrap px-4 py-3">韓国語</th>
                   <th className="whitespace-nowrap px-4 py-3">申込日</th>
+                  <th className="whitespace-nowrap px-4 py-3">支払方法</th>
                   <th className="whitespace-nowrap px-4 py-3">利用期限</th>
                   <th className="whitespace-nowrap px-4 py-3">延長回数</th>
-                  <th className="whitespace-nowrap px-4 py-3">payment</th>
+                  <th className="whitespace-nowrap px-4 py-3">支払状態</th>
                   <th className="whitespace-nowrap px-4 py-3">access</th>
                   <th className="whitespace-nowrap px-4 py-3">操作</th>
                 </tr>
@@ -461,13 +494,15 @@ export default function TrialApplicationsAdminPage() {
               <tbody className="divide-y divide-[#eef1f4]">
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-8 text-center text-[#595c5e]">
-                      銀行振込の申込はまだありません。
+                    <td colSpan={10} className="px-4 py-8 text-center text-[#595c5e]">
+                      該当する申込はまだありません。
                     </td>
                   </tr>
                 ) : (
                   rows.map((r) => {
-                    const showActivate = r.paymentStatus === 'pending'
+                    const pm = r.paymentMethod?.trim().toLowerCase() ?? ''
+                    const isBank = pm === 'bank_transfer' || pm === 'bank'
+                    const showActivate = isBank && r.paymentStatus === 'pending'
                     const showResend = r.paymentStatus === 'paid' && r.accessStatus === 'ready'
                     const showHistory = r.paymentStatus === 'paid'
                     const busy = busyId === r.id
@@ -480,6 +515,9 @@ export default function TrialApplicationsAdminPage() {
                           <td className="max-w-[200px] break-all px-4 py-3 text-[#595c5e]">{r.applicantEmail}</td>
                           <td className="px-4 py-3 text-[#595c5e]">{r.koreanLevel ?? '—'}</td>
                           <td className="whitespace-nowrap px-4 py-3 text-[#595c5e]">{formatJaDate(r.createdAt)}</td>
+                          <td className="whitespace-nowrap px-4 py-3 text-[#595c5e]">
+                            {paymentMethodLabel(r.paymentMethod ?? '')}
+                          </td>
                           <td className="whitespace-nowrap px-4 py-3 text-[#595c5e]">
                             {r.accessExpiresAt ? formatJaDate(r.accessExpiresAt) : '—'}
                           </td>
@@ -554,7 +592,7 @@ export default function TrialApplicationsAdminPage() {
                         </tr>
                         {historyOpen ? (
                           <tr className="bg-[#f8fafc]">
-                            <td colSpan={9} className="px-4 py-3 text-xs text-[#2c2f32]">
+                            <td colSpan={10} className="px-4 py-3 text-xs text-[#2c2f32]">
                               <p className="mb-2 font-bold text-[#595c5e]">延長履歴</p>
                               {logsEntry === 'loading' ? (
                                 <p className="text-[#595c5e]">読み込み中…</p>

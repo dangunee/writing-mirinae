@@ -50,7 +50,14 @@ export async function GET(req: Request) {
     return json({ ok: false, error: "server_misconfigured" }, 500);
   }
 
-  const url = `${cfg.base}/api/admin/trial-applications`;
+  let upstreamPath = "/api/admin/trial-applications";
+  try {
+    const u = new URL(req.url);
+    if (u.search) upstreamPath += u.search;
+  } catch {
+    /* keep path only */
+  }
+  const url = `${cfg.base}${upstreamPath}`;
   try {
     const res = await fetch(url, {
       method: "GET",
