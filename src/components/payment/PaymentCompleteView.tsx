@@ -11,6 +11,10 @@ type TrialStartLinkResponse =
   | { ok: true; redirectTo: string }
   | { ok: false; code: 'NOT_FOUND' | 'NOT_PAID' | 'EXPIRED' | 'REQUEST_FAILED' }
 
+type TrialReissueLinkResponse =
+  | { ok: true; message: string }
+  | { ok: false; code: 'REQUEST_FAILED' }
+
 const HERO_IMG =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuCxjqNfsVMm6O-CbvJXMYkxS9t2g1lFz2gLoCEjUFjoPqKH9BBhj4i5ousg7bOVoZ_TzwI4UQrv4WVq_jplz7gDDrCVt005HDAxUf5WzvR-3JhvqL3AmyEjI6LYudex2Y2koCVjWNNUKtE4-TlCUCfboF6Ypwd6zRKoSP3ADHlL2-FS3NWbs5libgbmLGScDGAykru7DnMfBxdz9hnK-m97IEvcDmBTu2-dF429eN_MRceiZnuHbkWA0UB3Iw8u-rceP-s3ty5QWzo'
 
@@ -46,6 +50,9 @@ export default function PaymentCompleteView({ paymentMethod, data, trialFlow, st
   const inquiry = displayInquiry(data)
   const [trialStartLoading, setTrialStartLoading] = useState(false)
   const [trialStartError, setTrialStartError] = useState<string | null>(null)
+  const [reissueLoading, setReissueLoading] = useState(false)
+  const [reissueMessage, setReissueMessage] = useState<string | null>(null)
+  const [reissueError, setReissueError] = useState<string | null>(null)
 
   const showTrialStartCta = Boolean(isEntitlementCard && stripeSessionId?.trim())
 
@@ -82,6 +89,43 @@ export default function PaymentCompleteView({ paymentMethod, data, trialFlow, st
       setTrialStartError(trialStartLinkErrorMessage('REQUEST_FAILED'))
     } finally {
       setTrialStartLoading(false)
+    }
+  }
+
+  async function requestTrialReissueLink() {
+    const email = data.email?.trim()
+    if (!email) return
+    setReissueError(null)
+    setReissueMessage(null)
+    setReissueLoading(true)
+    try {
+      const res = await fetch(trialPaymentApiUrl('/api/writing/trial/reissue-link'), {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      })
+      let json: TrialReissueLinkResponse = { ok: false, code: 'REQUEST_FAILED' }
+      try {
+        const text = await res.text()
+        json = text ? (JSON.parse(text) as TrialReissueLinkResponse) : json
+      } catch {
+        setReissueError('接続に失敗しました。時間をおいて再度お試しください。')
+        return
+      }
+      if (json.ok === true && typeof json.message === 'string') {
+        setReissueMessage(json.message)
+        return
+      }
+      if (json.ok === false && json.code === 'REQUEST_FAILED') {
+        setReissueError('しばらくしてから再度お試しください。')
+        return
+      }
+      setReissueError('接続に失敗しました。時間をおいて再度お試しください。')
+    } catch {
+      setReissueError('通信に失敗しました。')
+    } finally {
+      setReissueLoading(false)
     }
   }
 
@@ -188,12 +232,22 @@ export default function PaymentCompleteView({ paymentMethod, data, trialFlow, st
                   </button>
                   <button
                     type="button"
-                    disabled={trialStartLoading}
-                    onClick={() => void requestTrialStartLink()}
+                    disabled={reissueLoading}
+                    onClick={() => void requestTrialReissueLink()}
                     className="flex w-full items-center justify-center rounded-full border-2 border-[#4052b6] bg-white px-8 py-3.5 text-sm font-bold text-[#4052b6] transition-colors hover:bg-[#4052b6]/5 disabled:cursor-not-allowed disabled:opacity-70"
                   >
-                    {trialStartLoading ? '準備中…' : '体験リンクを再発行する'}
+                    {reissueLoading ? '送信中…' : '体験リンクを再発行する'}
                   </button>
+                  {reissueMessage ? (
+                    <p className="mt-1 text-center text-sm font-medium text-[#2c2f32]" role="status">
+                      {reissueMessage}
+                    </p>
+                  ) : null}
+                  {reissueError ? (
+                    <p className="mt-1 text-center text-sm font-medium text-[#b42318]" role="alert">
+                      {reissueError}
+                    </p>
+                  ) : null}
                   {trialStartError ? (
                     <p className="mt-1 text-center text-sm font-medium text-[#b42318]" role="alert">
                       {trialStartError}
