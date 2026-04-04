@@ -162,12 +162,14 @@ async function handleExtendUpstream(req: Request, applicationId: string): Promis
 
   const upstreamUrl = `${cfg.base}/api/admin/trial-applications/${encodeURIComponent(applicationId)}/extend-access`;
   console.log("before upstream fetch (mirinae-api extend-access)", { upstreamUrl, bodyLen: bodyText.length });
+  const idem = req.headers.get("x-idempotency-key")?.trim();
   try {
     const res = await fetch(upstreamUrl, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${cfg.secret}`,
         "Content-Type": "application/json",
+        ...(idem ? { "X-Idempotency-Key": idem } : {}),
       },
       body: bodyText || "{}",
     });
