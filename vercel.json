@@ -15,12 +15,6 @@
     "api/writing/trial-payment/payment-result.ts": {
       "maxDuration": 30
     },
-    "api/writing/trial/start-link.ts": {
-      "maxDuration": 30
-    },
-    "api/writing/trial/reissue-link.ts": {
-      "maxDuration": 30
-    },
     "api/writing/admin/trial-applications/index.ts": {
       "maxDuration": 30
     },
@@ -66,6 +60,14 @@
     {
       "source": "/api/writing/trial/access/consume",
       "destination": "/api/writing/trial/bff?op=access_consume"
+    },
+    {
+      "source": "/api/writing/trial/start-link",
+      "destination": "/api/writing/trial/bff?op=start_link"
+    },
+    {
+      "source": "/api/writing/trial/reissue-link",
+      "destination": "/api/writing/trial/bff?op=reissue_link"
     },
     {
       "source": "/api/writing/regular/access/dev-seed",

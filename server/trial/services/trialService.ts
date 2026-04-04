@@ -1,18 +1,14 @@
-/**
- * Vercel Serverless — POST /api/writing/trial/start-link
- * mirinae-api へプロキシ（DB・トークン発行は upstream のみ）。
- */
 import type { IncomingMessage, ServerResponse } from "http";
 
-export const config = {
-  runtime: "nodejs",
-  maxDuration: 30,
-  api: {
-    bodyParser: false,
-  },
-};
+export const COOKIE_MAX_AGE_FALLBACK = 7 * 24 * 60 * 60;
 
-function readRawBody(req: IncomingMessage): Promise<Buffer> {
+export function getMirinaeBase(): string | null {
+  const base = process.env.MIRINAE_API_BASE_URL?.trim() ?? "";
+  if (!base) return null;
+  return base.replace(/\/$/, "");
+}
+
+export function readRawBody(req: IncomingMessage): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     req.on("data", (chunk: Buffer | string) => {
@@ -23,7 +19,13 @@ function readRawBody(req: IncomingMessage): Promise<Buffer> {
   });
 }
 
-export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
+/** mirinae-api への JSON POST プロキシ（start-link / reissue-link 共通） */
+export async function proxyPostJsonToUpstream(
+  req: IncomingMessage,
+  res: ServerResponse,
+  upstreamPath: "/api/writing/trial/start-link" | "/api/writing/trial/reissue-link",
+  logPrefix: string
+): Promise<void> {
   if (req.method !== "POST") {
     res.statusCode = 405;
     res.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -31,9 +33,9 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     return;
   }
 
-  const base = process.env.MIRINAE_API_BASE_URL?.trim() ?? "";
+  const base = getMirinaeBase();
   if (!base) {
-    console.error("trial_start_link_bff_missing_mirinae_api_base");
+    console.error(`${logPrefix}_bff_missing_mirinae_api_base`);
     res.statusCode = 500;
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.end(JSON.stringify({ ok: false, code: "REQUEST_FAILED" }));
@@ -50,7 +52,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     return;
   }
 
-  const upstreamUrl = `${base.replace(/\/$/, "")}/api/writing/trial/start-link`;
+  const upstreamUrl = `${base}${upstreamPath}`;
   try {
     const upstream = await fetch(upstreamUrl, {
       method: "POST",
@@ -62,7 +64,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.end(text);
   } catch (e) {
-    console.error("trial_start_link_bff_upstream_error", e);
+    console.error(`${logPrefix}_bff_upstream_error`, e);
     res.statusCode = 502;
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.end(JSON.stringify({ ok: false, code: "REQUEST_FAILED" }));
