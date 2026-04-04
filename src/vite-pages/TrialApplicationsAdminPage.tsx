@@ -114,6 +114,15 @@ export default function TrialApplicationsAdminPage() {
   const [historyOpenId, setHistoryOpenId] = useState<string | null>(null)
   const [logsByAppId, setLogsByAppId] = useState<Record<string, ExtensionLogItem[] | 'loading' | 'error'>>({})
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<PaymentMethodFilter>('all')
+  const [searchInput, setSearchInput] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      setDebouncedSearch(searchInput.trim())
+    }, 300)
+    return () => window.clearTimeout(id)
+  }, [searchInput])
 
   useEffect(() => {
     const t = sessionStorage.getItem(STORAGE_KEY)?.trim() ?? ''
@@ -127,6 +136,9 @@ export default function TrialApplicationsAdminPage() {
       const q = new URLSearchParams()
       if (paymentMethodFilter !== 'all') {
         q.set('paymentMethod', paymentMethodFilter)
+      }
+      if (debouncedSearch.length > 0) {
+        q.set('query', debouncedSearch)
       }
       const qs = q.toString()
       const listUrl = `/api/writing/admin/trial-applications${qs ? `?${qs}` : ''}`
@@ -151,7 +163,7 @@ export default function TrialApplicationsAdminPage() {
     } finally {
       setLoading(false)
     }
-  }, [paymentMethodFilter])
+  }, [paymentMethodFilter, debouncedSearch])
 
   useEffect(() => {
     if (!token) {
@@ -374,7 +386,18 @@ export default function TrialApplicationsAdminPage() {
             </div>
           </div>
         ) : (
-          <div className="mb-6 flex flex-wrap items-center gap-3">
+          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+            <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm text-[#595c5e] sm:max-w-md">
+              <span className="font-semibold">🔍 メール・名前で検索</span>
+              <input
+                type="search"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="メールまたは名前で検索"
+                autoComplete="off"
+                className="w-full rounded-lg border border-[#abadb0]/40 px-3 py-2 text-sm text-[#2c2f32] outline-none focus:border-[#4052b6]"
+              />
+            </label>
             <label className="flex items-center gap-2 text-sm text-[#595c5e]">
               <span className="whitespace-nowrap font-semibold">支払方法</span>
               <select
@@ -495,7 +518,7 @@ export default function TrialApplicationsAdminPage() {
                 {rows.length === 0 ? (
                   <tr>
                     <td colSpan={10} className="px-4 py-8 text-center text-[#595c5e]">
-                      該当する申込はまだありません。
+                      該当するデータがありません
                     </td>
                   </tr>
                 ) : (
