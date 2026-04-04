@@ -464,8 +464,8 @@ export default function TrialApplicationsAdminPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f7fa] px-4 py-10 font-['Be_Vietnam_Pro',sans-serif] text-[#2c2f32]">
-      <div className="mx-auto max-w-6xl">
+    <div className="min-h-screen bg-[#f5f7fa] px-4 py-8 font-['Be_Vietnam_Pro',sans-serif] text-[#2c2f32] sm:px-6 lg:px-8 xl:px-10">
+      <div className="mx-auto w-full max-w-[1800px]">
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-[#595c5e]">Admin</p>
@@ -508,8 +508,8 @@ export default function TrialApplicationsAdminPage() {
             </div>
           </div>
         ) : (
-          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-            <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm text-[#595c5e] sm:max-w-md">
+          <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end lg:gap-x-5 lg:gap-y-3">
+            <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm text-[#595c5e] lg:min-w-[min(100%,22rem)] lg:max-w-xl xl:max-w-2xl">
               <span className="font-semibold">🔍 メール・名前で検索</span>
               <input
                 type="search"
@@ -520,48 +520,50 @@ export default function TrialApplicationsAdminPage() {
                 className="w-full rounded-lg border border-[#abadb0]/40 px-3 py-2 text-sm text-[#2c2f32] outline-none focus:border-[#4052b6]"
               />
             </label>
-            <label className="flex items-center gap-2 text-sm text-[#595c5e]">
-              <span className="whitespace-nowrap font-semibold">支払方法</span>
-              <select
-                value={paymentMethodFilter}
-                onChange={(e) => setPaymentMethodFilter(e.target.value as PaymentMethodFilter)}
-                className="rounded-lg border border-[#abadb0]/40 bg-white px-2 py-1.5 text-sm outline-none focus:border-[#4052b6]"
+            <div className="flex flex-wrap items-end gap-x-4 gap-y-3 sm:gap-x-5">
+              <label className="flex items-center gap-2 text-sm text-[#595c5e]">
+                <span className="whitespace-nowrap font-semibold">支払方法</span>
+                <select
+                  value={paymentMethodFilter}
+                  onChange={(e) => setPaymentMethodFilter(e.target.value as PaymentMethodFilter)}
+                  className="rounded-lg border border-[#abadb0]/40 bg-white px-2 py-1.5 text-sm outline-none focus:border-[#4052b6]"
+                >
+                  <option value="all">すべて</option>
+                  <option value="card">カード</option>
+                  <option value="bank_transfer">銀行振込</option>
+                </select>
+              </label>
+              <label className="flex items-center gap-2 text-sm text-[#595c5e]">
+                <span className="whitespace-nowrap font-semibold">並び順</span>
+                <select
+                  value={sort}
+                  onChange={(e) => setSort(e.target.value as SortKey)}
+                  className="min-w-[12rem] max-w-[min(100%,18rem)] rounded-lg border border-[#abadb0]/40 bg-white px-2 py-1.5 text-sm outline-none focus:border-[#4052b6]"
+                >
+                  <option value="created_desc">申込日が新しい順</option>
+                  <option value="expires_asc">利用期限が近い順</option>
+                  <option value="extended_desc">最近延長した順</option>
+                </select>
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  lastFetchedSigRef.current = null
+                  void fetchList(token, page)
+                }}
+                disabled={loading}
+                className="shrink-0 rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#2c2f32] shadow-sm ring-1 ring-[#abadb0]/30 disabled:opacity-50"
               >
-                <option value="all">すべて</option>
-                <option value="card">カード</option>
-                <option value="bank_transfer">銀行振込</option>
-              </select>
-            </label>
-            <label className="flex items-center gap-2 text-sm text-[#595c5e]">
-              <span className="whitespace-nowrap font-semibold">並び順</span>
-              <select
-                value={sort}
-                onChange={(e) => setSort(e.target.value as SortKey)}
-                className="max-w-[min(100%,14rem)] rounded-lg border border-[#abadb0]/40 bg-white px-2 py-1.5 text-sm outline-none focus:border-[#4052b6]"
+                {loading ? '読み込み中…' : '再読み込み'}
+              </button>
+              <button
+                type="button"
+                onClick={clearToken}
+                className="shrink-0 rounded-full border border-[#abadb0]/40 bg-transparent px-4 py-2 text-sm font-semibold text-[#595c5e]"
               >
-                <option value="created_desc">申込日が新しい順</option>
-                <option value="expires_asc">利用期限が近い順</option>
-                <option value="extended_desc">最近延長した順</option>
-              </select>
-            </label>
-            <button
-              type="button"
-              onClick={() => {
-                lastFetchedSigRef.current = null
-                void fetchList(token, page)
-              }}
-              disabled={loading}
-              className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#2c2f32] shadow-sm ring-1 ring-[#abadb0]/30 disabled:opacity-50"
-            >
-              {loading ? '読み込み中…' : '再読み込み'}
-            </button>
-            <button
-              type="button"
-              onClick={clearToken}
-              className="rounded-full border border-[#abadb0]/40 bg-transparent px-4 py-2 text-sm font-semibold text-[#595c5e]"
-            >
-              トークンを消去
-            </button>
+                トークンを消去
+              </button>
+            </div>
           </div>
         )}
 
@@ -636,23 +638,23 @@ export default function TrialApplicationsAdminPage() {
 
         {token && !listError && rows !== null && pagination !== null ? (
           <div
-            className={`overflow-x-auto rounded-xl border border-[#abadb0]/15 bg-white shadow-sm ${loading ? 'opacity-[0.72]' : ''}`}
+            className={`w-full min-w-0 overflow-x-auto rounded-xl border border-[#abadb0]/15 bg-white shadow-sm ${loading ? 'opacity-[0.72]' : ''}`}
           >
-            <table className="min-w-[1180px] table-fixed text-left text-sm">
+            <table className="w-full min-w-[1100px] table-fixed text-left text-sm lg:min-w-0">
               <thead className="border-b border-[#eef1f4] bg-[#f8fafc] text-xs font-bold uppercase tracking-wider text-[#595c5e]">
                 <tr>
-                  <th className="w-[7%] whitespace-nowrap px-2 py-2">お名前</th>
-                  <th className="w-[15%] whitespace-nowrap px-2 py-2">メール</th>
-                  <th className="w-[5%] whitespace-nowrap px-2 py-2">韓国語</th>
-                  <th className="w-[11%] whitespace-nowrap px-2 py-2">申込日</th>
-                  <th className="w-[6%] whitespace-nowrap px-2 py-2">支払方法</th>
-                  <th className="w-[11%] whitespace-nowrap px-2 py-2">利用期限</th>
-                  <th className="w-[7%] whitespace-nowrap px-2 py-2">提出状況</th>
-                  <th className="w-[8%] whitespace-nowrap px-2 py-2">24時間前通知</th>
-                  <th className="w-[4%] whitespace-nowrap px-2 py-2">延長</th>
-                  <th className="w-[5%] whitespace-nowrap px-2 py-2">支払</th>
-                  <th className="w-[5%] whitespace-nowrap px-2 py-2">access</th>
-                  <th className="w-[16%] whitespace-nowrap px-2 py-2">操作</th>
+                  <th className="w-[8%] min-w-[5.5rem] whitespace-nowrap px-2 py-2">お名前</th>
+                  <th className="w-[18%] min-w-[11rem] whitespace-nowrap px-2 py-2">メール</th>
+                  <th className="w-[5%] min-w-[3rem] whitespace-nowrap px-2 py-2">韓国語</th>
+                  <th className="w-[10%] min-w-[7rem] whitespace-nowrap px-2 py-2">申込日</th>
+                  <th className="w-[6%] min-w-[4rem] whitespace-nowrap px-2 py-2">支払方法</th>
+                  <th className="w-[10%] min-w-[7rem] whitespace-nowrap px-2 py-2">利用期限</th>
+                  <th className="w-[8%] min-w-[5.5rem] whitespace-nowrap px-2 py-2">提出状況</th>
+                  <th className="w-[8%] min-w-[5.5rem] whitespace-nowrap px-2 py-2">24時間前通知</th>
+                  <th className="w-[3%] min-w-[2.25rem] whitespace-nowrap px-2 py-2">延長</th>
+                  <th className="w-[5%] min-w-[3rem] whitespace-nowrap px-2 py-2">支払</th>
+                  <th className="w-[5%] min-w-[3rem] whitespace-nowrap px-2 py-2">access</th>
+                  <th className="w-[14%] min-w-[10rem] whitespace-nowrap px-2 py-2">操作</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#eef1f4]">
@@ -682,7 +684,7 @@ export default function TrialApplicationsAdminPage() {
                             {r.applicantName}
                           </td>
                           <td
-                            className="max-w-0 overflow-hidden text-ellipsis whitespace-nowrap px-2 py-1.5 text-[#595c5e]"
+                            className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap px-2 py-1.5 text-[#595c5e]"
                             title={r.applicantEmail}
                           >
                             {r.applicantEmail}
