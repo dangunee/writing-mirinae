@@ -232,6 +232,17 @@ function extractId(req: IncomingMessage): string {
 }
 
 export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  try {
+    const u = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
+    console.log("[admin bff hit]", {
+      method: req.method,
+      op: u.searchParams.get("__trial_admin_op"),
+      id: u.searchParams.get("id"),
+    });
+  } catch {
+    console.log("[admin bff hit]", { method: req.method, url: req.url });
+  }
+
   if (req.method !== "POST") {
     res.statusCode = 405;
     res.setHeader("Content-Type", "application/json; charset=utf-8");

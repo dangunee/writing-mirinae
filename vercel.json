@@ -4,31 +4,8 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "functions": {
-    "api/bank-transfer-notify.ts": {
-      "maxDuration": 30
-    },
-    "api/webhooks/stripe.ts": {
-      "maxDuration": 30
-    },
-    "api/writing/trial-payment/create-checkout-session.ts": {
-      "maxDuration": 30
-    },
-    "api/writing/trial-payment/payment-result.ts": {
-      "maxDuration": 30
-    },
-    "api/writing/admin/trial-applications/index.ts": {
-      "maxDuration": 30
-    },
-    "api/writing/admin/bff.ts": {
-      "maxDuration": 30
-    },
-    "api/writing/admin/regular-access-grants/[id].ts": {
-      "maxDuration": 30
-    },
-    "api/writing/trial/bff.ts": {
-      "maxDuration": 30
-    },
-    "api/writing/regular/access/consume.ts": {
+    "api/**/*.ts": {
+      "runtime": "nodejs18.x",
       "maxDuration": 30
     },
     "api/writing/regular/session/current.ts": {
