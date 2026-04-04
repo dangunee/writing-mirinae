@@ -1,5 +1,19 @@
+import type { TrialPaymentCalendarState } from '../types/trialPaymentForm'
+
 const WEEKDAYS_JA = ['日', '月', '火', '水', '木', '金', '土']
 const WEEKDAYS_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+/** 体験レッスン申込カレンダー — 表示月は当月、選択日は今日 */
+export function createTodayCalendarState(): TrialPaymentCalendarState {
+  const now = new Date()
+  const y = now.getFullYear()
+  const m = now.getMonth()
+  const d = now.getDate()
+  return {
+    view: new Date(y, m, 1),
+    selected: new Date(y, m, d),
+  }
+}
 
 export function formatJpDate(d: Date): string {
   return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`

@@ -12,7 +12,7 @@ import {
   type TrialPaymentCheckoutState,
 } from '../types/trialPaymentCheckout'
 import type { TrialPaymentCalendarState, TrialPaymentFormValues } from '../types/trialPaymentForm'
-import { formatJpDate } from '../utils/trialPaymentCalendar'
+import { createTodayCalendarState, formatJpDate } from '../utils/trialPaymentCalendar'
 
 const MOBILE_LEVEL_LABELS: Record<string, string> = {
   beginner: '未経験・入門',
@@ -58,15 +58,9 @@ export default function PaymentPage() {
     inquiry: '',
   })
 
-  const [desktopCal, setDesktopCal] = useState<TrialPaymentCalendarState>({
-    view: new Date(2024, 10, 1),
-    selected: new Date(2024, 10, 10),
-  })
+  const [desktopCal, setDesktopCal] = useState<TrialPaymentCalendarState>(() => createTodayCalendarState())
 
-  const [mobileCal, setMobileCal] = useState<TrialPaymentCalendarState>({
-    view: new Date(2024, 11, 1),
-    selected: new Date(2024, 11, 11),
-  })
+  const [mobileCal, setMobileCal] = useState<TrialPaymentCalendarState>(() => createTodayCalendarState())
 
   const [showValidationError, setShowValidationError] = useState(false)
   const [bankTransferSubmitting, setBankTransferSubmitting] = useState(false)

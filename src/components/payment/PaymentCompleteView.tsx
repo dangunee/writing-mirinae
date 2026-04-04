@@ -49,7 +49,7 @@ export default function PaymentCompleteView({ paymentMethod, data, trialFlow, st
 
   const showTrialStartCta = Boolean(isEntitlementCard && stripeSessionId?.trim())
 
-  async function onStartTrialClick() {
+  async function requestTrialStartLink() {
     const sid = stripeSessionId?.trim()
     if (!sid) return
     setTrialStartError(null)
@@ -140,10 +140,14 @@ export default function PaymentCompleteView({ paymentMethod, data, trialFlow, st
                 <p className="max-w-md text-lg leading-relaxed text-[#595c5e]">
                   {isEntitlementCard ? (
                     <>
-                      下のボタンからすぐに体験を開始できます。
+                      下のボタンから体験を開始できます（決済後7日間、いつでも再発行可能です）。
                       <br />
                       <span className="text-base text-[#595c5e]/90">
-                        確認メールにも同様の手順をお送りしています（バックアップ用）。
+                        メールのリンクは15分で切れます。切れた場合は
+                        <Link to="/writing/trial/reissue" className="font-medium text-[#4052b6] underline">
+                          再発行ページ
+                        </Link>
+                        からお受け取りください。
                       </span>
                     </>
                   ) : (
@@ -168,11 +172,11 @@ export default function PaymentCompleteView({ paymentMethod, data, trialFlow, st
               </div>
 
               {showTrialStartCta ? (
-                <div className="pt-2">
+                <div className="space-y-3 pt-2">
                   <button
                     type="button"
                     disabled={trialStartLoading}
-                    onClick={() => void onStartTrialClick()}
+                    onClick={() => void requestTrialStartLink()}
                     className="group flex w-full items-center justify-center gap-2 rounded-full bg-[#ff9727] px-8 py-4 font-bold text-[#4c2700] [box-shadow:0_12px_24px_rgba(44,47,50,0.06)] transition-transform active:scale-95 disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     <span>{trialStartLoading ? '準備中…' : '体験を開始する'}</span>
@@ -182,8 +186,16 @@ export default function PaymentCompleteView({ paymentMethod, data, trialFlow, st
                       </span>
                     ) : null}
                   </button>
+                  <button
+                    type="button"
+                    disabled={trialStartLoading}
+                    onClick={() => void requestTrialStartLink()}
+                    className="flex w-full items-center justify-center rounded-full border-2 border-[#4052b6] bg-white px-8 py-3.5 text-sm font-bold text-[#4052b6] transition-colors hover:bg-[#4052b6]/5 disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {trialStartLoading ? '準備中…' : '体験リンクを再発行する'}
+                  </button>
                   {trialStartError ? (
-                    <p className="mt-3 text-center text-sm font-medium text-[#b42318]" role="alert">
+                    <p className="mt-1 text-center text-sm font-medium text-[#b42318]" role="alert">
                       {trialStartError}
                     </p>
                   ) : null}
@@ -216,7 +228,11 @@ export default function PaymentCompleteView({ paymentMethod, data, trialFlow, st
                 <span className="material-symbols-outlined text-[#4052b6]">mail</span>
                 <div className="text-sm text-[#595c5e]">
                   <span className="font-bold text-[#2c2f32]">確認メール:</span>
-                  ご登録のメールアドレスにも手順をお送りしています。ボタンが使えない場合はメール内のリンクをご利用ください。
+                  ご登録のメールアドレスにもリンクをお送りしています（15分有効）。ページを閉じた場合やリンク切れのときは
+                  <Link to="/writing/trial/reissue" className="font-medium text-[#4052b6] underline">
+                    再発行ページ
+                  </Link>
+                  から再取得できます。
                 </div>
               </div>
             </div>

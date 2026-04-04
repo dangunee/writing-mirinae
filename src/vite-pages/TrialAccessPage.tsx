@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { apiUrl, logApiFetch } from '../lib/apiUrl'
 
 type Phase = 'loading' | 'consuming' | 'invalid' | 'network_error' | 'done'
@@ -66,7 +66,24 @@ export default function TrialAccessPage() {
   return (
     <div className="writing-page min-h-[60vh] flex flex-col items-center justify-center px-6 text-center">
       <p className="text-on-surface font-body leading-relaxed max-w-md">{message}</p>
-      {phase === 'invalid' || phase === 'network_error' ? (
+      {phase === 'invalid' ? (
+        <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
+          <Link
+            to="/writing/trial/reissue"
+            className="inline-flex min-h-[44px] items-center justify-center rounded-full bg-[#4052b6] px-6 py-2.5 text-sm font-bold text-white"
+          >
+            新しいリンクを受け取る
+          </Link>
+          <button
+            type="button"
+            className="text-sm font-medium text-[#4052b6] underline"
+            onClick={() => navigate('/writing')}
+          >
+            トップへ
+          </button>
+        </div>
+      ) : null}
+      {phase === 'network_error' ? (
         <button
           type="button"
           className="mt-6 text-primary underline"
