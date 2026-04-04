@@ -20,6 +20,15 @@ function authHeaders(token: string): HeadersInit {
   return { Authorization: `Bearer ${t}` }
 }
 
+/** Vercel rewrite なしで単一 bff へ POST（__trial_admin_op + id） */
+function trialAdminBffPostUrl(op: 'activate' | 'extend' | 'resend', applicationId: string): string {
+  const q = new URLSearchParams({
+    __trial_admin_op: op,
+    id: applicationId,
+  })
+  return trialAdminBffApiUrl(`/api/writing/admin/bff?${q.toString()}`)
+}
+
 function formatJaDate(iso: string): string {
   try {
     const d = new Date(iso)
@@ -103,7 +112,7 @@ export default function TrialApplicationsAdminPage() {
     setBusyId(id)
     setBanner(null)
     try {
-      const res = await fetch(trialAdminBffApiUrl(`/api/writing/admin/trial-applications/${encodeURIComponent(id)}/activate`), {
+      const res = await fetch(trialAdminBffPostUrl('activate', id), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
         body: JSON.stringify({}),
@@ -126,14 +135,11 @@ export default function TrialApplicationsAdminPage() {
     setBusyId(id)
     setBanner(null)
     try {
-      const res = await fetch(
-        trialAdminBffApiUrl(`/api/writing/admin/trial-applications/${encodeURIComponent(id)}/extend-access`),
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
-          body: JSON.stringify({ days }),
-        }
-      )
+      const res = await fetch(trialAdminBffPostUrl('extend', id), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+        body: JSON.stringify({ days }),
+      })
       const data = (await res.json()) as { ok?: boolean; accessExpiresAt?: string; error?: string }
       if (!res.ok || data.ok !== true) {
         setBanner({ kind: 'err', text: '延長に失敗しました。' })
@@ -156,7 +162,7 @@ export default function TrialApplicationsAdminPage() {
     setBusyId(id)
     setBanner(null)
     try {
-      const res = await fetch(trialAdminBffApiUrl(`/api/writing/admin/trial-applications/${encodeURIComponent(id)}/resend-access`), {
+      const res = await fetch(trialAdminBffPostUrl('resend', id), {
         method: 'POST',
         headers: { ...authHeaders(token) },
       })

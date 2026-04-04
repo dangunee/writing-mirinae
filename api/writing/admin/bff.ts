@@ -1,8 +1,7 @@
 /**
  * Vercel — trial admin 単一 Serverless（activate / extend / resend を集約）
  *
- * vercel.json rewrite（外部 URL は従来どおり）:
- * - POST .../trial-applications/:id/{activate|extend-access|resend-access} → /api/writing/admin/bff?__trial_admin_op=…&id=:id
+ * フロントは POST /api/writing/admin/bff?__trial_admin_op=…&id=… を直接呼ぶ（vercel rewrite は未使用。復帰時は vercel.json に admin trial の rewrite を足す）。
  *
  * mirinae-api upstream は変更なし: /api/admin/trial-applications/:id/{activate|resend-access|extend-access}
  */

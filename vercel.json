@@ -49,18 +49,6 @@
   ],
   "rewrites": [
     {
-      "source": "/api/writing/admin/trial-applications/:id/extend-access",
-      "destination": "/api/writing/admin/bff?__trial_admin_op=extend&id=:id"
-    },
-    {
-      "source": "/api/writing/admin/trial-applications/:id/resend-access",
-      "destination": "/api/writing/admin/bff?__trial_admin_op=resend&id=:id"
-    },
-    {
-      "source": "/api/writing/admin/trial-applications/:id/activate",
-      "destination": "/api/writing/admin/bff?__trial_admin_op=activate&id=:id"
-    },
-    {
       "source": "/api/writing/trial/session/current",
       "destination": "/api/writing/trial/bff?op=session_current"
     },
