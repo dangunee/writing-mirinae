@@ -57,6 +57,9 @@ function adminOpFromRequest(req: Request): AdminOp {
     const q = u.searchParams.get("__trial_admin_op")?.trim();
     if (q === "extend") return "extend";
     if (q === "resend") return "resend";
+    const p = u.pathname;
+    if (p.endsWith("/extend-access")) return "extend";
+    if (p.endsWith("/resend-access")) return "resend";
   } catch {
     /* fall through */
   }
@@ -216,10 +219,15 @@ function readRawBody(req: IncomingMessage): Promise<Buffer> {
   });
 }
 
-/** rewrite 後は常に .../activate になる想定で id を取る */
+/**
+ * vercel.json の rewrite で .../activate?__trial_admin_op=... になる場合と、
+ * 開発環境などで .../extend-access | .../resend-access のまま届く場合の両方から id を取る。
+ */
 function extractId(req: IncomingMessage): string {
   const u = req.url ?? "";
-  const m = u.match(/\/trial-applications\/([^/]+)\/activate(?:\?|$)/);
+  const m = u.match(
+    /\/trial-applications\/([^/]+)\/(?:activate|extend-access|resend-access)(?:\?|$)/
+  );
   return m?.[1]?.trim() ?? "";
 }
 

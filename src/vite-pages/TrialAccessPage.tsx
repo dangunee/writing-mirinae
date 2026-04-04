@@ -57,7 +57,8 @@ export default function TrialAccessPage() {
 
   const message = (() => {
     if (phase === 'loading' || phase === 'consuming') return 'アクセスを確認しています…'
-    if (phase === 'invalid') return 'リンクが無効または期限切れです。'
+    if (phase === 'invalid')
+      return 'リンクが無効または期限切れです。新しいリンクが必要な場合は下のボタンから再発行ページへお進みください。'
     if (phase === 'network_error') return '通信に失敗しました。しばらくしてから再度お試しください。'
     if (phase === 'done') return 'リダイレクト中…'
     return ''

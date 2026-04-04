@@ -36,7 +36,7 @@ export async function proxyPostJsonToUpstream(
   const base = getMirinaeBase();
   if (!base) {
     console.error(`${logPrefix}_bff_missing_mirinae_api_base`);
-    res.statusCode = 500;
+    res.statusCode = 200;
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.end(JSON.stringify({ ok: false, code: "REQUEST_FAILED" }));
     return;

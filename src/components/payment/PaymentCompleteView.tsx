@@ -11,10 +11,6 @@ type TrialStartLinkResponse =
   | { ok: true; redirectTo: string }
   | { ok: false; code: 'NOT_FOUND' | 'NOT_PAID' | 'EXPIRED' | 'REQUEST_FAILED' }
 
-type TrialReissueLinkResponse =
-  | { ok: true; message: string }
-  | { ok: false; code: 'REQUEST_FAILED' }
-
 const HERO_IMG =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuCxjqNfsVMm6O-CbvJXMYkxS9t2g1lFz2gLoCEjUFjoPqKH9BBhj4i5ousg7bOVoZ_TzwI4UQrv4WVq_jplz7gDDrCVt005HDAxUf5WzvR-3JhvqL3AmyEjI6LYudex2Y2koCVjWNNUKtE4-TlCUCfboF6Ypwd6zRKoSP3ADHlL2-FS3NWbs5libgbmLGScDGAykru7DnMfBxdz9hnK-m97IEvcDmBTu2-dF429eN_MRceiZnuHbkWA0UB3Iw8u-rceP-s3ty5QWzo'
 
@@ -50,9 +46,6 @@ export default function PaymentCompleteView({ paymentMethod, data, trialFlow, st
   const inquiry = displayInquiry(data)
   const [trialStartLoading, setTrialStartLoading] = useState(false)
   const [trialStartError, setTrialStartError] = useState<string | null>(null)
-  const [reissueLoading, setReissueLoading] = useState(false)
-  const [reissueMessage, setReissueMessage] = useState<string | null>(null)
-  const [reissueError, setReissueError] = useState<string | null>(null)
 
   const showTrialStartCta = Boolean(isEntitlementCard && stripeSessionId?.trim())
 
@@ -89,43 +82,6 @@ export default function PaymentCompleteView({ paymentMethod, data, trialFlow, st
       setTrialStartError(trialStartLinkErrorMessage('REQUEST_FAILED'))
     } finally {
       setTrialStartLoading(false)
-    }
-  }
-
-  async function requestTrialReissueLink() {
-    const email = data.email?.trim()
-    if (!email) return
-    setReissueError(null)
-    setReissueMessage(null)
-    setReissueLoading(true)
-    try {
-      const res = await fetch(trialPaymentApiUrl('/api/writing/trial/reissue-link'), {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      })
-      let json: TrialReissueLinkResponse = { ok: false, code: 'REQUEST_FAILED' }
-      try {
-        const text = await res.text()
-        json = text ? (JSON.parse(text) as TrialReissueLinkResponse) : json
-      } catch {
-        setReissueError('接続に失敗しました。時間をおいて再度お試しください。')
-        return
-      }
-      if (json.ok === true && typeof json.message === 'string') {
-        setReissueMessage(json.message)
-        return
-      }
-      if (json.ok === false && json.code === 'REQUEST_FAILED') {
-        setReissueError('しばらくしてから再度お試しください。')
-        return
-      }
-      setReissueError('接続に失敗しました。時間をおいて再度お試しください。')
-    } catch {
-      setReissueError('通信に失敗しました。')
-    } finally {
-      setReissueLoading(false)
     }
   }
 
@@ -184,14 +140,15 @@ export default function PaymentCompleteView({ paymentMethod, data, trialFlow, st
                 <p className="max-w-md text-lg leading-relaxed text-[#595c5e]">
                   {isEntitlementCard ? (
                     <>
-                      下のボタンから体験を開始できます（決済後7日間、いつでも再発行可能です）。
+                      このページの「体験を開始する」から、すぐに体験を始められます。
                       <br />
                       <span className="text-base text-[#595c5e]/90">
-                        メールのリンクは15分で切れます。切れた場合は
+                        あとから始める場合は、登録メールに届くリンクをご利用ください（15分有効）。
+                        リンクの期限が切れた場合は、
                         <Link to="/writing/trial/reissue" className="font-medium text-[#4052b6] underline">
                           再発行ページ
                         </Link>
-                        からお受け取りください。
+                        から新しいリンクを取得できます。
                       </span>
                     </>
                   ) : (
@@ -230,24 +187,6 @@ export default function PaymentCompleteView({ paymentMethod, data, trialFlow, st
                       </span>
                     ) : null}
                   </button>
-                  <button
-                    type="button"
-                    disabled={reissueLoading}
-                    onClick={() => void requestTrialReissueLink()}
-                    className="flex w-full items-center justify-center rounded-full border-2 border-[#4052b6] bg-white px-8 py-3.5 text-sm font-bold text-[#4052b6] transition-colors hover:bg-[#4052b6]/5 disabled:cursor-not-allowed disabled:opacity-70"
-                  >
-                    {reissueLoading ? '送信中…' : '体験リンクを再発行する'}
-                  </button>
-                  {reissueMessage ? (
-                    <p className="mt-1 text-center text-sm font-medium text-[#2c2f32]" role="status">
-                      {reissueMessage}
-                    </p>
-                  ) : null}
-                  {reissueError ? (
-                    <p className="mt-1 text-center text-sm font-medium text-[#b42318]" role="alert">
-                      {reissueError}
-                    </p>
-                  ) : null}
                   {trialStartError ? (
                     <p className="mt-1 text-center text-sm font-medium text-[#b42318]" role="alert">
                       {trialStartError}
@@ -281,12 +220,12 @@ export default function PaymentCompleteView({ paymentMethod, data, trialFlow, st
               <div className="flex items-start gap-3 rounded-xl bg-[#4052b6]/5 p-4">
                 <span className="material-symbols-outlined text-[#4052b6]">mail</span>
                 <div className="text-sm text-[#595c5e]">
-                  <span className="font-bold text-[#2c2f32]">確認メール:</span>
-                  ご登録のメールアドレスにもリンクをお送りしています（15分有効）。ページを閉じた場合やリンク切れのときは
+                  <span className="font-bold text-[#2c2f32]">メールでの再開:</span>
+                  登録メールには、あとから体験を始めるためのリンクもお送りします（15分有効）。リンクが切れた場合は
                   <Link to="/writing/trial/reissue" className="font-medium text-[#4052b6] underline">
                     再発行ページ
                   </Link>
-                  から再取得できます。
+                  から取得できます。
                 </div>
               </div>
             </div>
