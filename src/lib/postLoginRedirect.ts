@@ -16,5 +16,12 @@ export function postLoginRedirect(navigate: NavigateFunction, me: AuthMePayload)
     navigate('/writing/app', { replace: true })
     return
   }
+  if (typeof window !== 'undefined') {
+    try {
+      sessionStorage.setItem('writing_intro_login_banner', '1')
+    } catch {
+      /* ignore */
+    }
+  }
   navigate('/writing/intro', { replace: true })
 }

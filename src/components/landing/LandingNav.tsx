@@ -1,7 +1,8 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { useAuthMe } from '../../hooks/useAuthMe'
+import { apiUrl } from '../../lib/apiUrl'
 
 type Props = {
   goApp: () => void
@@ -33,7 +34,19 @@ export default function LandingNav({ goApp, anchorBase = '', curriculumHref }: P
   const [accountMenuOpen, setAccountMenuOpen] = useState(false)
   const accountDesktopRef = useRef<HTMLDivElement>(null)
   const accountMobileRef = useRef<HTMLDivElement>(null)
-  const { me, loading } = useAuthMe()
+  const { me, loading, refetch } = useAuthMe()
+
+  const handleLogout = useCallback(async () => {
+    try {
+      await fetch(apiUrl('/api/auth/logout'), { method: 'POST', credentials: 'include' })
+    } catch {
+      /* still clear client state */
+    }
+    await refetch()
+    setAccountMenuOpen(false)
+    setOpen(false)
+    navigate('/writing')
+  }, [navigate, refetch])
 
   const linkClass =
     "font-['Manrope'] font-bold tracking-tight text-sm uppercase text-[#1e1b13]/70 hover:text-[#000666] transition-colors"
@@ -88,46 +101,91 @@ export default function LandingNav({ goApp, anchorBase = '', curriculumHref }: P
           <a className={linkClass} href={`${anchorBase}#reviews`}>
             受講生の声
           </a>
-          <button
-            type="button"
-            onClick={goApp}
-            className="bg-[#000666] px-6 py-2 font-['Manrope'] text-sm font-bold uppercase tracking-widest text-white hover:opacity-90 active:scale-[0.99] transition-all rounded-lg"
-          >
-            お申し込み
-          </button>
-          <div className="relative" ref={accountDesktopRef}>
-            <button
-              type="button"
-              onClick={handleAccountClick}
-              disabled={loading}
-              aria-busy={loading}
-              aria-expanded={accountMenuOpen && !me?.user}
-              aria-haspopup={me?.user ? undefined : 'menu'}
-              className="material-symbols-outlined text-[#000666] cursor-pointer bg-transparent border-0 p-0 disabled:cursor-wait disabled:opacity-50"
-              aria-label="アカウント"
-            >
-              account_circle
-            </button>
-            {accountMenuOpen && !me?.user && !loading ? <AccountDropdown onClose={() => setAccountMenuOpen(false)} /> : null}
-          </div>
+          {me?.user && !loading ? (
+            <>
+              <Link
+                to="/writing/app/mypage"
+                className="rounded-lg border border-[#000666] bg-white px-5 py-2 font-['Manrope'] text-sm font-bold text-[#000666] hover:bg-[#000666]/5 transition-colors"
+              >
+                マイページ
+              </Link>
+              <button
+                type="button"
+                onClick={() => void handleLogout()}
+                className="font-['Manrope'] text-sm font-semibold text-[#1e1b13]/70 hover:text-[#000666] transition-colors"
+              >
+                ログアウト
+              </button>
+              <button
+                type="button"
+                onClick={goApp}
+                className="bg-[#000666] px-6 py-2 font-['Manrope'] text-sm font-bold uppercase tracking-widest text-white hover:opacity-90 active:scale-[0.99] transition-all rounded-lg"
+              >
+                お申し込み
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={goApp}
+                className="bg-[#000666] px-6 py-2 font-['Manrope'] text-sm font-bold uppercase tracking-widest text-white hover:opacity-90 active:scale-[0.99] transition-all rounded-lg"
+              >
+                お申し込み
+              </button>
+              <div className="relative" ref={accountDesktopRef}>
+                <button
+                  type="button"
+                  onClick={handleAccountClick}
+                  disabled={loading}
+                  aria-busy={loading}
+                  aria-expanded={accountMenuOpen && !me?.user}
+                  aria-haspopup={me?.user ? undefined : 'menu'}
+                  className="material-symbols-outlined text-[#000666] cursor-pointer bg-transparent border-0 p-0 disabled:cursor-wait disabled:opacity-50"
+                  aria-label="アカウント"
+                >
+                  account_circle
+                </button>
+                {accountMenuOpen && !me?.user && !loading ? <AccountDropdown onClose={() => setAccountMenuOpen(false)} /> : null}
+              </div>
+            </>
+          )}
         </div>
 
         <div className="flex md:hidden items-center gap-2">
-          <div className="relative" ref={accountMobileRef}>
-            <button
-              type="button"
-              onClick={handleAccountClick}
-              disabled={loading}
-              aria-busy={loading}
-              aria-expanded={accountMenuOpen && !me?.user}
-              aria-haspopup={me?.user ? undefined : 'menu'}
-              className="material-symbols-outlined text-[#000666] bg-transparent border-0 p-0 disabled:cursor-wait disabled:opacity-50"
-              aria-label="アカウント"
-            >
-              account_circle
-            </button>
-            {accountMenuOpen && !me?.user && !loading ? <AccountDropdown onClose={() => setAccountMenuOpen(false)} /> : null}
-          </div>
+          {me?.user && !loading ? (
+            <>
+              <Link
+                to="/writing/app/mypage"
+                className="font-['Manrope'] text-xs font-bold text-[#000666] px-1"
+              >
+                マイページ
+              </Link>
+              <button
+                type="button"
+                onClick={() => void handleLogout()}
+                className="font-['Manrope'] text-xs font-semibold text-[#1e1b13]/70 px-1"
+              >
+                ログアウト
+              </button>
+            </>
+          ) : (
+            <div className="relative" ref={accountMobileRef}>
+              <button
+                type="button"
+                onClick={handleAccountClick}
+                disabled={loading}
+                aria-busy={loading}
+                aria-expanded={accountMenuOpen && !me?.user}
+                aria-haspopup={me?.user ? undefined : 'menu'}
+                className="material-symbols-outlined text-[#000666] bg-transparent border-0 p-0 disabled:cursor-wait disabled:opacity-50"
+                aria-label="アカウント"
+              >
+                account_circle
+              </button>
+              {accountMenuOpen && !me?.user && !loading ? <AccountDropdown onClose={() => setAccountMenuOpen(false)} /> : null}
+            </div>
+          )}
           <button
             type="button"
             className="material-symbols-outlined text-[#000666] bg-transparent border-0 p-0"
@@ -163,13 +221,25 @@ export default function LandingNav({ goApp, anchorBase = '', curriculumHref }: P
           </button>
           <div className="mt-2 border-t border-[#1e1b13]/10 pt-3 flex flex-col gap-2">
             {me?.user ? (
-              <Link
-                to="/writing/app/mypage"
-                className="font-['Manrope'] text-sm font-bold text-[#000666]"
-                onClick={() => setOpen(false)}
-              >
-                マイページ
-              </Link>
+              <>
+                <Link
+                  to="/writing/app/mypage"
+                  className="font-['Manrope'] text-sm font-bold text-[#000666]"
+                  onClick={() => setOpen(false)}
+                >
+                  マイページ
+                </Link>
+                <button
+                  type="button"
+                  className="text-left font-['Manrope'] text-sm font-semibold text-[#1e1b13]/70"
+                  onClick={() => {
+                    setOpen(false)
+                    void handleLogout()
+                  }}
+                >
+                  ログアウト
+                </button>
+              </>
             ) : (
               <>
                 <Link
