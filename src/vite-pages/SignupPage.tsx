@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useRedirectIfLoggedIn } from '../hooks/useRedirectIfLoggedIn'
 import { tryAcceptPendingInviteAfterAuth } from '../lib/academyInviteFlow'
 import { apiUrl } from '../lib/apiUrl'
+import { readJsonBody } from '../lib/readJsonBody'
 import { postLoginRedirect } from '../lib/postLoginRedirect'
 import type { AuthMePayload } from '../types/authMe'
 
@@ -50,11 +51,15 @@ export default function SignupPage() {
           termsAccepted: true,
         }),
       })
-      const data = (await res.json()) as {
+      const data = await readJsonBody<{
         ok?: boolean
         needsEmailConfirmation?: boolean
         error?: string
         message?: string
+      }>(res)
+      if (!data) {
+        setError('通信に失敗しました。')
+        return
       }
       if (!res.ok || data.ok !== true) {
         if (data.error === 'password_policy' && data.message) {
@@ -78,7 +83,11 @@ export default function SignupPage() {
         navigate('/writing/login', { replace: true })
         return
       }
-      const me = (await meRes.json()) as AuthMePayload
+      const me = await readJsonBody<AuthMePayload>(meRes)
+      if (!me?.entitlements) {
+        navigate('/writing/login', { replace: true })
+        return
+      }
       postLoginRedirect(navigate, me)
     } catch {
       setError('通信に失敗しました。')

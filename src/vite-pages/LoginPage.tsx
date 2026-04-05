@@ -4,6 +4,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useRedirectIfLoggedIn } from '../hooks/useRedirectIfLoggedIn'
 import { tryAcceptPendingInviteAfterAuth } from '../lib/academyInviteFlow'
 import { apiUrl } from '../lib/apiUrl'
+import { readJsonBody } from '../lib/readJsonBody'
 import { postLoginRedirect } from '../lib/postLoginRedirect'
 import type { AuthMePayload } from '../types/authMe'
 
@@ -39,7 +40,11 @@ export default function LoginPage() {
         credentials: 'include',
         body: JSON.stringify({ email: email.trim(), password }),
       })
-      const data = (await res.json()) as { ok?: boolean; error?: string }
+      const data = await readJsonBody<{ ok?: boolean; error?: string }>(res)
+      if (!data) {
+        setError('通信に失敗しました。')
+        return
+      }
       if (!res.ok || data.ok !== true) {
         setError(GENERIC_LOGIN_ERROR)
         return
@@ -50,7 +55,11 @@ export default function LoginPage() {
         setError('セッションの確認に失敗しました。しばらくしてからお試しください。')
         return
       }
-      const me = (await meRes.json()) as AuthMePayload
+      const me = await readJsonBody<AuthMePayload>(meRes)
+      if (!me?.entitlements) {
+        setError('セッションの確認に失敗しました。しばらくしてからお試しください。')
+        return
+      }
       postLoginRedirect(navigate, me)
     } catch {
       setError('通信に失敗しました。')
