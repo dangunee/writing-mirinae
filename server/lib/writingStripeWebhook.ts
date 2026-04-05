@@ -1,6 +1,6 @@
 /**
- * Vercel Serverless — `vite build` では Next `app/api` がデプロイされないため、
- * このファイルで `/api/webhooks/stripe` を提供する。
+ * Shared handler for POST /api/webhooks/stripe (used by `app/api/webhooks/stripe/route.ts`).
+ * Legacy root `api/webhooks/stripe.ts` removed to avoid duplicate Vercel/Next function collision.
  *
  * Vercel Node ランタイムは `IncomingMessage` / `ServerResponse` を渡すことが多く、
  * Web `Request` の `arrayBuffer()` は存在しない → raw body を自前で読む。

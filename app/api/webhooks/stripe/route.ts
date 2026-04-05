@@ -1,10 +1,9 @@
-import { handleWritingStripeWebhookPost } from "../../../../api/webhooks/stripe";
+import { handleWritingStripeWebhookPost } from "../../../../server/lib/writingStripeWebhook";
 
 export const runtime = "nodejs";
 
 /**
- * POST /api/webhooks/stripe
- * 本番 Vercel では `api/webhooks/stripe.ts` が実体。`next dev` や将来 Next 単体ビルド用に残す。
+ * POST /api/webhooks/stripe — delegates to server/lib (single implementation; no duplicate root `api/` handler).
  */
 export async function POST(req: Request) {
   console.info("writing_stripe_webhook_next_route_entry", {
