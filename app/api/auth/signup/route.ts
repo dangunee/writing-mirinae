@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { getPublicOrigin } from "../../../../server/lib/authOrigin";
 import { validatePasswordPolicy } from "../../../../server/lib/passwordPolicy";
 import { createSupabaseServerClient } from "../../../../server/lib/supabaseServer";
 
@@ -48,10 +49,12 @@ export async function POST(req: Request) {
 
   try {
     const supabase = await createSupabaseServerClient();
+    const origin = getPublicOrigin(req);
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
+        emailRedirectTo: `${origin}/writing/login`,
         data: {
           full_name: fullName,
         },
@@ -59,6 +62,10 @@ export async function POST(req: Request) {
     });
     if (error) {
       console.error("auth_signup_supabase", error.message);
+      return NextResponse.json({ ok: false, error: "signup_failed" }, { status: 400 });
+    }
+    if (!data.user) {
+      console.error("auth_signup_no_user");
       return NextResponse.json({ ok: false, error: "signup_failed" }, { status: 400 });
     }
     const needsEmailConfirmation = !data.session;
