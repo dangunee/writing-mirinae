@@ -10,6 +10,8 @@ if (!base.endsWith('/')) {
 
 export default defineConfig({
   base,
+  /** Same-origin auth cookies: expose NEXT_PUBLIC_* to Vite client (matches Next server env names). */
+  envPrefix: ['VITE_', 'NEXT_PUBLIC_'],
   plugins: [react()],
   // [API 연결] Vite dev에서 Next `/api`로 프록시 (환경에 따라 `VITE_API_BASE_URL` 사용 가능)
   server: {

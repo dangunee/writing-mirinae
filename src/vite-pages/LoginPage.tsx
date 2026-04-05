@@ -1,12 +1,11 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
 import { useRedirectIfLoggedIn } from '../hooks/useRedirectIfLoggedIn'
-import { tryAcceptPendingInviteAfterAuth } from '../lib/academyInviteFlow'
 import { apiUrl } from '../lib/apiUrl'
+import { completeSessionLoginFlow } from '../lib/completeSessionLoginFlow'
 import { readJsonBody } from '../lib/readJsonBody'
-import { postLoginRedirect } from '../lib/postLoginRedirect'
-import type { AuthMePayload } from '../types/authMe'
+import { getSupabaseBrowserClient } from '../lib/supabaseBrowser'
 
 const GENERIC_LOGIN_ERROR = 'メールアドレスまたはパスワードが正しくありません。'
 
@@ -16,7 +15,10 @@ const INK_GRADIENT =
 export default function LoginPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const checkingSession = useRedirectIfLoggedIn()
+  const codeParam = searchParams.get('code')
+  const oauthCode = typeof codeParam === 'string' ? codeParam.trim() : ''
+  const skipSessionCheckWhileCode = oauthCode.length > 0
+  const checkingSession = useRedirectIfLoggedIn(!skipSessionCheckWhileCode)
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -24,8 +26,58 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const submitLockRef = useRef(false)
+  const codeExchangeStartedForRef = useRef<string | null>(null)
+  const [codeExchangeFinished, setCodeExchangeFinished] = useState(() => oauthCode.length === 0)
 
   const oauthError = searchParams.get('error') === 'oauth'
+
+  useEffect(() => {
+    if (oauthCode) {
+      setCodeExchangeFinished(false)
+    } else {
+      codeExchangeStartedForRef.current = null
+      setCodeExchangeFinished(true)
+    }
+  }, [oauthCode])
+
+  useEffect(() => {
+    if (!oauthCode) return
+    if (codeExchangeStartedForRef.current === oauthCode) return
+    codeExchangeStartedForRef.current = oauthCode
+
+    let cancelled = false
+    ;(async () => {
+      try {
+        const supabase = getSupabaseBrowserClient()
+        const { error: exchangeErr } = await supabase.auth.exchangeCodeForSession(oauthCode)
+        if (cancelled) return
+        if (exchangeErr) {
+          setError(GENERIC_LOGIN_ERROR)
+          setCodeExchangeFinished(true)
+          navigate('/writing/login', { replace: true })
+          return
+        }
+        const result = await completeSessionLoginFlow(navigate)
+        if (cancelled) return
+        if (!result.ok) {
+          setError('セッションの確認に失敗しました。しばらくしてからお試しください。')
+          setCodeExchangeFinished(true)
+          navigate('/writing/login', { replace: true })
+          return
+        }
+        /* postLoginRedirect navigates away; avoid setState after unmount */
+      } catch {
+        if (cancelled) return
+        setError(GENERIC_LOGIN_ERROR)
+        setCodeExchangeFinished(true)
+        navigate('/writing/login', { replace: true })
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [oauthCode, navigate])
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -49,18 +101,11 @@ export default function LoginPage() {
         setError(GENERIC_LOGIN_ERROR)
         return
       }
-      await tryAcceptPendingInviteAfterAuth()
-      const meRes = await fetch(apiUrl('/api/auth/me'), { credentials: 'include' })
-      if (!meRes.ok) {
+      const sessionResult = await completeSessionLoginFlow(navigate)
+      if (!sessionResult.ok) {
         setError('セッションの確認に失敗しました。しばらくしてからお試しください。')
         return
       }
-      const me = await readJsonBody<AuthMePayload>(meRes)
-      if (!me?.entitlements) {
-        setError('セッションの確認に失敗しました。しばらくしてからお試しください。')
-        return
-      }
-      postLoginRedirect(navigate, me)
     } catch {
       setError('通信に失敗しました。')
     } finally {
@@ -69,11 +114,13 @@ export default function LoginPage() {
     }
   }
 
-  if (checkingSession) {
+  const showBlockingLoader = checkingSession || (skipSessionCheckWhileCode && !codeExchangeFinished)
+
+  if (showBlockingLoader) {
     return (
       <div className="min-h-screen bg-[#f3f4f6] flex items-center justify-center px-6 py-12 font-body text-on-surface">
         <p className="text-sm text-on-surface-variant" role="status">
-          確認中…
+          {skipSessionCheckWhileCode ? 'ログイン処理中…' : '確認中…'}
         </p>
       </div>
     )
