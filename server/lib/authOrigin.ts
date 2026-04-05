@@ -2,6 +2,12 @@
  * OAuth callback redirects and Referer validation — allowlisted origins only (no open redirects).
  */
 
+/** Known writing-app deploy origins (env may duplicate; Set dedupes). No wildcards. */
+const WRITING_APP_STATIC_ORIGINS = [
+  "https://writing-mirinae.vercel.app",
+  "https://mirinae.jp",
+] as const;
+
 export function getPublicOrigin(request: Request): string {
   const forwardedHost = request.headers.get("x-forwarded-host");
   const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
@@ -14,6 +20,9 @@ export function getPublicOrigin(request: Request): string {
 
 export function collectAllowedOrigins(): Set<string> {
   const allowed = new Set<string>();
+  for (const o of WRITING_APP_STATIC_ORIGINS) {
+    allowed.add(o);
+  }
   for (const key of ["NEXT_PUBLIC_SITE_URL", "SITE_URL"] as const) {
     const v = process.env[key]?.trim();
     if (v) {
