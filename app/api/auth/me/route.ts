@@ -4,6 +4,7 @@ import {
   computeEntitlementsForUser,
   resolveRoleFromEnv,
   type AuthMePayload,
+  type AuthRole,
 } from "../../../../server/lib/authMe";
 import { getDb } from "../../../../server/db/client";
 import { createSupabaseServerClient } from "../../../../server/lib/supabaseServer";
@@ -35,9 +36,21 @@ export async function GET() {
       return NextResponse.json(body);
     }
 
-    const db = getDb();
-    const entitlements = await computeEntitlementsForUser(db, user.id);
-    const role = resolveRoleFromEnv(user.id);
+    let entitlements = {
+      hasTrial: false,
+      hasActiveCourse: false,
+      isAcademyUnlimited: false,
+    };
+    let role: AuthRole | null = null;
+    try {
+      const db = getDb();
+      entitlements = await computeEntitlementsForUser(db, user.id);
+      role = resolveRoleFromEnv(user.id);
+    } catch (dbErr) {
+      // Avoid 500 after successful login/signup when only Postgres/entitlements fail (e.g. missing DATABASE_URL).
+      console.error("auth_me_db_or_entitlements_failed", dbErr);
+      role = resolveRoleFromEnv(user.id);
+    }
 
     const body: AuthMePayload = {
       user: {
