@@ -4,6 +4,9 @@
  * - `VITE_API_BASE_URL` があればそのオリジンに接続（別ドメインの API 用）。
  * - 未設定時は相対パス `/api/...`（開発: Vite proxy → Next、本番: 同一オリジンの Vercel Serverless `api/`）。
  *
+ * `/api/auth/*` は常に同一オリジン（相対パス）のみ。Supabase セッション Cookie はこのデプロイの
+ * `api/auth/*` に送る必要があり、`VITE_API_BASE_URL`（例: mirinae-api）へ送ると 404/CORS で壊れる。
+ *
  * 体験決済（trial-payment）は writing-mirinae 同一デプロイの `api/writing/trial-payment/*` を叩く必要がある。
  * `VITE_API_BASE_URL` が mirinae-api 等を指していると Next/Vercel 側のハンドラに届かないため、
  * `trialPaymentApiUrl` は常に相対パス（同一オリジン）を返す。
@@ -15,6 +18,9 @@ function normalizePath(path: string): string {
 
 function resolveApiUrl(path: string): string {
   const p = normalizePath(path)
+  if (p.startsWith('/api/auth')) {
+    return p
+  }
   const raw = import.meta.env.VITE_API_BASE_URL?.trim() ?? ''
   if (raw) {
     return `${raw.replace(/\/$/, '')}${p}`
