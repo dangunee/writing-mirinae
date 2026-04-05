@@ -1,22 +1,34 @@
-import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 
 import { useRedirectIfLoggedIn } from '../hooks/useRedirectIfLoggedIn'
+import { parseAuthUrlParams } from '../lib/authUrlParams'
 import { apiUrl } from '../lib/apiUrl'
 import { completeSessionLoginFlow } from '../lib/completeSessionLoginFlow'
 import { readJsonBody } from '../lib/readJsonBody'
 import { getSupabaseBrowserClient } from '../lib/supabaseBrowser'
 
 const GENERIC_LOGIN_ERROR = 'メールアドレスまたはパスワードが正しくありません。'
+/** OAuth callback redirect (?error=oauth) — keep distinct from password generic */
+const OAUTH_CALLBACK_ERROR_MSG = 'ログインに失敗しました。しばらくしてからお試しください。'
 
 const INK_GRADIENT =
   'bg-gradient-to-br from-[#000666] to-[#1a237e] shadow-md hover:shadow-lg active:scale-[0.98] transition-all duration-200'
 
 export default function LoginPage() {
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
-  const codeParam = searchParams.get('code')
-  const oauthCode = typeof codeParam === 'string' ? codeParam.trim() : ''
+  const location = useLocation()
+
+  const parsedAuth = useMemo(
+    () => parseAuthUrlParams(location.search, location.hash),
+    [location.search, location.hash]
+  )
+
+  const oauthCode = useMemo(() => {
+    if (parsedAuth.error || parsedAuth.errorCode) return ''
+    return parsedAuth.code?.trim() ?? ''
+  }, [parsedAuth])
+
   const skipSessionCheckWhileCode = oauthCode.length > 0
   const checkingSession = useRedirectIfLoggedIn(!skipSessionCheckWhileCode)
 
@@ -27,9 +39,39 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const submitLockRef = useRef(false)
   const codeExchangeStartedForRef = useRef<string | null>(null)
+  const authUrlHandledRef = useRef<string | null>(null)
   const [codeExchangeFinished, setCodeExchangeFinished] = useState(() => oauthCode.length === 0)
 
-  const oauthError = searchParams.get('error') === 'oauth'
+  /** Supabase / OAuth redirect errors in search or hash — never show raw Supabase text */
+  useEffect(() => {
+    const { code, error, errorCode } = parseAuthUrlParams(location.search, location.hash)
+    const hasErr = Boolean(error || errorCode)
+    const hasCode = Boolean(code?.trim())
+
+    if (!hasErr && !hasCode) return
+    if (!hasErr && hasCode) return
+
+    const urlKey = `${location.pathname}${location.search}${location.hash}`
+    if (authUrlHandledRef.current === urlKey) return
+    authUrlHandledRef.current = urlKey
+
+    if (hasErr && hasCode) {
+      setError(GENERIC_LOGIN_ERROR)
+      setCodeExchangeFinished(true)
+      navigate('/writing/login', { replace: true })
+      return
+    }
+
+    if (hasErr) {
+      if (error === 'oauth' && !errorCode) {
+        setError(OAUTH_CALLBACK_ERROR_MSG)
+      } else {
+        setError(GENERIC_LOGIN_ERROR)
+      }
+      setCodeExchangeFinished(true)
+      navigate('/writing/login', { replace: true })
+    }
+  }, [location.pathname, location.search, location.hash, navigate])
 
   useEffect(() => {
     if (oauthCode) {
@@ -215,11 +257,6 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {oauthError ? (
-              <p className="rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container" role="alert">
-                ログインに失敗しました。しばらくしてからお試しください。
-              </p>
-            ) : null}
             {error ? (
               <p className="rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container" role="alert">
                 {error}
@@ -377,11 +414,6 @@ export default function LoginPage() {
                   </div>
                 </div>
 
-                {oauthError ? (
-                  <p className="rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container" role="alert">
-                    ログインに失敗しました。しばらくしてからお試しください。
-                  </p>
-                ) : null}
                 {error ? (
                   <p className="rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container" role="alert">
                     {error}
