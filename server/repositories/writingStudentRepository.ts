@@ -20,6 +20,11 @@ export async function findActiveWritingCourseForUser(db: Db, userId: string) {
   return rows[0] ?? null;
 }
 
+export async function getWritingCourseById(db: Db, courseId: string) {
+  const rows = await db.select().from(writingCourses).where(eq(writingCourses.id, courseId)).limit(1);
+  return rows[0] ?? null;
+}
+
 /** Unlock sessions whose time has passed (lazy unlock; no cron required). */
 export async function lazyUnlockDueSessions(db: Db, courseId: string) {
   const now = new Date();
@@ -101,6 +106,39 @@ export async function getSubmissionBySessionIdForGrant(db: Db, sessionId: string
       and(
         eq(writingSubmissions.sessionId, sessionId),
         eq(writingSubmissions.regularAccessGrantId, grantId)
+      )
+    )
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/** Trial: at most one in-flight submission per trial_application_id (draft..corrected). */
+export async function findActivePipelineSubmissionForTrial(db: Db, applicationId: string) {
+  const rows = await db
+    .select({
+      submission: writingSubmissions,
+      session: writingSessions,
+    })
+    .from(writingSubmissions)
+    .innerJoin(writingSessions, eq(writingSubmissions.sessionId, writingSessions.id))
+    .where(
+      and(
+        eq(writingSubmissions.trialApplicationId, applicationId),
+        inArray(writingSubmissions.status, ["draft", "submitted", "in_review", "corrected"])
+      )
+    )
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function getSubmissionBySessionIdForTrial(db: Db, sessionId: string, applicationId: string) {
+  const rows = await db
+    .select()
+    .from(writingSubmissions)
+    .where(
+      and(
+        eq(writingSubmissions.sessionId, sessionId),
+        eq(writingSubmissions.trialApplicationId, applicationId)
       )
     )
     .limit(1);
@@ -240,6 +278,64 @@ export async function submitSubmissionFinalForGrant(db: Db, submissionId: string
     )
     .returning();
   return updated ?? null;
+}
+
+export async function updateSubmissionDraftForTrial(
+  db: Db,
+  submissionId: string,
+  applicationId: string,
+  patch: {
+    bodyText: string | null;
+    imageStorageKey: string | null;
+    imageMimeType: string | null;
+  }
+) {
+  const [updated] = await db
+    .update(writingSubmissions)
+    .set({
+      ...patch,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(writingSubmissions.id, submissionId),
+        eq(writingSubmissions.trialApplicationId, applicationId),
+        eq(writingSubmissions.status, "draft")
+      )
+    )
+    .returning();
+  return updated ?? null;
+}
+
+export async function submitSubmissionFinalForTrial(db: Db, submissionId: string, applicationId: string) {
+  const now = new Date();
+  const [updated] = await db
+    .update(writingSubmissions)
+    .set({
+      status: "submitted",
+      submittedAt: now,
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(writingSubmissions.id, submissionId),
+        eq(writingSubmissions.trialApplicationId, applicationId),
+        eq(writingSubmissions.status, "draft")
+      )
+    )
+    .returning();
+  return updated ?? null;
+}
+
+export async function getSubmissionByIdForTrial(db: Db, submissionId: string, applicationId: string) {
+  const rows = await db
+    .select()
+    .from(writingSubmissions)
+    .where(
+      and(eq(writingSubmissions.id, submissionId), eq(writingSubmissions.trialApplicationId, applicationId))
+    )
+    .limit(1);
+  return rows[0] ?? null;
 }
 
 export type PublishedResultRow = {

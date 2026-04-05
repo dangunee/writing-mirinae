@@ -1,7 +1,21 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import WritingLayout from '../components/WritingLayout'
+import StudentAccountPanel from '../components/student/StudentAccountPanel'
 import { apiUrl } from '../lib/apiUrl'
+
+function ViewCorrectionShell({ children }: { children: ReactNode }) {
+  return (
+    <WritingLayout>
+      <div className="view-correction-page">
+        <div className="view-account-strip max-w-4xl mx-auto w-full px-4 pt-4">
+          <StudentAccountPanel compact />
+        </div>
+        {children}
+      </div>
+    </WritingLayout>
+  )
+}
 
 /** GET /api/writing/results/:id 성공 시 (getPublishedStudentResult) */
 type PublishedResultResponse = {
@@ -89,45 +103,37 @@ export default function ViewCorrectionPage() {
 
   if (loadState === 'loading') {
     return (
-      <WritingLayout>
-        <div className="view-correction-page">
-          <p>로딩 중...</p>
-          <Link to="/writing/app">목록으로</Link>
-        </div>
-      </WritingLayout>
+      <ViewCorrectionShell>
+        <p>로딩 중...</p>
+        <Link to="/writing/app">목록으로</Link>
+      </ViewCorrectionShell>
     )
   }
 
   if (loadState === 'not_found') {
     return (
-      <WritingLayout>
-        <div className="view-correction-page">
-          <p>제출 내용을 찾을 수 없습니다.</p>
-          <Link to="/writing/app">목록으로</Link>
-        </div>
-      </WritingLayout>
+      <ViewCorrectionShell>
+        <p>제출 내용을 찾을 수 없습니다.</p>
+        <Link to="/writing/app">목록으로</Link>
+      </ViewCorrectionShell>
     )
   }
 
   if (loadState === 'not_published') {
     return (
-      <WritingLayout>
-        <div className="view-correction-page">
-          <p>아직 공개되지 않았습니다.</p>
-          <Link to="/writing/app">목록으로</Link>
-        </div>
-      </WritingLayout>
+      <ViewCorrectionShell>
+        <p>아직 공개되지 않았습니다.</p>
+        <Link to="/writing/app">목록으로</Link>
+      </ViewCorrectionShell>
     )
   }
 
   if (loadState !== 'ok' || !result) {
     return (
-      <WritingLayout>
-        <div className="view-correction-page">
-          <p>제출 내용을 찾을 수 없습니다.</p>
-          <Link to="/writing/app">목록으로</Link>
-        </div>
-      </WritingLayout>
+      <ViewCorrectionShell>
+        <p>제출 내용을 찾을 수 없습니다.</p>
+        <Link to="/writing/app">목록으로</Link>
+      </ViewCorrectionShell>
     )
   }
 
@@ -137,32 +143,30 @@ export default function ViewCorrectionPage() {
   const hasCorrectedBody = (correctedText ?? '').trim() !== ''
 
   return (
-    <WritingLayout>
-      <div className="view-correction-page">
-        <div className="view-header">
-          <Link to="/writing/app" className="back-link">
-            ← 목록으로
-          </Link>
-          <h1>학생이 볼 수 있음 View</h1>
-          <p className="student-name">학생님의 첨삭 결과</p>
+    <ViewCorrectionShell>
+      <div className="view-header">
+        <Link to="/writing/app" className="back-link">
+          ← 목록으로
+        </Link>
+        <h1>학생이 볼 수 있음 View</h1>
+        <p className="student-name">학생님의 첨삭 결과</p>
+      </div>
+
+      <div className="correction-view">
+        <div className="view-section">
+          <h3>내가 제출한 글</h3>
+          <div className="original-content">{originalDisplay}</div>
         </div>
 
-        <div className="correction-view">
-          <div className="view-section">
-            <h3>내가 제출한 글</h3>
-            <div className="original-content">{originalDisplay}</div>
-          </div>
-
-          <div className="view-section">
-            <h3>강사님 첨삭</h3>
-            {hasCorrectedBody ? (
-              <div className="corrected-content">{correctedText}</div>
-            ) : (
-              <p className="pending">아직 첨삭이 완료되지 않았습니다.</p>
-            )}
-          </div>
+        <div className="view-section">
+          <h3>강사님 첨삭</h3>
+          {hasCorrectedBody ? (
+            <div className="corrected-content">{correctedText}</div>
+          ) : (
+            <p className="pending">아직 첨삭이 완료되지 않았습니다.</p>
+          )}
         </div>
       </div>
-    </WritingLayout>
+    </ViewCorrectionShell>
   )
 }

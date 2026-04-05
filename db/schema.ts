@@ -184,6 +184,25 @@ export const stripeWebhookEvents = pgTable("stripe_webhook_events", {
   payloadHash: text("payload_hash"),
 });
 
+/** One-time password reset tokens (server-issued; 15-minute TTL). */
+export const passwordResetTokens = pgTable(
+  "password_reset_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("password_reset_tokens_token_hash_uq").on(t.tokenHash),
+    index("password_reset_tokens_user_id_idx").on(t.userId),
+  ]
+);
+
 // -----------------------------------------------------------------------------
 // Writing app schema
 // -----------------------------------------------------------------------------
@@ -264,6 +283,45 @@ export const regularAccessTokens = writing.table(
   ]
 );
 
+export const academyInvites = writing.table(
+  "academy_invites",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tokenHash: text("token_hash").notNull(),
+    invitedEmail: text("invited_email"),
+    invitedName: text("invited_name"),
+    academyLabel: text("academy_label"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    usedByUserId: uuid("used_by_user_id").references(() => authUsers.id, { onDelete: "set null" }),
+    createdByUserId: uuid("created_by_user_id")
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("academy_invites_token_hash_unique").on(t.tokenHash),
+    index("idx_academy_invites_expires_at").on(t.expiresAt),
+    index("idx_academy_invites_invited_email").on(t.invitedEmail),
+    index("idx_academy_invites_used_at").on(t.usedAt),
+  ]
+);
+
+export const academyUnlimitedGrants = writing.table(
+  "academy_unlimited_grants",
+  {
+    userId: uuid("user_id")
+      .primaryKey()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    inviteId: uuid("invite_id")
+      .notNull()
+      .references(() => academyInvites.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("idx_academy_unlimited_grants_invite_id").on(t.inviteId)]
+);
+
 export const writingSessions = writing.table(
   "sessions",
   {
@@ -300,6 +358,8 @@ export const writingSubmissions = writing.table(
     regularAccessGrantId: uuid("regular_access_grant_id").references(() => regularAccessGrants.id, {
       onDelete: "cascade",
     }),
+    /** 体験申込 (writing.trial_applications)。提出の source of truth は本行の status / submitted_at（trial_applications に複製しない） */
+    trialApplicationId: uuid("trial_application_id"),
     status: submissionStatusEnum("status").notNull().default("draft"),
     bodyText: text("body_text"),
     imageStorageKey: text("image_storage_key"),
@@ -313,8 +373,8 @@ export const writingSubmissions = writing.table(
     index("idx_writing_submissions_user_status").on(t.userId, t.status),
     index("idx_writing_submissions_course_status").on(t.courseId, t.status),
     check(
-      "writing_submissions_user_or_grant_xor",
-      sql`(user_id IS NOT NULL AND regular_access_grant_id IS NULL) OR (user_id IS NULL AND regular_access_grant_id IS NOT NULL)`
+      "writing_submissions_access_xor",
+      sql`(user_id IS NOT NULL AND regular_access_grant_id IS NULL AND trial_application_id IS NULL) OR (user_id IS NULL AND regular_access_grant_id IS NOT NULL AND trial_application_id IS NULL) OR (user_id IS NULL AND regular_access_grant_id IS NULL AND trial_application_id IS NOT NULL)`
     ),
     uniqueIndex("writing_submissions_one_active_pipeline_per_user")
       .on(t.userId)
@@ -326,6 +386,12 @@ export const writingSubmissions = writing.table(
       .where(
         sql`regular_access_grant_id IS NOT NULL AND status IN ('draft', 'submitted', 'in_review', 'corrected')`
       ),
+    uniqueIndex("writing_submissions_one_active_pipeline_per_trial")
+      .on(t.trialApplicationId)
+      .where(
+        sql`trial_application_id IS NOT NULL AND status IN ('draft', 'submitted', 'in_review', 'corrected')`
+      ),
+    index("idx_writing_submissions_trial_application_id").on(t.trialApplicationId),
   ]
 );
 

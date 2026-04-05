@@ -48,6 +48,7 @@ export function validateImageUpload(params: {
 export function buildStorageObjectKey(params: {
   userId?: string;
   regularAccessGrantId?: string;
+  trialApplicationId?: string;
   submissionId: string;
   mimeType: string;
 }): { storageKey: string; extension: string } {
@@ -62,7 +63,9 @@ export function buildStorageObjectKey(params: {
       ? params.userId
       : params.regularAccessGrantId != null
         ? `regular-grants/${params.regularAccessGrantId}`
-        : null;
+        : params.trialApplicationId != null
+          ? `trial-apps/${params.trialApplicationId}`
+          : null;
   if (!prefix) {
     throw new Error("storage owner required");
   }

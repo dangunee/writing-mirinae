@@ -1,48 +1,35 @@
 import { useEffect, useState } from 'react'
-import { Outlet, Navigate } from 'react-router-dom'
+import { Outlet, Navigate, useLocation } from 'react-router-dom'
+
 import { apiUrl } from './lib/apiUrl'
+import { canAccessWritingStudentApp } from './lib/authEntitlements'
+import type { AuthMePayload } from './types/authMe'
 
-type StudentGuardState = 'loading' | 'ok' | 'unauthorized' | 'error'
+type AuthGuardState = 'loading' | 'ok' | 'unauthorized' | 'error'
 
-/** 학생 화면: 로그인(세션) 여부만 확인. 401이 아니면 통과(200·404 등). */
-export function StudentRouteGuard() {
-  const [state, setState] = useState<StudentGuardState>('loading')
+/**
+ * 로그인(세션) 필수 — GET /api/auth/me 의 user 로만 판단.
+ */
+export function AuthRouteGuard() {
+  const [state, setState] = useState<AuthGuardState>('loading')
+  const location = useLocation()
 
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       try {
-        const res = await fetch(apiUrl('/api/writing/sessions/current'), {
-          credentials: 'include',
-        })
+        const res = await fetch(apiUrl('/api/auth/me'), { credentials: 'include' })
         if (cancelled) return
-        if (res.status !== 401) {
-          setState('ok')
+        if (!res.ok) {
+          setState('error')
           return
         }
-        const trialRes = await fetch(apiUrl('/api/writing/trial/session/current'), {
-          credentials: 'include',
-        })
-        if (cancelled) return
-        if (trialRes.ok) {
-          const data = (await trialRes.json()) as { ok?: boolean }
-          if (data?.ok === true) {
-            setState('ok')
-            return
-          }
+        const data = (await res.json()) as AuthMePayload
+        if (!data.user) {
+          setState('unauthorized')
+          return
         }
-        const regularRes = await fetch(apiUrl('/api/writing/regular/session/current'), {
-          credentials: 'include',
-        })
-        if (cancelled) return
-        if (regularRes.ok) {
-          const data = (await regularRes.json()) as { ok?: boolean }
-          if (data?.ok === true) {
-            setState('ok')
-            return
-          }
-        }
-        setState('unauthorized')
+        setState('ok')
       } catch {
         if (!cancelled) setState('error')
       }
@@ -60,13 +47,7 @@ export function StudentRouteGuard() {
     )
   }
   if (state === 'unauthorized') {
-    return (
-      <div className="writing-page">
-        <p className="status pending">
-          로그인이 필요합니다. 체험은 메일의 접근 링크를 사용해 주세요. / ログインが必要です。体験はメールのリンクからアクセスしてください。
-        </p>
-      </div>
-    )
+    return <Navigate to="/writing/login" replace state={{ from: location.pathname }} />
   }
   if (state === 'error') {
     return (
@@ -78,33 +59,56 @@ export function StudentRouteGuard() {
   return <Outlet />
 }
 
-type TeacherGuardState = 'loading' | 'ok' | 'unauthorized' | 'forbidden' | 'error'
+type EntitlementState =
+  | 'loading'
+  | 'ok'
+  | 'unauthorized'
+  | 'no_entitlement'
+  | 'teacher_no_student_access'
+  | 'error'
 
-/** 강사 화면: queue 조회로 권한 확인. 200만 통과. */
-export function TeacherRouteGuard() {
-  const [state, setState] = useState<TeacherGuardState>('loading')
+/**
+ * 체험 / 유료 코스 / academy_unlimited 중 하나 필요. 세션의 user 로만 판단.
+ */
+export function EntitlementRouteGuard() {
+  const [state, setState] = useState<EntitlementState>('loading')
 
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       try {
-        const res = await fetch(apiUrl('/api/teacher/writing/submissions/queue'), {
-          credentials: 'include',
-        })
+        const meRes = await fetch(apiUrl('/api/auth/me'), { credentials: 'include' })
         if (cancelled) return
-        if (res.status === 401) {
-          setState('unauthorized')
+        if (!meRes.ok) {
+          setState('error')
           return
         }
-        if (res.status === 403) {
-          setState('forbidden')
-          return
-        }
-        if (res.status === 200) {
+        const data = (await meRes.json()) as AuthMePayload
+
+        if (data.user && canAccessWritingStudentApp(data.entitlements)) {
           setState('ok')
           return
         }
-        setState('error')
+
+        const curRes = await fetch(apiUrl('/api/writing/sessions/current'), { credentials: 'include' })
+        if (cancelled) return
+        if (curRes.ok) {
+          const cur = (await curRes.json()) as { ok?: boolean }
+          if (cur?.ok === true) {
+            setState('ok')
+            return
+          }
+        }
+
+        if (!data.user) {
+          setState('unauthorized')
+          return
+        }
+        if (data.role === 'teacher' || data.role === 'admin') {
+          setState('teacher_no_student_access')
+          return
+        }
+        setState('no_entitlement')
       } catch {
         if (!cancelled) setState('error')
       }
@@ -122,14 +126,77 @@ export function TeacherRouteGuard() {
     )
   }
   if (state === 'unauthorized') {
+    return <Navigate to="/writing/login" replace />
+  }
+  if (state === 'teacher_no_student_access') {
+    return <Navigate to="/writing/teacher" replace />
+  }
+  if (state === 'no_entitlement') {
+    return <Navigate to="/writing/intro" replace />
+  }
+  if (state === 'error') {
     return (
       <div className="writing-page">
-        <p className="status pending">로그인이 필요합니다.</p>
+        <p className="status pending">일시적으로 확인할 수 없습니다.</p>
       </div>
     )
   }
+  return <Outlet />
+}
+
+/** Alias for spec naming */
+export { EntitlementRouteGuard as EntitlementGuard }
+
+/** @deprecated Use AuthRouteGuard */
+export { AuthRouteGuard as StudentRouteGuard }
+
+type TeacherGuardState = 'loading' | 'ok' | 'unauthorized' | 'forbidden' | 'error'
+
+/** 강사/관리자: GET /api/auth/me 의 role 로만 판단. */
+export function TeacherRouteGuard() {
+  const [state, setState] = useState<TeacherGuardState>('loading')
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch(apiUrl('/api/auth/me'), { credentials: 'include' })
+        if (cancelled) return
+        if (!res.ok) {
+          setState('error')
+          return
+        }
+        const data = (await res.json()) as AuthMePayload
+        if (!data.user) {
+          setState('unauthorized')
+          return
+        }
+        if (data.role !== 'teacher' && data.role !== 'admin') {
+          setState('forbidden')
+          return
+        }
+        setState('ok')
+      } catch {
+        if (!cancelled) setState('error')
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  if (state === 'loading') {
+    return (
+      <div className="writing-page">
+        <p className="status pending">확인 중…</p>
+      </div>
+    )
+  }
+  if (state === 'unauthorized') {
+    return <Navigate to="/writing/login" replace />
+  }
   if (state === 'forbidden') {
-    return <Navigate to="/" replace />
+    return <Navigate to="/writing" replace />
   }
   if (state === 'error') {
     return (

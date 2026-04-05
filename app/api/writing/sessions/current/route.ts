@@ -7,6 +7,7 @@ import { advanceRegularGrantToNextCourseIfNeeded } from "../../../../../server/s
 import {
   getCurrentSessionForRegularGrant,
   getCurrentSessionForStudent,
+  getCurrentSessionForTrialApplication,
 } from "../../../../../server/services/writingStudentService";
 
 export const runtime = "nodejs";
@@ -48,12 +49,24 @@ export async function GET(req: Request) {
           application?: { id?: string; accessExpiresAt?: string | null };
         };
         if (j?.ok === true && j.application?.id) {
+          const applicationId = j.application.id;
+          const accessExpiresAt = j.application.accessExpiresAt ?? null;
+          const trialCourseId = process.env.WRITING_TRIAL_COURSE_ID?.trim();
+          if (trialCourseId) {
+            const trialSession = await getCurrentSessionForTrialApplication(db, applicationId);
+            if (trialSession.ok === true && trialSession.accessKind === "trial") {
+              return NextResponse.json({
+                ...trialSession,
+                accessExpiresAt: accessExpiresAt ?? trialSession.accessExpiresAt,
+              });
+            }
+          }
           return NextResponse.json({
             ok: true,
             accessKind: "trial" as const,
-            applicationId: j.application.id,
+            applicationId,
             canSubmit: true,
-            expiresAt: j.application.accessExpiresAt ?? null,
+            expiresAt: accessExpiresAt,
           });
         }
       }

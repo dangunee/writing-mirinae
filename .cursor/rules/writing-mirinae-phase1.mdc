@@ -1,0 +1,32 @@
+---
+description: Writing-Mirinae Phase 1 — auth, RBAC, route guards, integration
+alwaysApply: true
+---
+
+# Writing-Mirinae Project Rules (Phase 1 Refined)
+
+## 1. Authentication & Security
+
+- **Auth Strategy:** Supabase Auth with Cookie-based sessions.
+- **Server-side Auth:** Always use `createSupabaseServerClient` and `getSessionUserId` from `server/lib/supabaseServer.ts`.
+- **Security Rule:** NEVER accept `userId` from the request body or query params. Extract it from the server session only.
+- **Database:** Use Drizzle ORM. Database access is only allowed in Next.js Route Handlers (Server-side).
+
+## 2. Roles & Permissions (RBAC)
+
+- Roles: `admin`, `teacher`, `student`.
+- Logic: Defined in `server/lib/authMe.ts` using `ADMIN_USER_IDS`, `TEACHER_USER_IDS` env variables.
+
+## 3. Routing & Guards (Critical)
+
+- **`AuthRouteGuard`:** Requires `user` session (`GET /api/auth/me`).
+- **`TeacherRouteGuard`:** Requires `role` to be `teacher` or `admin`.
+- **`EntitlementRouteGuard`:**
+  - **Primary:** Check `me.entitlements` (active course / trial / academy flags from server).
+  - **Backward Compatibility:** Also allow access if `GET /api/writing/sessions/current` returns `{ ok: true }` (existing trial / email-link cookie flows).
+- **Redirects:** Always use `src/lib/postLoginRedirect.ts` for post-auth routing.
+
+## 4. Integration Guidelines
+
+- Refactor existing APIs to stop using client-provided `userId`.
+- Ensure new pages follow the Stitch UI tone; auth-related full-bleed pages must be added to the layout exception list in `src/components/Layout.tsx`.

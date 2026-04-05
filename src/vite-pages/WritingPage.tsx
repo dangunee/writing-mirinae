@@ -1,13 +1,15 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
+import StudentAccountPanel from '../components/student/StudentAccountPanel'
 import AssignmentSubmitScreen from '../components/writing/AssignmentSubmitScreen'
 import { apiUrl } from '../lib/apiUrl'
 import type { AccessContext } from '../types/writingAccess'
 
-/** GET /api/writing/sessions/current — student / regular course session (unified) */
+/** GET /api/writing/sessions/current — student / regular / trial course session (unified) */
 type CurrentSessionOk = {
   ok: true
-  accessKind?: 'student' | 'regular'
+  accessKind?: 'student' | 'regular' | 'trial'
+  applicationId?: string
   grantId?: string
   accessExpiresAt?: string | null
   pendingSubmissionId?: string | null
@@ -58,6 +60,12 @@ export default function WritingPage() {
         | { ok: true; accessKind: 'trial'; applicationId: string; canSubmit: boolean; expiresAt: string | null }
         | { ok: false }
       if (data && 'ok' in data && data.ok === true && 'accessKind' in data && data.accessKind === 'trial') {
+        if ('courseId' in data && typeof (data as CurrentSessionOk).courseId === 'string') {
+          const d = data as CurrentSessionOk
+          setCurrent(d)
+          setAccessContext({ type: 'trial' })
+          return
+        }
         setCurrent(null)
         setAccessContext({ type: 'trial' })
         return
@@ -247,6 +255,9 @@ export default function WritingPage() {
 
   return (
     <div className="writing-submit-page writing-stitch-root">
+      <div className="max-w-6xl mx-auto px-4 pt-4 w-full">
+        <StudentAccountPanel compact />
+      </div>
       <AssignmentSubmitScreen
         accessContext={accessContext}
         text={content}

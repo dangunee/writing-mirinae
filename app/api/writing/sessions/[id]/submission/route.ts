@@ -2,10 +2,13 @@ import { NextResponse } from "next/server";
 
 import { getDb } from "../../../../../../server/db/client";
 import { parseRegularWritingGrantIdFromCookieHeader } from "../../../../../../server/lib/regularSessionCookie";
+import { fetchTrialApplicationIdFromMirinaeSessionCookie } from "../../../../../../server/lib/writingTrialUpstream";
+import { requireWritingSubmissionEntitlement } from "../../../../../../server/lib/authMe";
 import { getSessionUserId } from "../../../../../../server/lib/supabaseServer";
 import {
   saveOrSubmitSubmission,
   saveOrSubmitSubmissionForRegular,
+  saveOrSubmitSubmissionForTrial,
 } from "../../../../../../server/services/writingStudentService";
 
 export const runtime = "nodejs";
@@ -13,18 +16,34 @@ export const dynamic = "force-dynamic";
 
 /**
  * POST /api/writing/sessions/:id/submission
- * Security: identity from session or verified regular cookie; reject client-supplied userId/status/courseId.
- * Abuse mitigation: body size (platform + WRITING_MAX_BODY_TEXT_CHARS), MIME/size on images, unique index on active pipeline.
+ * Security: userId only from `getSessionUserId()` (never from body). Rejects client-supplied identity/ownership fields.
+ * Logged-in users: `requireWritingSubmissionEntitlement` (Drizzle-backed) before save.
+ * Trial / regular-mail: unchanged (cookie-derived trialApplicationId / grantId).
+ * Abuse mitigation: body size, MIME/size on images, unique index on active pipeline.
  */
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
   const userId = await getSessionUserId();
-  const grantId = parseRegularWritingGrantIdFromCookieHeader(req.headers.get("cookie"));
+  const cookieHeader = req.headers.get("cookie");
+  const grantId = parseRegularWritingGrantIdFromCookieHeader(cookieHeader);
+  const trialApplicationId =
+    !userId && !grantId ? await fetchTrialApplicationIdFromMirinaeSessionCookie(cookieHeader) : null;
 
-  if (!userId && !grantId) {
+  if (!userId && !grantId && !trialApplicationId) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   if (userId && grantId) {
     return NextResponse.json({ error: "ambiguous_identity" }, { status: 400 });
+  }
+  if (trialApplicationId && (userId || grantId)) {
+    return NextResponse.json({ error: "ambiguous_identity" }, { status: 400 });
+  }
+
+  const db = getDb();
+  if (userId) {
+    const gate = await requireWritingSubmissionEntitlement(db, userId);
+    if (!gate.ok) {
+      return NextResponse.json({ error: "insufficient_entitlement" }, { status: 403 });
+    }
   }
 
   const { id: sessionId } = await context.params;
@@ -37,6 +56,24 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
 
   if (contentType.includes("multipart/form-data")) {
     const form = await req.formData();
+    const forbiddenFormKeys = [
+      "userId",
+      "user_id",
+      "status",
+      "courseId",
+      "course_id",
+      "sessionId",
+      "session_id",
+      "grantId",
+      "grant_id",
+      "trialApplicationId",
+      "trial_application_id",
+    ];
+    for (const k of forbiddenFormKeys) {
+      if (form.has(k)) {
+        return NextResponse.json({ error: "forbidden_fields" }, { status: 400 });
+      }
+    }
     const act = form.get("action");
     action = act === "submit" ? "submit" : "save";
     const bt = form.get("bodyText");
@@ -53,8 +90,23 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     } catch {
       return NextResponse.json({ error: "invalid_json" }, { status: 400 });
     }
-    if ("userId" in json || "status" in json || "courseId" in json || "sessionId" in json) {
-      return NextResponse.json({ error: "forbidden_fields" }, { status: 400 });
+    const forbiddenJsonKeys = [
+      "userId",
+      "user_id",
+      "status",
+      "courseId",
+      "course_id",
+      "sessionId",
+      "session_id",
+      "grantId",
+      "grant_id",
+      "trialApplicationId",
+      "trial_application_id",
+    ];
+    for (const k of forbiddenJsonKeys) {
+      if (k in json) {
+        return NextResponse.json({ error: "forbidden_fields" }, { status: 400 });
+      }
     }
     action = json.action === "submit" ? "submit" : "save";
     bodyText = typeof json.bodyText === "string" ? json.bodyText : null;
@@ -62,24 +114,32 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     return NextResponse.json({ error: "unsupported_content_type" }, { status: 415 });
   }
 
-  const db = getDb();
-  const result = userId
-    ? await saveOrSubmitSubmission(db, {
-        userId,
+  const result = trialApplicationId
+    ? await saveOrSubmitSubmissionForTrial(db, {
+        trialApplicationId,
         sessionId,
         action,
         bodyText,
         imageBuffer,
         imageMimeType,
       })
-    : await saveOrSubmitSubmissionForRegular(db, {
-        grantId: grantId!,
-        sessionId,
-        action,
-        bodyText,
-        imageBuffer,
-        imageMimeType,
-      });
+    : userId
+      ? await saveOrSubmitSubmission(db, {
+          userId,
+          sessionId,
+          action,
+          bodyText,
+          imageBuffer,
+          imageMimeType,
+        })
+      : await saveOrSubmitSubmissionForRegular(db, {
+          grantId: grantId!,
+          sessionId,
+          action,
+          bodyText,
+          imageBuffer,
+          imageMimeType,
+        });
 
   if (!result.ok) {
     return NextResponse.json({ error: result.code }, { status: result.status });

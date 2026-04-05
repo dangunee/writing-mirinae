@@ -78,6 +78,32 @@ export type CurrentSessionResponse =
       canSubmit: boolean;
       reasonIfNot?: string;
     }
+  | {
+      ok: true;
+      accessKind: "trial";
+      applicationId: string;
+      courseId: string;
+      accessExpiresAt: string | null;
+      pendingSubmissionId: string | null;
+      mode: "pipeline" | "fresh" | "all_done";
+      session: {
+        id: string;
+        courseId: string;
+        index: number;
+        unlockAt: string;
+        status: string;
+      } | null;
+      submission: {
+        id: string;
+        status: string;
+        bodyText: string | null;
+        imageStorageKey: string | null;
+        imageMimeType: string | null;
+        submittedAt: string | null;
+      } | null;
+      canSubmit: boolean;
+      reasonIfNot?: string;
+    }
   | { ok: false; error: "no_active_course" };
 
 /**
@@ -351,6 +377,153 @@ export async function getCurrentSessionForRegularGrant(db: Db, grantId: string):
   };
 }
 
+function getTrialWritingCourseId(): string | null {
+  const raw = process.env.WRITING_TRIAL_COURSE_ID?.trim();
+  return raw || null;
+}
+
+/**
+ * 体験: trial_application_id は Cookie 経由の upstream 検証後にのみ渡す。
+ * 提出データの source of truth は writing.submissions（trial_application_id）。
+ */
+export async function getCurrentSessionForTrialApplication(
+  db: Db,
+  applicationId: string
+): Promise<CurrentSessionResponse> {
+  const courseId = getTrialWritingCourseId();
+  if (!courseId) {
+    return { ok: false, error: "no_active_course" };
+  }
+  const course = await repo.getWritingCourseById(db, courseId);
+  if (!course || course.status !== "active") {
+    return { ok: false, error: "no_active_course" };
+  }
+
+  await repo.lazyUnlockDueSessions(db, course.id);
+  const sessions = await repo.listSessionsForCourseOrdered(db, course.id);
+
+  const pipeline = await repo.findActivePipelineSubmissionForTrial(db, applicationId);
+  if (pipeline) {
+    return {
+      ok: true,
+      accessKind: "trial",
+      applicationId,
+      courseId: course.id,
+      accessExpiresAt: null,
+      pendingSubmissionId: pipeline.submission.id,
+      mode: "pipeline",
+      session: {
+        id: pipeline.session.id,
+        courseId: pipeline.session.courseId,
+        index: pipeline.session.index,
+        unlockAt: pipeline.session.unlockAt.toISOString(),
+        status: pipeline.session.status,
+      },
+      submission: {
+        id: pipeline.submission.id,
+        status: pipeline.submission.status,
+        bodyText: pipeline.submission.bodyText,
+        imageStorageKey: pipeline.submission.imageStorageKey,
+        imageMimeType: pipeline.submission.imageMimeType,
+        submittedAt: pipeline.submission.submittedAt?.toISOString() ?? null,
+      },
+      canSubmit: pipeline.submission.status === "draft",
+      reasonIfNot:
+        pipeline.submission.status === "draft"
+          ? undefined
+          : "pipeline_in_review_wait_for_result",
+    };
+  }
+
+  const now = new Date();
+  for (const s of sessions) {
+    if (s.status === "completed") continue;
+
+    const lower = sessions.filter((x) => x.index < s.index);
+    const prevAllCompleted = lower.every((x) => x.status === "completed");
+    if (!prevAllCompleted) {
+      const blocker = lower.find((x) => x.status !== "completed");
+      if (blocker) {
+        return {
+          ok: true,
+          accessKind: "trial",
+          applicationId,
+          courseId: course.id,
+          accessExpiresAt: null,
+          pendingSubmissionId: null,
+          mode: "fresh",
+          session: {
+            id: blocker.id,
+            courseId: blocker.courseId,
+            index: blocker.index,
+            unlockAt: blocker.unlockAt.toISOString(),
+            status: blocker.status,
+          },
+          submission: null,
+          canSubmit: false,
+          reasonIfNot: "complete_previous_sessions_first",
+        };
+      }
+    }
+
+    const timeOk = s.unlockAt <= now;
+    if (!timeOk) {
+      return {
+        ok: true,
+        accessKind: "trial",
+        applicationId,
+        courseId: course.id,
+        accessExpiresAt: null,
+        pendingSubmissionId: null,
+        mode: "fresh",
+        session: {
+          id: s.id,
+          courseId: s.courseId,
+          index: s.index,
+          unlockAt: s.unlockAt.toISOString(),
+          status: s.status,
+        },
+        submission: null,
+        canSubmit: false,
+        reasonIfNot: "session_not_unlocked_yet",
+      };
+    }
+
+    return {
+      ok: true,
+      accessKind: "trial",
+      applicationId,
+      courseId: course.id,
+      accessExpiresAt: null,
+      pendingSubmissionId: null,
+      mode: "fresh",
+      session: {
+        id: s.id,
+        courseId: s.courseId,
+        index: s.index,
+        unlockAt: s.unlockAt.toISOString(),
+        status: s.status,
+      },
+      submission: null,
+      canSubmit: true,
+    };
+  }
+
+  return {
+    ok: true,
+    accessKind: "trial",
+    applicationId,
+    courseId: course.id,
+    accessExpiresAt: null,
+    pendingSubmissionId: null,
+    mode: "all_done",
+    session: null,
+    submission: null,
+    canSubmit: false,
+    reasonIfNot: "all_sessions_completed",
+  };
+}
+
 function hasSubstantiveContent(bodyText: string | null | undefined, imageKey: string | null | undefined) {
   const t = bodyText?.trim() ?? "";
   if (t.length > 0) return true;
@@ -369,6 +542,15 @@ export type SaveSubmissionInput = {
 
 export type SaveSubmissionRegularInput = {
   grantId: string;
+  sessionId: string;
+  action: "save" | "submit";
+  bodyText: string | null;
+  imageBuffer: Buffer | null;
+  imageMimeType: string | null;
+};
+
+export type SaveSubmissionTrialInput = {
+  trialApplicationId: string;
   sessionId: string;
   action: "save" | "submit";
   bodyText: string | null;
@@ -801,6 +983,224 @@ export async function saveOrSubmitSubmissionForRegular(
           return { ok: false, status: 422, code: "empty_submission" };
         }
         const fin = await repo.submitSubmissionFinalForGrant(tx, submissionId!, input.grantId);
+        if (!fin) {
+          return { ok: false, status: 409, code: "submit_failed" };
+        }
+        return { ok: true, submissionId: fin.id, status: fin.status };
+      }
+
+      return { ok: true, submissionId: sub.id, status: sub.status };
+    });
+  } catch (e) {
+    if (e instanceof PostgresError && e.code === "23505") {
+      return { ok: false, status: 409, code: "active_submission_conflict" };
+    }
+    throw e;
+  }
+}
+
+/**
+ * 体験: trial_application_id は Cookie→mirinae-api で検証済みの値のみ渡す。
+ * writing.submissions.trial_application_id が提出の source of truth。
+ */
+export async function saveOrSubmitSubmissionForTrial(
+  db: Db,
+  input: SaveSubmissionTrialInput
+): Promise<SaveSubmissionResult> {
+  const lenErr = assertBodyTextLength(input.bodyText);
+  if (lenErr) return lenErr;
+
+  const courseIdEnv = getTrialWritingCourseId();
+  if (!courseIdEnv) {
+    return { ok: false, status: 503, code: "trial_course_not_configured" };
+  }
+
+  const trialCourse = await repo.getWritingCourseById(db, courseIdEnv);
+  if (!trialCourse || trialCourse.status !== "active") {
+    return { ok: false, status: 404, code: "session_not_found" };
+  }
+
+  const row = await repo.getSessionByIdWithCourse(db, input.sessionId);
+  if (!row || row.course.id !== trialCourse.id) {
+    return { ok: false, status: 404, code: "session_not_found" };
+  }
+  if (row.course.status !== "active") {
+    return { ok: false, status: 409, code: "course_not_active" };
+  }
+
+  await repo.lazyUnlockDueSessions(db, row.course.id);
+  const refreshed = await repo.getSessionByIdWithCourse(db, input.sessionId);
+  if (!refreshed) {
+    return { ok: false, status: 404, code: "session_not_found" };
+  }
+  const session = refreshed.session;
+
+  const now = new Date();
+  if (session.status === "completed") {
+    return { ok: false, status: 409, code: "session_completed" };
+  }
+  if (session.unlockAt > now) {
+    return { ok: false, status: 409, code: "session_locked" };
+  }
+
+  const sessions = await repo.listSessionsForCourseOrdered(db, row.course.id);
+  const lower = sessions.filter((x) => x.index < session.index);
+  if (!lower.every((x) => x.status === "completed")) {
+    return { ok: false, status: 409, code: "complete_previous_sessions_first" };
+  }
+
+  const pipeline = await repo.findActivePipelineSubmissionForTrial(db, input.trialApplicationId);
+  if (pipeline && pipeline.session.id !== input.sessionId) {
+    return { ok: false, status: 409, code: "active_submission_on_other_session" };
+  }
+
+  let existing = await repo.getSubmissionBySessionIdForTrial(db, input.sessionId, input.trialApplicationId);
+  if (!existing && pipeline && pipeline.session.id === input.sessionId) {
+    existing = pipeline.submission;
+  }
+
+  if (existing && existing.trialApplicationId !== input.trialApplicationId) {
+    return { ok: false, status: 403, code: "forbidden" };
+  }
+
+  if (existing && existing.status !== "draft") {
+    return { ok: false, status: 409, code: "submission_not_editable" };
+  }
+
+  let imageKey = existing?.imageStorageKey ?? null;
+  let imageMime = existing?.imageMimeType ?? null;
+
+  if (input.imageBuffer && input.imageMimeType) {
+    const v = validateImageUpload({
+      mimeType: input.imageMimeType,
+      byteLength: input.imageBuffer.length,
+    });
+    if (!v.ok) {
+      return { ok: false, status: 400, code: v.reason };
+    }
+  }
+
+  try {
+    return await db.transaction(async (tx) => {
+      let submissionId = existing?.id;
+
+      if (input.imageBuffer && input.imageMimeType) {
+        const v = validateImageUpload({
+          mimeType: input.imageMimeType,
+          byteLength: input.imageBuffer.length,
+        });
+        if (!v.ok) {
+          return { ok: false, status: 400, code: v.reason };
+        }
+
+        if (!submissionId) {
+          try {
+            const ins = await repo.insertSubmission(tx, {
+              sessionId: input.sessionId,
+              courseId: row.course.id,
+              userId: null,
+              regularAccessGrantId: null,
+              trialApplicationId: input.trialApplicationId,
+              status: "draft",
+              bodyText: input.bodyText,
+              imageStorageKey: null,
+              imageMimeType: null,
+              submittedAt: null,
+            });
+            submissionId = ins.id;
+          } catch (e) {
+            if (e instanceof PostgresError && e.code === "23505") {
+              return { ok: false, status: 409, code: "active_submission_conflict" };
+            }
+            throw e;
+          }
+        }
+
+        const { storageKey } = buildStorageObjectKey({
+          trialApplicationId: input.trialApplicationId,
+          submissionId: submissionId!,
+          mimeType: input.imageMimeType,
+        });
+
+        const supabase = getServiceRoleClient();
+        const up = await supabase.storage
+          .from(BUCKET)
+          .upload(storageKey, input.imageBuffer, {
+            contentType: input.imageMimeType.split(";")[0]?.trim(),
+            upsert: false,
+          });
+        if (up.error) {
+          console.error("storage_upload_failed", up.error.message);
+          return { ok: false, status: 500, code: "storage_upload_failed" };
+        }
+
+        imageKey = storageKey;
+        imageMime = input.imageMimeType.split(";")[0]?.trim() ?? input.imageMimeType;
+
+        const updated = await repo.updateSubmissionDraftForTrial(tx, submissionId!, input.trialApplicationId, {
+          bodyText: input.bodyText,
+          imageStorageKey: imageKey,
+          imageMimeType: imageMime,
+        });
+        if (!updated) {
+          return { ok: false, status: 409, code: "submission_not_editable" };
+        }
+
+        if (input.action === "submit") {
+          if (!hasSubstantiveContent(updated.bodyText, updated.imageStorageKey)) {
+            return { ok: false, status: 422, code: "empty_submission" };
+          }
+          const fin = await repo.submitSubmissionFinalForTrial(tx, submissionId!, input.trialApplicationId);
+          if (!fin) {
+            return { ok: false, status: 409, code: "submit_failed" };
+          }
+          return { ok: true, submissionId: fin.id, status: fin.status };
+        }
+        return { ok: true, submissionId: updated.id, status: updated.status };
+      }
+
+      if (!submissionId) {
+        try {
+          const ins = await repo.insertSubmission(tx, {
+            sessionId: input.sessionId,
+            courseId: row.course.id,
+            userId: null,
+            regularAccessGrantId: null,
+            trialApplicationId: input.trialApplicationId,
+            status: "draft",
+            bodyText: input.bodyText,
+            imageStorageKey: imageKey,
+            imageMimeType: imageMime,
+            submittedAt: null,
+          });
+          submissionId = ins.id;
+        } catch (e) {
+          if (e instanceof PostgresError && e.code === "23505") {
+            return { ok: false, status: 409, code: "active_submission_conflict" };
+          }
+          throw e;
+        }
+      } else {
+        const updated = await repo.updateSubmissionDraftForTrial(tx, submissionId, input.trialApplicationId, {
+          bodyText: input.bodyText,
+          imageStorageKey: imageKey,
+          imageMimeType: imageMime,
+        });
+        if (!updated) {
+          return { ok: false, status: 409, code: "submission_not_editable" };
+        }
+      }
+
+      const sub = await repo.getSubmissionByIdForTrial(tx, submissionId!, input.trialApplicationId);
+      if (!sub) {
+        return { ok: false, status: 500, code: "submission_missing" };
+      }
+
+      if (input.action === "submit") {
+        if (!hasSubstantiveContent(sub.bodyText, sub.imageStorageKey)) {
+          return { ok: false, status: 422, code: "empty_submission" };
+        }
+        const fin = await repo.submitSubmissionFinalForTrial(tx, submissionId!, input.trialApplicationId);
         if (!fin) {
           return { ok: false, status: 409, code: "submit_failed" };
         }

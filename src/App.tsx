@@ -1,7 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import './App.css'
 import Layout from './components/Layout'
-import { StudentRouteGuard, TeacherRouteGuard } from './routeGuards'
+import { AuthRouteGuard, EntitlementRouteGuard, TeacherRouteGuard } from './routeGuards'
 import LandingPage from './vite-pages/LandingPage'
 import WritingPage from './vite-pages/WritingPage'
 import CorrectionPage from './vite-pages/CorrectionPage'
@@ -21,11 +21,25 @@ import TrialAccessPage from './vite-pages/TrialAccessPage'
 import TrialReissuePage from './vite-pages/TrialReissuePage'
 import RegularAccessPage from './vite-pages/RegularAccessPage'
 import TrialApplicationsAdminPage from './vite-pages/TrialApplicationsAdminPage'
+import LoginPage from './vite-pages/LoginPage'
+import SignupPage from './vite-pages/SignupPage'
+import ForgotPasswordPage from './vite-pages/ForgotPasswordPage'
+import ResetPasswordPage from './vite-pages/ResetPasswordPage'
+import ResetPasswordCompletePage from './vite-pages/ResetPasswordCompletePage'
+import OAuthCompletePage from './vite-pages/OAuthCompletePage'
+import AcademyInvitePage from './vite-pages/AcademyInvitePage'
 
 function App() {
   return (
     <Layout>
       <Routes>
+        <Route path="/writing/login" element={<LoginPage />} />
+        <Route path="/writing/signup" element={<SignupPage />} />
+        <Route path="/writing/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/writing/reset-password/complete" element={<ResetPasswordCompletePage />} />
+        <Route path="/writing/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/writing/oauth-complete" element={<OAuthCompletePage />} />
+        <Route path="/writing/invite" element={<AcademyInvitePage />} />
         <Route path="/writing/intro" element={<TrialLandingPage />} />
         <Route path="/writing/trial-payment/checkout" element={<TrialPaymentCheckoutPage />} />
         <Route path="/writing/bank-complete" element={<BankTransferCompletePage />} />
@@ -37,11 +51,13 @@ function App() {
         <Route path="/writing/trial-payment" element={<PaymentPage />} />
         <Route path="/writing/course" element={<CoursePage />} />
         <Route path="/writing/correction-detail" element={<CorrectionSystemDetailPage />} />
-        <Route path="/writing/app/complete" element={<WritingCompletePage />} />
         <Route path="/writing/admin/trial-applications" element={<TrialApplicationsAdminPage />} />
-        <Route element={<StudentRouteGuard />}>
+        <Route element={<AuthRouteGuard />}>
           <Route path="/writing/app/mypage" element={<MypagePage />} />
           <Route path="/writing/app/view/:submissionId" element={<ViewCorrectionPage />} />
+        </Route>
+        <Route element={<EntitlementRouteGuard />}>
+          <Route path="/writing/app/complete" element={<WritingCompletePage />} />
           <Route path="/writing/app" element={<WritingPage />} />
         </Route>
         <Route path="/writing" element={<LandingPage />} />

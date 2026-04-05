@@ -16,8 +16,18 @@ function isEmbedded(): boolean {
 export default function Layout({ children }: LayoutProps) {
   const location = useLocation()
   const embedded = isEmbedded()
+  const p = location.pathname
+  const writingAppFullBleed = p === '/writing/app' || p.startsWith('/writing/app/view')
 
   if (
+    location.pathname === '/writing/login' ||
+    location.pathname === '/writing/signup' ||
+    location.pathname === '/writing/forgot-password' ||
+    location.pathname === '/writing/reset-password' ||
+    location.pathname === '/writing/reset-password/complete' ||
+    location.pathname === '/writing/oauth-complete' ||
+    location.pathname === '/writing/invite' ||
+    writingAppFullBleed ||
     location.pathname === '/writing/app/mypage' ||
     location.pathname === '/writing/correction-detail' ||
     location.pathname === '/writing/course' ||
@@ -39,7 +49,7 @@ export default function Layout({ children }: LayoutProps) {
     <div className={embedded ? 'layout layout-embedded' : 'layout'}>
       <main
         className={
-          location.pathname === '/writing/app'
+          p === '/writing/app' || p.startsWith('/writing/app/view')
             ? 'main main-writing-stitch'
             : location.pathname === '/writing/correction-detail'
               ? 'main main-atelier-detail'

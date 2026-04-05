@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import StudentAccountPanel from '../components/student/StudentAccountPanel'
 import { apiUrl } from '../lib/apiUrl'
 
 const DONUT_C = 251.2
@@ -312,6 +313,10 @@ export default function MypagePage() {
           overflow: visible;
         }
       `}</style>
+
+      <div className="w-full max-w-[1200px] mx-auto px-4 pt-4 lg:px-8">
+        <StudentAccountPanel />
+      </div>
 
       {/* ——— Desktop (Stitch) ——— */}
       <div className="hidden lg:block">
