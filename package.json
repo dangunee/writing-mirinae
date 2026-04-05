@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "vite",
     "dev:next": "next dev",
-    "build": "tsc && vite build",
+    "build": "tsc && vite build && node scripts/copy-dist-to-public.mjs && next build",
     "build:next": "next build",
     "preview": "vite preview",
     "db:check": "drizzle-kit check",

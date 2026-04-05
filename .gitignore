@@ -10,5 +10,9 @@ dist
 .next/
 out/
 
+# Vite 빌드 후 public/으로 복사되는 SPA 산출물 (npm run build에서 생성)
+public/index.html
+public/assets/
+
 # TypeScript incremental 캐시
 *.tsbuildinfo
