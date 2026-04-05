@@ -112,22 +112,7 @@ export default function LandingNav({ goApp, anchorBase = '', curriculumHref }: P
           </div>
         </div>
 
-        <div className="flex md:hidden items-center gap-3">
-          <a
-            href="https://mirinae.jp"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="border border-[#1e1b13]/20 text-[#000666] px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest"
-          >
-            MAIN SITE
-          </a>
-          <button
-            type="button"
-            onClick={goApp}
-            className="bg-[#000666] px-4 py-1.5 font-['Manrope'] text-xs font-bold uppercase tracking-widest text-white rounded-lg"
-          >
-            お申し込み
-          </button>
+        <div className="flex md:hidden items-center gap-2">
           <div className="relative" ref={accountMobileRef}>
             <button
               type="button"
@@ -166,6 +151,16 @@ export default function LandingNav({ goApp, anchorBase = '', curriculumHref }: P
           <a className={linkClass} href={`${anchorBase}#reviews`} onClick={() => setOpen(false)}>
             受講生の声
           </a>
+          <button
+            type="button"
+            onClick={() => {
+              goApp()
+              setOpen(false)
+            }}
+            className="w-full bg-[#000666] px-4 py-2.5 font-['Manrope'] text-xs font-bold uppercase tracking-widest text-white rounded-lg hover:opacity-90 active:scale-[0.99] transition-all text-center"
+          >
+            お申し込み
+          </button>
           <div className="mt-2 border-t border-[#1e1b13]/10 pt-3 flex flex-col gap-2">
             {me?.user ? (
               <Link
