@@ -53,6 +53,28 @@ export function isAllowedOrigin(origin: string): boolean {
 /**
  * OAuth start: only trust Referer or Origin when they match the allowlist (blocks arbitrary redirect chains).
  */
+/**
+ * Writable redirect origin for email links (Referer / Origin / getPublicOrigin / SITE_URL), allowlisted.
+ */
+export function resolveAuthAppOrigin(request: Request): string | null {
+  const fromRefererOrOrigin = resolveOAuthRedirectOrigin(request);
+  if (fromRefererOrOrigin) return fromRefererOrOrigin;
+  const originHeader = request.headers.get("origin");
+  if (originHeader && isAllowedOrigin(originHeader)) return originHeader;
+  const pub = getPublicOrigin(request);
+  if (isAllowedOrigin(pub)) return pub;
+  const env = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (env) {
+    try {
+      const origin = new URL(env.endsWith("/") ? env : `${env}/`).origin;
+      if (isAllowedOrigin(origin)) return origin;
+    } catch {
+      /* ignore */
+    }
+  }
+  return null;
+}
+
 export function resolveOAuthRedirectOrigin(request: Request): string | null {
   const referer = request.headers.get("referer");
   if (referer) {

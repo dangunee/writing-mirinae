@@ -1,5 +1,5 @@
 /**
- * Drizzle ORM — mirrors supabase/migrations/20260327120000_platform_and_writing_schema.sql
+ * Drizzle ORM — mirrors supabase/migrations/*.sql (platform + writing + auth helpers)
  * - public.* : platform identity + catalog + commerce + entitlements
  * - writing.* : writing app domain only (quiz/ondoku will use other schemas)
  * Use from backend/API only; do not import into browser bundles.
@@ -83,6 +83,11 @@ export const paymentStatusEnum = pgEnum("payment_status", [
   "succeeded",
   "failed",
   "refunded",
+]);
+
+export const emailVerificationPurposeEnum = pgEnum("email_verification_purpose", [
+  "line_onboarding",
+  "email_link",
 ]);
 
 // -----------------------------------------------------------------------------
@@ -200,6 +205,47 @@ export const passwordResetTokens = pgTable(
   (t) => [
     uniqueIndex("password_reset_tokens_token_hash_uq").on(t.tokenHash),
     index("password_reset_tokens_user_id_idx").on(t.userId),
+  ]
+);
+
+/** App profile (LINE onboarding, email display); id = auth.users.id */
+export const profiles = pgTable(
+  "profiles",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    email: text("email"),
+    name: text("name"),
+    koreanLevel: text("korean_level"),
+    emailVerified: boolean("email_verified").notNull().default(false),
+    onboardingCompletedAt: timestamp("onboarding_completed_at", { withTimezone: true }),
+    termsAcceptedAt: timestamp("terms_accepted_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  () => []
+);
+
+/** One-time email verification (15 min TTL in app). */
+export const emailVerificationTokens = pgTable(
+  "email_verification_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull(),
+    purpose: emailVerificationPurposeEnum("purpose").notNull(),
+    pendingEmail: text("pending_email").notNull(),
+    passwordEncrypted: text("password_encrypted"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("email_verification_tokens_token_hash_uq").on(t.tokenHash),
+    index("email_verification_tokens_user_id_idx").on(t.userId),
   ]
 );
 

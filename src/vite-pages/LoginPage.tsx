@@ -55,7 +55,15 @@ export default function LoginPage() {
     return AUTH_ERROR_MESSAGES[key] ?? null
   }, [location.search])
 
-  const displayError = error ?? authErrorFromQuery
+  const oauthGoogleConflictError = useMemo(() => {
+    const p = new URLSearchParams(location.search)
+    if (p.get('error') === 'email_conflict_existing_account') {
+      return 'このメールアドレスは既にメールログインで登録されています。ログイン後、設定画面からGoogle連携を行ってください。'
+    }
+    return null
+  }, [location.search])
+
+  const displayError = error ?? authErrorFromQuery ?? oauthGoogleConflictError
 
   /** Supabase / OAuth redirect errors in search or hash — never show raw Supabase text */
   useEffect(() => {
@@ -160,13 +168,27 @@ export default function LoginPage() {
         credentials: 'include',
         body: JSON.stringify({ email: email.trim(), password }),
       })
-      const data = await readJsonBody<{ ok?: boolean; error?: string }>(res)
+      const data = await readJsonBody<{
+        ok?: boolean
+        error?: string
+        expected?: 'google' | 'line'
+      }>(res)
       if (!data) {
         setError('通信に失敗しました。')
         return
       }
       if (!res.ok || data.ok !== true) {
-        setError(GENERIC_LOGIN_ERROR)
+        if (data.error === 'wrong_login_method') {
+          if (data.expected === 'google') {
+            setError('Googleでログインしてください。')
+          } else if (data.expected === 'line') {
+            setError('LINEでログインしてください。')
+          } else {
+            setError(GENERIC_LOGIN_ERROR)
+          }
+        } else {
+          setError(GENERIC_LOGIN_ERROR)
+        }
         return
       }
       const sessionResult = await completeSessionLoginFlow(navigate)

@@ -27,6 +27,9 @@ import ForgotPasswordPage from './vite-pages/ForgotPasswordPage'
 import ResetPasswordPage from './vite-pages/ResetPasswordPage'
 import ResetPasswordCompletePage from './vite-pages/ResetPasswordCompletePage'
 import OAuthCompletePage from './vite-pages/OAuthCompletePage'
+import LineOnboardingPage from './vite-pages/LineOnboardingPage'
+import SettingsPage from './vite-pages/SettingsPage'
+import VerifyEmailPage from './vite-pages/VerifyEmailPage'
 import AcademyInvitePage from './vite-pages/AcademyInvitePage'
 
 function App() {
@@ -39,6 +42,7 @@ function App() {
         <Route path="/writing/reset-password/complete" element={<ResetPasswordCompletePage />} />
         <Route path="/writing/reset-password" element={<ResetPasswordPage />} />
         <Route path="/writing/oauth-complete" element={<OAuthCompletePage />} />
+        <Route path="/writing/verify-email" element={<VerifyEmailPage />} />
         <Route path="/writing/invite" element={<AcademyInvitePage />} />
         <Route path="/writing/intro" element={<TrialLandingPage />} />
         <Route path="/writing/trial-payment/checkout" element={<TrialPaymentCheckoutPage />} />
@@ -53,6 +57,8 @@ function App() {
         <Route path="/writing/correction-detail" element={<CorrectionSystemDetailPage />} />
         <Route path="/writing/admin/trial-applications" element={<TrialApplicationsAdminPage />} />
         <Route element={<AuthRouteGuard />}>
+          <Route path="/writing/onboarding" element={<LineOnboardingPage />} />
+          <Route path="/writing/app/settings" element={<SettingsPage />} />
           <Route path="/writing/app/mypage" element={<MypagePage />} />
           <Route path="/writing/app/view/:submissionId" element={<ViewCorrectionPage />} />
         </Route>

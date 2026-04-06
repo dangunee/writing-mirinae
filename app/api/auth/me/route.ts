@@ -1,11 +1,14 @@
+import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
+import { profiles } from "../../../../db/schema";
 import {
   computeEntitlementsForUser,
   resolveRoleFromEnv,
   type AuthRole,
 } from "../../../../server/lib/authMe";
 import { getDb } from "../../../../server/db/client";
+import { loginMethodsFromIdentities } from "../../../../server/lib/loginMethodsFromIdentities";
 import { createSupabaseServerClient } from "../../../../server/lib/supabaseServer";
 import { linkTrialApplicationsToUserByEmail } from "../../../../server/services/trialApplicationLinkService";
 
@@ -52,6 +55,13 @@ export async function GET() {
       isAcademyUnlimited: false,
     };
     let role: AuthRole | null = null;
+    const loginMethods = loginMethodsFromIdentities(user.identities);
+    let profileRow: {
+      name: string | null;
+      koreanLevel: string | null;
+      emailVerified: boolean;
+      onboardingCompletedAt: Date | null;
+    } | null = null;
     try {
       const db = getDb();
       const email = user.email?.trim();
@@ -64,10 +74,36 @@ export async function GET() {
       }
       entitlements = await computeEntitlementsForUser(db, user.id);
       role = resolveRoleFromEnv(user.id);
+      try {
+        const rows = await db
+          .select({
+            name: profiles.name,
+            koreanLevel: profiles.koreanLevel,
+            emailVerified: profiles.emailVerified,
+            onboardingCompletedAt: profiles.onboardingCompletedAt,
+          })
+          .from(profiles)
+          .where(eq(profiles.id, user.id))
+          .limit(1);
+        const p = rows[0];
+        if (p) {
+          profileRow = {
+            name: p.name,
+            koreanLevel: p.koreanLevel,
+            emailVerified: p.emailVerified,
+            onboardingCompletedAt: p.onboardingCompletedAt,
+          };
+        }
+      } catch {
+        /* profiles optional */
+      }
     } catch (dbErr) {
       console.error("auth_me_db_or_entitlements_failed", dbErr);
       role = resolveRoleFromEnv(user.id);
     }
+
+    const needsEmailOnboarding =
+      loginMethods.line && profileRow?.onboardingCompletedAt == null;
 
     return NextResponse.json({
       ok: true,
@@ -77,6 +113,15 @@ export async function GET() {
       },
       role,
       entitlements,
+      loginMethods,
+      needsEmailOnboarding,
+      profile: profileRow
+        ? {
+            name: profileRow.name,
+            koreanLevel: profileRow.koreanLevel,
+            emailVerified: profileRow.emailVerified,
+          }
+        : null,
     });
   } catch (e) {
     console.error("auth_me_failed", e);

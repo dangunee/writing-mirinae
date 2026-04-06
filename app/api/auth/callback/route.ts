@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getPublicOrigin, isAllowedOrigin } from "../../../../server/lib/authOrigin";
+import { detectGoogleEmailConflict } from "../../../../server/lib/googleEmailConflict";
 import { createSupabaseServerClient } from "../../../../server/lib/supabaseServer";
 
 export const runtime = "nodejs";
@@ -34,6 +35,15 @@ export async function GET(request: Request) {
     if (error) {
       console.error("auth_oauth_callback_exchange_failed", error.message);
       return NextResponse.redirect(`${origin}/writing/login?error=oauth`);
+    }
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user && (await detectGoogleEmailConflict(user))) {
+      await supabase.auth.signOut();
+      return NextResponse.redirect(
+        `${origin}/writing/login?error=email_conflict_existing_account&existing_method=email`
+      );
     }
     return NextResponse.redirect(`${origin}/writing/oauth-complete`);
   } catch (e) {

@@ -1,7 +1,11 @@
+import { eq } from "drizzle-orm";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
+import { profiles } from "../../../db/schema";
+import { getDb } from "../../../server/db/client";
+import { userHasProvider } from "../../../server/lib/authIdentitiesLookup";
 import { getPublicOrigin, isAllowedOrigin } from "../../../server/lib/authOrigin";
 
 export const runtime = "nodejs";
@@ -30,7 +34,7 @@ function normalizeNext(next: string | null): string {
   if (!path.startsWith("/") || path.startsWith("//") || path.includes("://")) {
     return fallback;
   }
-  const allowedPrefixes = ["/writing/app", "/writing/teacher"] as const;
+  const allowedPrefixes = ["/writing/app", "/writing/teacher", "/writing/onboarding"] as const;
   for (const prefix of allowedPrefixes) {
     if (path === prefix || path.startsWith(`${prefix}/`)) {
       return path;
@@ -39,10 +43,21 @@ function normalizeNext(next: string | null): string {
   return fallback;
 }
 
+async function lineNeedsEmailOnboarding(userId: string): Promise<boolean> {
+  const hasLine = await userHasProvider(userId, "line");
+  if (!hasLine) return false;
+  const db = getDb();
+  const rows = await db
+    .select({ onboardingCompletedAt: profiles.onboardingCompletedAt })
+    .from(profiles)
+    .where(eq(profiles.id, userId))
+    .limit(1);
+  const p = rows[0];
+  return p?.onboardingCompletedAt == null;
+}
+
 /**
- * Same env + cookie read path as createSupabaseServerClient, but session cookies from
- * exchangeCodeForSession must be written via the redirect response's cookies API so
- * Set-Cookie is attached to the outgoing NextResponse (next/headers alone can miss this).
+ * LINE OAuth completes here (`/auth/callback`) — exchange session cookies, then optional redirect to onboarding.
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -67,8 +82,7 @@ export async function GET(request: Request) {
   try {
     const { url: supabaseUrl, anon } = requireSupabaseEnv();
     const cookieStore = await cookies();
-    const redirectUrl = `${origin}${nextPath}`;
-    const response = NextResponse.redirect(redirectUrl);
+    const sessionResponse = NextResponse.next();
 
     const supabase = createServerClient(supabaseUrl, anon, {
       cookies: {
@@ -77,7 +91,7 @@ export async function GET(request: Request) {
         },
         setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
           cookiesToSet.forEach(({ name, value, options }) => {
-            response.cookies.set(name, value, options);
+            sessionResponse.cookies.set(name, value, options);
           });
         },
       },
@@ -88,8 +102,31 @@ export async function GET(request: Request) {
       console.error("auth_callback_exchange_failed", error.message);
       return NextResponse.redirect(`${origin}${LOGIN_WITH_AUTH_ERROR}?auth_error=exchange_failed`);
     }
-    console.log("[auth/callback] exchange_ok", { nextPath });
-    return response;
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    let redirectPath = nextPath;
+    if (user?.id) {
+      try {
+        if (await lineNeedsEmailOnboarding(user.id)) {
+          redirectPath = "/writing/onboarding";
+        }
+      } catch (e) {
+        console.error("auth_callback_onboarding_check_failed", e);
+      }
+    }
+
+    const out = NextResponse.redirect(`${origin}${redirectPath}`);
+    sessionResponse.headers.forEach((value, key) => {
+      if (key.toLowerCase() === "set-cookie") {
+        out.headers.append(key, value);
+      }
+    });
+
+    console.log("[auth/callback] exchange_ok", { nextPath: redirectPath });
+    return out;
   } catch (e) {
     console.error("auth_callback_failed", e);
     return NextResponse.redirect(`${origin}${LOGIN_WITH_AUTH_ERROR}?auth_error=exchange_failed`);

@@ -19,7 +19,7 @@ export async function completeSessionLoginFlow(navigate: NavigateFunction): Prom
     return { ok: false }
   }
   const me = await readJsonBody<AuthMePayload>(meRes)
-  if (!me?.ok || !me.user || !me.entitlements) {
+  if (!me?.ok || !me.user || !me.entitlements || !me.loginMethods || typeof me.needsEmailOnboarding !== 'boolean') {
     return { ok: false }
   }
   postLoginRedirect(navigate, me)

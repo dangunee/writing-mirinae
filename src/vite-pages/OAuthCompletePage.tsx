@@ -28,6 +28,10 @@ export default function OAuthCompletePage() {
           setError('ログインを完了できませんでした。')
           return
         }
+        if (me.needsEmailOnboarding) {
+          navigate('/writing/onboarding', { replace: true })
+          return
+        }
         await tryAcceptPendingInviteAfterAuth()
         const me2 = await fetch(apiUrl('/api/auth/me'), { credentials: 'include' })
         if (me2.ok) {

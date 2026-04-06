@@ -39,6 +39,12 @@ export function useAuthMe(): UseAuthMeResult {
         setError(false)
         return
       }
+      if (!data.loginMethods) {
+        data.loginMethods = { email: false, google: false, line: false }
+      }
+      if (typeof data.needsEmailOnboarding !== 'boolean') {
+        data.needsEmailOnboarding = false
+      }
       setMe(data)
     } catch {
       setMe(null)

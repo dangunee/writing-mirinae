@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { findAuthUserIdByEmail } from "../../../../server/lib/authUsersLookup";
+import { getIdentityProvidersForUserId } from "../../../../server/lib/authIdentitiesLookup";
 import { createSupabaseServerClient } from "../../../../server/lib/supabaseServer";
 
 export const runtime = "nodejs";
@@ -32,6 +34,25 @@ export async function POST(req: Request) {
     const supabase = await createSupabaseServerClient();
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
+      const normalized = email.trim().toLowerCase();
+      const existingId = await findAuthUserIdByEmail(normalized);
+      if (existingId) {
+        const providers = await getIdentityProvidersForUserId(existingId);
+        if (!providers.includes("email")) {
+          if (providers.includes("google")) {
+            return NextResponse.json(
+              { ok: false, error: "wrong_login_method", expected: "google" },
+              { status: 401 }
+            );
+          }
+          if (providers.includes("line")) {
+            return NextResponse.json(
+              { ok: false, error: "wrong_login_method", expected: "line" },
+              { status: 401 }
+            );
+          }
+        }
+      }
       return NextResponse.json({ ok: false, error: "invalid_credentials" }, { status: 401 });
     }
     if (!data.session || !data.user) {

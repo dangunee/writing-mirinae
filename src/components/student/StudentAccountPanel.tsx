@@ -134,6 +134,12 @@ export default function StudentAccountPanel({ compact = false }: Props) {
         </div>
         <div className="flex flex-shrink-0 flex-wrap items-center gap-2 sm:justify-end">
           <Link
+            to="/writing/app/settings"
+            className="rounded-lg border border-[#1e1b13]/15 bg-white px-3 py-1.5 text-xs font-bold text-[#000666] hover:bg-[#fafafa]"
+          >
+            設定
+          </Link>
+          <Link
             to="/writing/app/mypage"
             className="rounded-lg border border-[#1e1b13]/15 bg-[#F5F5F5] px-3 py-1.5 text-xs font-bold text-[#000666] hover:bg-[#ebebeb]"
           >
