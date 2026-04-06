@@ -51,7 +51,8 @@ function isAcademyUnlimitedUser(userId: string): boolean {
   return parseUuidList(process.env.ACADEMY_UNLIMITED_USER_IDS).includes(userId);
 }
 
-async function hasAcademyUnlimitedGrant(db: Db, userId: string): Promise<boolean> {
+/** DB table: writing.academy_unlimited_grants (Drizzle: academyUnlimitedGrants). */
+async function tryHasAcademyUnlimitedGrant(db: Db, userId: string): Promise<boolean> {
   const rows = await db
     .select({ userId: academyUnlimitedGrants.userId })
     .from(academyUnlimitedGrants)
@@ -65,67 +66,107 @@ function skuImpliesTrial(sku: string): boolean {
   return s.includes("trial") || s === "writing_trial_lesson";
 }
 
+function logOutcome(userId: string, e: AuthEntitlements): void {
+  console.info("entitlement_trial_result", { userId, hasTrial: e.hasTrial });
+  console.info("entitlement_paid_result", { userId, hasActiveCourse: e.hasActiveCourse });
+  console.info("final_entitlements", { userId, ...e });
+}
+
 /**
  * Derives entitlements from active writing entitlements + active course (if any).
+ * Fault-tolerant: academy / entitlements / course lookups are independent; one failure does not zero the rest.
  */
 export async function computeEntitlementsForUser(db: Db, userId: string): Promise<AuthEntitlements> {
-  if (isAcademyUnlimitedUser(userId)) {
-    return {
-      hasTrial: true,
-      hasActiveCourse: true,
-      isAcademyUnlimited: true,
-    };
-  }
-
-  if (await hasAcademyUnlimitedGrant(db, userId)) {
-    return {
-      hasTrial: true,
-      hasActiveCourse: true,
-      isAcademyUnlimited: true,
-    };
-  }
-
   let hasTrial = false;
   let hasActiveCourse = false;
+  let isAcademyUnlimited = false;
 
-  const activeSkuRows = await db
-    .select({ sku: products.sku })
-    .from(entitlements)
-    .innerJoin(products, eq(entitlements.productId, products.id))
-    .where(
-      and(eq(entitlements.userId, userId), eq(entitlements.app, "writing"), eq(entitlements.status, "active"))
-    )
-    .limit(100);
-
-  for (const r of activeSkuRows) {
-    if (skuImpliesTrial(r.sku)) {
-      hasTrial = true;
-    } else {
-      hasActiveCourse = true;
-    }
+  if (isAcademyUnlimitedUser(userId)) {
+    isAcademyUnlimited = true;
+    hasTrial = true;
+    hasActiveCourse = true;
+    console.info("entitlement_academy_result", { userId, source: "env_allowlist", ok: true });
+    logOutcome(userId, { hasTrial, hasActiveCourse, isAcademyUnlimited });
+    return { hasTrial, hasActiveCourse, isAcademyUnlimited };
   }
 
-  const course = await findActiveWritingCourseForUser(db, userId);
-  if (course) {
-    const rows = await db
+  try {
+    const grant = await tryHasAcademyUnlimitedGrant(db, userId);
+    if (grant) {
+      isAcademyUnlimited = true;
+      hasTrial = true;
+      hasActiveCourse = true;
+      console.info("entitlement_academy_result", {
+        userId,
+        table: "writing.academy_unlimited_grants",
+        ok: true,
+        matched: true,
+      });
+      logOutcome(userId, { hasTrial, hasActiveCourse, isAcademyUnlimited });
+      return { hasTrial, hasActiveCourse, isAcademyUnlimited };
+    }
+    console.info("entitlement_academy_result", {
+      userId,
+      table: "writing.academy_unlimited_grants",
+      ok: true,
+      matched: false,
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn("entitlement_academy_result", {
+      userId,
+      table: "writing.academy_unlimited_grants",
+      ok: false,
+      error: msg,
+    });
+  }
+
+  try {
+    const activeSkuRows = await db
       .select({ sku: products.sku })
       .from(entitlements)
       .innerJoin(products, eq(entitlements.productId, products.id))
-      .where(eq(entitlements.id, course.entitlementId))
-      .limit(1);
-    const sku = rows[0]?.sku ?? "";
-    if (skuImpliesTrial(sku)) {
-      hasTrial = true;
-    } else {
-      hasActiveCourse = true;
+      .where(
+        and(eq(entitlements.userId, userId), eq(entitlements.app, "writing"), eq(entitlements.status, "active"))
+      )
+      .limit(100);
+
+    for (const r of activeSkuRows) {
+      if (skuImpliesTrial(r.sku)) {
+        hasTrial = true;
+      } else {
+        hasActiveCourse = true;
+      }
     }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn("entitlement_sku_query_failed", { userId, error: msg });
   }
 
-  return {
-    hasTrial,
-    hasActiveCourse,
-    isAcademyUnlimited: false,
-  };
+  try {
+    const course = await findActiveWritingCourseForUser(db, userId);
+    if (course) {
+      const rows = await db
+        .select({ sku: products.sku })
+        .from(entitlements)
+        .innerJoin(products, eq(entitlements.productId, products.id))
+        .where(eq(entitlements.id, course.entitlementId))
+        .limit(1);
+      const sku = rows[0]?.sku ?? "";
+      if (skuImpliesTrial(sku)) {
+        hasTrial = true;
+      } else {
+        hasActiveCourse = true;
+      }
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn("entitlement_course_query_failed", { userId, error: msg });
+  }
+
+  const out = { hasTrial, hasActiveCourse, isAcademyUnlimited };
+  logOutcome(userId, out);
+  return out;
 }
 
 export function canAccessWritingStudentApp(e: AuthEntitlements): boolean {
