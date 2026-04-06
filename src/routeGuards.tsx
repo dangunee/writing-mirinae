@@ -100,10 +100,22 @@ export function EntitlementRouteGuard() {
       try {
         const meRes = await fetchAuthMeWithRetry()
         if (cancelled) return
+
+        // Trial mail link: no Supabase session (401) but writing_trial_access cookie + sessions/current
         if (meRes.status === 401) {
+          const curRes = await fetch(apiUrl('/api/writing/sessions/current'), { credentials: 'include' })
+          if (cancelled) return
+          if (curRes.ok) {
+            const cur = (await curRes.json()) as { ok?: boolean }
+            if (cur?.ok === true) {
+              setState('ok')
+              return
+            }
+          }
           setState('unauthorized')
           return
         }
+
         if (!meRes.ok) {
           setState('error')
           return
