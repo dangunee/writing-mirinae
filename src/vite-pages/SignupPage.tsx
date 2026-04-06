@@ -2,6 +2,9 @@ import { useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { useRedirectIfLoggedIn } from '../hooks/useRedirectIfLoggedIn'
+
+/** Set when API returns email_already_registered — render links in alert (not user-facing magic string). */
+const SIGNUP_ERROR_EMAIL_TAKEN = '__signup_email_taken__'
 import { tryAcceptPendingInviteAfterAuth } from '../lib/academyInviteFlow'
 import { apiUrl } from '../lib/apiUrl'
 import { startLineOAuth } from '../lib/startLineOAuth'
@@ -81,9 +84,7 @@ export default function SignupPage() {
         } else if (data.error === 'terms_required') {
           setError('利用規約およびプライバシーに関する告知に同意してください。')
         } else if (data.error === 'email_already_registered') {
-          setError(
-            'このメールアドレスは既に登録されています。ログイン画面からお入りください。パスワードを忘れた場合は再設定をご利用ください。'
-          )
+          setError(SIGNUP_ERROR_EMAIL_TAKEN)
         } else {
           setError('登録を完了できませんでした。入力内容をご確認ください。')
         }
@@ -122,6 +123,32 @@ export default function SignupPage() {
       </div>
     )
   }
+
+  const errorAlert =
+    error === SIGNUP_ERROR_EMAIL_TAKEN ? (
+      <p className="rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container" role="alert">
+        このメールアドレスは既に登録されています。{' '}
+        <Link to="/writing/login" className="font-bold text-primary underline underline-offset-4">
+          ログイン
+        </Link>
+        からお入りください。パスワードをお忘れの場合は{' '}
+        <Link to="/writing/forgot-password" className="font-bold text-primary underline underline-offset-4">
+          パスワード再設定
+        </Link>
+        をご利用ください。
+      </p>
+    ) : error ? (
+      <p className="rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container" role="alert">
+        {error}
+      </p>
+    ) : null
+
+  const oauthHelperCopy = (
+    <p className="text-xs text-on-surface-variant leading-relaxed">
+      既に登録済みの方も、Google・LINEで続けると<strong className="font-semibold text-on-surface">同じアカウントでログイン</strong>
+      します。同じGoogle／LINEの利用では、別会員として重複登録されることはありません。
+    </p>
+  )
 
   const termsLabel = (
     <>
@@ -290,11 +317,7 @@ export default function SignupPage() {
             <span className="text-xs text-on-surface-variant leading-relaxed">{termsLabel}</span>
           </label>
 
-          {error ? (
-            <p className="rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container" role="alert">
-              {error}
-            </p>
-          ) : null}
+          {errorAlert}
           {info ? (
             <p className="rounded-lg bg-secondary-container/40 px-3 py-2 text-sm text-on-secondary-container" role="status">
               {info}
@@ -325,6 +348,8 @@ export default function SignupPage() {
           </span>
         </div>
 
+        <div className="mb-3">{oauthHelperCopy}</div>
+
         <div className="grid grid-cols-2 gap-4">
           <a
             href={apiUrl('/api/auth/oauth/google')}
@@ -350,7 +375,7 @@ export default function SignupPage() {
                 />
               </svg>
             </div>
-            <span className="text-xs font-bold font-headline text-on-surface">Google</span>
+            <span className="text-xs font-bold font-headline text-on-surface">Googleで続ける</span>
           </a>
           <button
             type="button"
@@ -363,7 +388,7 @@ export default function SignupPage() {
                 fill="#06C755"
               />
             </svg>
-            <span className="text-xs font-bold font-headline text-on-surface">LINE</span>
+            <span className="text-xs font-bold font-headline text-on-surface">LINEで続ける</span>
           </button>
         </div>
 
@@ -544,11 +569,7 @@ export default function SignupPage() {
                   </label>
                 </div>
 
-                {error ? (
-                  <p className="rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container" role="alert">
-                    {error}
-                  </p>
-                ) : null}
+                {errorAlert}
                 {info ? (
                   <p
                     className="rounded-lg bg-secondary-container/40 px-3 py-2 text-sm text-on-secondary-container"
@@ -580,6 +601,8 @@ export default function SignupPage() {
                   </span>
                 </div>
               </div>
+
+              <div className="mb-3">{oauthHelperCopy}</div>
 
               <div className="grid grid-cols-2 gap-4">
                 <a

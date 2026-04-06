@@ -22,17 +22,21 @@ export function useRedirectIfLoggedIn(enabled = true): boolean {
     let cancelled = false
     setChecking(true)
     ;(async () => {
+      let redirected = false
       try {
         const res = await fetch(apiUrl('/api/auth/me'), { credentials: 'include' })
         if (cancelled || res.status === 401 || !res.ok) return
         const me = (await res.json()) as AuthMePayload
         if (me.ok && me.user) {
           postLoginRedirect(navigate, me)
+          redirected = true
+          /* Keep checking=true until route unmounts — avoids flashing signup while navigating. */
+          return
         }
       } catch {
         /* stay on page */
       } finally {
-        if (!cancelled) setChecking(false)
+        if (!cancelled && !redirected) setChecking(false)
       }
     })()
     return () => {
