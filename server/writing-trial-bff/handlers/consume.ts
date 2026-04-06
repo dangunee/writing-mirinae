@@ -113,7 +113,7 @@ export async function handleAccessConsume(req: IncomingMessage, res: ServerRespo
         : COOKIE_MAX_AGE_FALLBACK;
     const cookieParts = [
       `writing_trial_access=${encodeURIComponent(sessionCookie)}`,
-      "Path=/writing",
+      "Path=/",
       `Max-Age=${maxAge}`,
       "HttpOnly",
       "SameSite=Lax",
