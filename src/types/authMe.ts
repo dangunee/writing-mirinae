@@ -6,8 +6,10 @@ export type AuthEntitlements = {
   isAcademyUnlimited: boolean
 }
 
+/** Authenticated GET /api/auth/me response (401 uses { ok: false } only). */
 export type AuthMePayload = {
-  user: { id: string; email: string | null } | null
+  ok: true
+  user: { id: string; email: string | null }
   role: AuthRole | null
   entitlements: AuthEntitlements
 }

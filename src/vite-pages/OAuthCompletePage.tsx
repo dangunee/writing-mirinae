@@ -19,19 +19,22 @@ export default function OAuthCompletePage() {
       try {
         const res = await fetch(apiUrl('/api/auth/me'), { credentials: 'include' })
         if (cancelled) return
-        if (!res.ok) {
+        if (res.status === 401 || !res.ok) {
           setError('セッションを確認できませんでした。')
           return
         }
         let me = (await res.json()) as AuthMePayload
-        if (!me.user) {
+        if (!me.ok || !me.user) {
           setError('ログインを完了できませんでした。')
           return
         }
         await tryAcceptPendingInviteAfterAuth()
         const me2 = await fetch(apiUrl('/api/auth/me'), { credentials: 'include' })
         if (me2.ok) {
-          me = (await me2.json()) as AuthMePayload
+          const parsed = (await me2.json()) as AuthMePayload
+          if (parsed.ok && parsed.user) {
+            me = parsed
+          }
         }
         postLoginRedirect(navigate, me)
       } catch {

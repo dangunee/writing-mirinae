@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 import {
   computeEntitlementsForUser,
   resolveRoleFromEnv,
-  type AuthMePayload,
   type AuthRole,
 } from "../../../../server/lib/authMe";
 import { getDb } from "../../../../server/db/client";
@@ -13,28 +12,38 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * GET /api/auth/me — session user + role + entitlements (no client userId).
+ * GET /api/auth/me — session from Supabase cookies only (no client userId).
+ * 200: { ok: true, user, role, entitlements }
+ * 401: { ok: false }
  */
 export async function GET() {
   try {
     const supabase = await createSupabaseServerClient();
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser();
 
-    if (error || !user) {
-      const body: AuthMePayload = {
-        user: null,
-        role: null,
-        entitlements: {
-          hasTrial: false,
-          hasActiveCourse: false,
-          isAcademyUnlimited: false,
-        },
-      };
-      return NextResponse.json(body);
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    let user = session?.user ?? null;
+
+    if (!user) {
+      const {
+        data: { user: jwtUser },
+        error: userError,
+      } = await supabase.auth.getUser();
+      if (jwtUser) {
+        user = jwtUser;
+      } else if (userError) {
+        console.log("[auth/me] getUser_no_session", userError.message);
+      }
     }
+
+    if (!user) {
+      console.log("[auth/me] auth_me_unauthenticated");
+      return NextResponse.json({ ok: false }, { status: 401 });
+    }
+
+    console.log("[auth/me] auth_me_ok", { userId: user.id });
 
     let entitlements = {
       hasTrial: false,
@@ -47,20 +56,19 @@ export async function GET() {
       entitlements = await computeEntitlementsForUser(db, user.id);
       role = resolveRoleFromEnv(user.id);
     } catch (dbErr) {
-      // Avoid 500 after successful login/signup when only Postgres/entitlements fail (e.g. missing DATABASE_URL).
       console.error("auth_me_db_or_entitlements_failed", dbErr);
       role = resolveRoleFromEnv(user.id);
     }
 
-    const body: AuthMePayload = {
+    return NextResponse.json({
+      ok: true,
       user: {
         id: user.id,
         email: user.email ?? null,
       },
       role,
       entitlements,
-    };
-    return NextResponse.json(body);
+    });
   } catch (e) {
     console.error("auth_me_failed", e);
     return NextResponse.json({ ok: false, error: "server_misconfigured" }, { status: 500 });

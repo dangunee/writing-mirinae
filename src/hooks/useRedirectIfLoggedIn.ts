@@ -24,9 +24,9 @@ export function useRedirectIfLoggedIn(enabled = true): boolean {
     ;(async () => {
       try {
         const res = await fetch(apiUrl('/api/auth/me'), { credentials: 'include' })
-        if (cancelled || !res.ok) return
+        if (cancelled || res.status === 401 || !res.ok) return
         const me = (await res.json()) as AuthMePayload
-        if (me.user) {
+        if (me.ok && me.user) {
           postLoginRedirect(navigate, me)
         }
       } catch {

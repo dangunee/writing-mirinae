@@ -15,11 +15,11 @@ import { readJsonBody } from './readJsonBody'
 export async function completeSessionLoginFlow(navigate: NavigateFunction): Promise<{ ok: true } | { ok: false }> {
   await tryAcceptPendingInviteAfterAuth()
   const meRes = await fetch(apiUrl('/api/auth/me'), { credentials: 'include' })
-  if (!meRes.ok) {
+  if (meRes.status === 401 || !meRes.ok) {
     return { ok: false }
   }
   const me = await readJsonBody<AuthMePayload>(meRes)
-  if (!me?.entitlements) {
+  if (!me?.ok || !me.user || !me.entitlements) {
     return { ok: false }
   }
   postLoginRedirect(navigate, me)

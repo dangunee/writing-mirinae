@@ -23,12 +23,22 @@ export function useAuthMe(): UseAuthMeResult {
     setError(false)
     try {
       const res = await fetch(apiUrl('/api/auth/me'), { credentials: 'include' })
+      if (res.status === 401) {
+        setMe(null)
+        setError(false)
+        return
+      }
       if (!res.ok) {
         setMe(null)
         setError(true)
         return
       }
       const data = (await res.json()) as AuthMePayload
+      if (!data.ok || !data.user) {
+        setMe(null)
+        setError(false)
+        return
+      }
       setMe(data)
     } catch {
       setMe(null)

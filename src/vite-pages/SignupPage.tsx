@@ -91,12 +91,12 @@ export default function SignupPage() {
       }
       await tryAcceptPendingInviteAfterAuth()
       const meRes = await fetch(apiUrl('/api/auth/me'), { credentials: 'include' })
-      if (!meRes.ok) {
+      if (meRes.status === 401 || !meRes.ok) {
         setError('セッションの確認に失敗しました。ログイン画面からお試しください。')
         return
       }
       const me = await readJsonBody<AuthMePayload>(meRes)
-      if (!me?.entitlements) {
+      if (!me?.ok || !me.user || !me?.entitlements) {
         setError('セッションの確認に失敗しました。ログイン画面からお試しください。')
         return
       }

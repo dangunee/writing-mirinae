@@ -56,6 +56,7 @@ export async function GET(request: Request) {
       console.error("auth_callback_exchange_failed", error.message);
       return NextResponse.redirect(`${origin}${LOGIN_WITH_AUTH_ERROR}?auth_error=exchange_failed`);
     }
+    console.log("[auth/callback] exchange_ok", { nextPath });
     return NextResponse.redirect(`${origin}${nextPath}`);
   } catch (e) {
     console.error("auth_callback_failed", e);
