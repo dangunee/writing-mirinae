@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useRedirectIfLoggedIn } from '../hooks/useRedirectIfLoggedIn'
 import { tryAcceptPendingInviteAfterAuth } from '../lib/academyInviteFlow'
 import { apiUrl } from '../lib/apiUrl'
+import { startLineOAuth } from '../lib/startLineOAuth'
 import { readJsonBody } from '../lib/readJsonBody'
 import { postLoginRedirect } from '../lib/postLoginRedirect'
 import type { AuthMePayload } from '../types/authMe'
@@ -26,6 +27,17 @@ export default function SignupPage() {
   const [info, setInfo] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const submitLockRef = useRef(false)
+
+  const onLineOAuth = () => {
+    void (async () => {
+      setError(null)
+      try {
+        await startLineOAuth('/writing/app')
+      } catch {
+        setError('ログインを開始できませんでした。')
+      }
+    })()
+  }
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -336,8 +348,9 @@ export default function SignupPage() {
             </div>
             <span className="text-xs font-bold font-headline text-on-surface">Google</span>
           </a>
-          <a
-            href={apiUrl('/api/auth/oauth/line')}
+          <button
+            type="button"
+            onClick={onLineOAuth}
             className="flex items-center justify-center gap-3 border border-outline-variant/10 py-3.5 rounded-lg hover:bg-white transition-colors active:scale-95 bg-white"
           >
             <svg fill="none" height="20" viewBox="0 0 24 24" width="20" xmlns="http://www.w3.org/2000/svg">
@@ -347,7 +360,7 @@ export default function SignupPage() {
               />
             </svg>
             <span className="text-xs font-bold font-headline text-on-surface">LINE</span>
-          </a>
+          </button>
         </div>
 
         <p className="text-center mt-10 text-sm text-on-surface-variant">
@@ -572,15 +585,16 @@ export default function SignupPage() {
                   <img alt="" className="w-5 h-5" src={GOOGLE_G_IMG} />
                   <span className="text-xs font-bold text-on-surface-variant">Google</span>
                 </a>
-                <a
-                  href={apiUrl('/api/auth/oauth/line')}
+                <button
+                  type="button"
+                  onClick={onLineOAuth}
                   className="flex items-center justify-center gap-3 py-3 bg-[#06C755] text-white rounded-lg hover:opacity-90 transition-all active:scale-[0.98]"
                 >
                   <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>
                     chat
                   </span>
                   <span className="text-xs font-bold">LINE</span>
-                </a>
+                </button>
               </div>
 
               <p className="mt-8 text-center text-xs text-on-surface-variant">

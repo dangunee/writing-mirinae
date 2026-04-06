@@ -7,10 +7,17 @@ import { apiUrl } from '../lib/apiUrl'
 import { completeSessionLoginFlow } from '../lib/completeSessionLoginFlow'
 import { readJsonBody } from '../lib/readJsonBody'
 import { getSupabaseBrowserClient } from '../lib/supabaseBrowser'
+import { startLineOAuth } from '../lib/startLineOAuth'
 
 const GENERIC_LOGIN_ERROR = 'メールアドレスまたはパスワードが正しくありません。'
 /** OAuth callback redirect (?error=oauth) — keep distinct from password generic */
 const OAUTH_CALLBACK_ERROR_MSG = 'ログインに失敗しました。しばらくしてからお試しください。'
+
+const AUTH_ERROR_MESSAGES: Record<string, string> = {
+  access_denied: '로그인이 취소되었습니다.',
+  exchange_failed: '세션 생성에 실패했습니다.',
+  missing_code: '로그인 응답 오류',
+}
 
 const INK_GRADIENT =
   'bg-gradient-to-br from-[#000666] to-[#1a237e] shadow-md hover:shadow-lg active:scale-[0.98] transition-all duration-200'
@@ -41,6 +48,14 @@ export default function LoginPage() {
   const codeExchangeStartedForRef = useRef<string | null>(null)
   const authUrlHandledRef = useRef<string | null>(null)
   const [codeExchangeFinished, setCodeExchangeFinished] = useState(() => oauthCode.length === 0)
+
+  const authErrorFromQuery = useMemo(() => {
+    const p = new URLSearchParams(location.search)
+    const key = p.get('auth_error')?.trim() ?? ''
+    return AUTH_ERROR_MESSAGES[key] ?? null
+  }, [location.search])
+
+  const displayError = error ?? authErrorFromQuery
 
   /** Supabase / OAuth redirect errors in search or hash — never show raw Supabase text */
   useEffect(() => {
@@ -120,6 +135,17 @@ export default function LoginPage() {
       cancelled = true
     }
   }, [oauthCode, navigate])
+
+  const onLineOAuth = () => {
+    void (async () => {
+      setError(null)
+      try {
+        await startLineOAuth('/writing/app')
+      } catch {
+        setError('ログインを開始できませんでした。')
+      }
+    })()
+  }
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -257,9 +283,9 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {error ? (
+            {displayError ? (
               <p className="rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container" role="alert">
-                {error}
+                {displayError}
               </p>
             ) : null}
 
@@ -293,8 +319,9 @@ export default function LoginPage() {
               />
               <span className="text-sm font-bold text-on-surface-variant">Google</span>
             </a>
-            <a
-              href={apiUrl('/api/auth/oauth/line')}
+            <button
+              type="button"
+              onClick={onLineOAuth}
               className="flex items-center justify-center gap-2 py-3.5 px-4 bg-[#06C755] rounded-lg hover:opacity-90 transition-opacity active:scale-95 duration-200"
             >
               <img
@@ -303,7 +330,7 @@ export default function LoginPage() {
                 src="https://lh3.googleusercontent.com/aida-public/AB6AXuD3_gKAGnzM1QwAFhQB_gBr6jGczekVDR7WGemfwwbXDDCaxN2hNLz778dwhtEZ3RJHbYUcDDamkVYwJcLWk-_jjyXtbEFAoqe5nc5dgb8YxgZFSmNxl9bIk2ATaaS7rQm1lsxYfxZfMsqr-4rv7bu1G10N57DZaJOboDGXx3W__luGbU4zp0YTRDI7K0Rd7o7VYLRFkmPydZcmSwigeH_8TUE6fwqjjXc8j4cJKLCeCHRmjO_ojmAaW0vjzKqzreDTxJv5nF67TZA"
               />
               <span className="text-sm font-bold text-white">LINE</span>
-            </a>
+            </button>
           </div>
 
           <div className="text-center pt-4">
@@ -414,9 +441,9 @@ export default function LoginPage() {
                   </div>
                 </div>
 
-                {error ? (
+                {displayError ? (
                   <p className="rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container" role="alert">
-                    {error}
+                    {displayError}
                   </p>
                 ) : null}
 
@@ -455,8 +482,9 @@ export default function LoginPage() {
                     Google
                   </span>
                 </a>
-                <a
-                  href={apiUrl('/api/auth/oauth/line')}
+                <button
+                  type="button"
+                  onClick={onLineOAuth}
                   className="flex items-center justify-center gap-3 px-4 py-3 bg-surface ring-1 ring-outline-variant/20 rounded-lg hover:bg-surface-container-low transition-colors duration-300"
                 >
                   <div className="w-5 h-5 bg-[#06C755] flex items-center justify-center rounded-[2px]">
@@ -465,7 +493,7 @@ export default function LoginPage() {
                   <span className="font-label text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
                     LINE
                   </span>
-                </a>
+                </button>
               </div>
 
               <footer className="mt-12 text-center">

@@ -16,6 +16,22 @@ export default defineConfig({
   // [API 연결] Vite dev에서 Next `/api`로 프록시 (환경에 따라 `VITE_API_BASE_URL` 사용 가능)
   server: {
     proxy: {
+      '/auth': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq, req) => {
+            const host = req.headers?.host
+            if (host) {
+              proxyReq.setHeader('X-Forwarded-Host', host)
+            }
+            const proto =
+              (req.headers?.['x-forwarded-proto'] as string | undefined) ||
+              (req.socket && 'encrypted' in req.socket && req.socket.encrypted ? 'https' : 'http')
+            proxyReq.setHeader('X-Forwarded-Proto', proto)
+          })
+        },
+      },
       '/api': {
         target: 'http://localhost:3000',
         changeOrigin: true,

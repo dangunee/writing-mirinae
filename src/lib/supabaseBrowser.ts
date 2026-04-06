@@ -13,7 +13,13 @@ export function getSupabaseBrowserClient() {
     throw new Error('NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are required')
   }
   if (!client) {
-    client = createBrowserClient(url, anon)
+    client = createBrowserClient(url, anon, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: false,
+      },
+    })
   }
   return client
 }
