@@ -303,7 +303,9 @@ export default function LoginPage() {
 
           <div className="relative flex items-center py-2">
             <div className="flex-grow border-t border-outline-variant/20" />
-            <span className="flex-shrink mx-4 text-[10px] font-bold text-outline uppercase tracking-widest">または</span>
+            <span className="flex-shrink mx-4 text-[10px] font-bold text-outline uppercase tracking-widest">
+              または
+            </span>
             <div className="flex-grow border-t border-outline-variant/20" />
           </div>
 
@@ -317,7 +319,7 @@ export default function LoginPage() {
                 className="w-5 h-5"
                 src="https://lh3.googleusercontent.com/aida-public/AB6AXuBt7c6LeRoYnx6tuWw18h5ZuyR1cQ-mUt__1qrKfSQf2o0tfHuKhVutpReA5lF4jTDr6BYTAtHFkHaQAx5PnAu2gJBteu-pfl_0OLpcSaBGU5Ng2pgfsrmHCr0E075hPxcXdCyqBlco-NMeeo03gxbqBsy_3ee8DnVe074WuEh6bRjCAL5up9lj3xlqNvHxFroQQt5ZYHHVZ52SKSocVCXCFlIIVkjTuJjkMIRs-TiEZqU0DG8-gZpMUt3D3KgCNMBiv1ngFx6zZg4"
               />
-              <span className="text-sm font-bold text-on-surface-variant">Google</span>
+              <span className="text-sm font-bold text-on-surface-variant">Googleで続ける</span>
             </a>
             <button
               type="button"
@@ -329,7 +331,7 @@ export default function LoginPage() {
                 className="w-5 h-5"
                 src="https://lh3.googleusercontent.com/aida-public/AB6AXuD3_gKAGnzM1QwAFhQB_gBr6jGczekVDR7WGemfwwbXDDCaxN2hNLz778dwhtEZ3RJHbYUcDDamkVYwJcLWk-_jjyXtbEFAoqe5nc5dgb8YxgZFSmNxl9bIk2ATaaS7rQm1lsxYfxZfMsqr-4rv7bu1G10N57DZaJOboDGXx3W__luGbU4zp0YTRDI7K0Rd7o7VYLRFkmPydZcmSwigeH_8TUE6fwqjjXc8j4cJKLCeCHRmjO_ojmAaW0vjzKqzreDTxJv5nF67TZA"
               />
-              <span className="text-sm font-bold text-white">LINE</span>
+              <span className="text-sm font-bold text-white">LINEで続ける</span>
             </button>
           </div>
 
@@ -464,7 +466,7 @@ export default function LoginPage() {
                   <div className="w-full border-t border-outline-variant/20" />
                 </div>
                 <div className="relative flex justify-center text-[10px] uppercase tracking-widest font-bold text-outline">
-                  <span className="bg-surface-container-lowest px-4">または他でログイン</span>
+                  <span className="bg-surface-container-lowest px-4">または</span>
                 </div>
               </div>
 
@@ -479,7 +481,7 @@ export default function LoginPage() {
                     src="https://lh3.googleusercontent.com/aida-public/AB6AXuA0hvUXzdt37uZMkV8lZX-2ela1NuiUgR2Pg6-6XFKnDjMFW8NeS7Rv6hZAsvXXpdqvr3f4ChJb1_fmAj4ZQD9tdHE6kG76seyLBY6aPCUsauLkaii-x67WdrJHVXoDOhfd5iLARor9kIVIQWQ6y7tFuwM5DIitvFs_-X7WPezDgPRBybYj8Ea7EUn_-6kV4OwuMqPYffuyYlbrUBUBALFxCMKgw6UaHP2MVPXPFHYDAS2bHuXAA7Uf7Rnrs64eX7ouOhe_XNJ28aw"
                   />
                   <span className="font-label text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
-                    Google
+                    Googleで続ける
                   </span>
                 </a>
                 <button
@@ -491,7 +493,7 @@ export default function LoginPage() {
                     <span className="text-white text-[10px] font-bold">L</span>
                   </div>
                   <span className="font-label text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
-                    LINE
+                    LINEで続ける
                   </span>
                 </button>
               </div>

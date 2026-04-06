@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * GET /api/auth/oauth/line — starts Supabase OAuth (LINE must be enabled in Supabase Auth providers).
+ * Uses signInWithOAuth (same as login): existing LINE identity signs into the same auth user.
  */
 export async function GET(request: Request) {
   const origin = resolveOAuthRedirectOrigin(request);

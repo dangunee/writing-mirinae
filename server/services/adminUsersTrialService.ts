@@ -5,6 +5,8 @@ import type { Db } from "../db/client";
 export type AdminUserTrialRow = {
   userId: string;
   email: string | null;
+  /** ISO string from auth.users.created_at */
+  createdAt: string | null;
   trialLinkedCount: number;
   hasTrialHistory: boolean;
 };
@@ -18,11 +20,13 @@ export async function listAdminUsersWithTrialLinkage(db: Db): Promise<AdminUserT
   const rowList = await db.execute<{
     user_id: string;
     email: string | null;
+    created_at: string | null;
     trial_linked_count: string;
   }>(sql`
     SELECT
       u.id::text AS user_id,
       u.email::text AS email,
+      u.created_at::text AS created_at,
       COALESCE(
         (SELECT COUNT(*)::text
          FROM writing.trial_applications ta
@@ -38,6 +42,7 @@ export async function listAdminUsersWithTrialLinkage(db: Db): Promise<AdminUserT
     rowList as unknown as {
       user_id: string;
       email: string | null;
+      created_at: string | null;
       trial_linked_count: string;
     }[]
   );
@@ -47,6 +52,7 @@ export async function listAdminUsersWithTrialLinkage(db: Db): Promise<AdminUserT
     return {
       userId: r.user_id,
       email: r.email,
+      createdAt: r.created_at ?? null,
       trialLinkedCount,
       hasTrialHistory: trialLinkedCount > 0,
     };

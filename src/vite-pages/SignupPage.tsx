@@ -80,6 +80,10 @@ export default function SignupPage() {
           setError('パスワードが一致しません。')
         } else if (data.error === 'terms_required') {
           setError('利用規約およびプライバシーに関する告知に同意してください。')
+        } else if (data.error === 'email_already_registered') {
+          setError(
+            'このメールアドレスは既に登録されています。ログイン画面からお入りください。パスワードを忘れた場合は再設定をご利用ください。'
+          )
         } else {
           setError('登録を完了できませんでした。入力内容をご確認ください。')
         }
@@ -317,7 +321,7 @@ export default function SignupPage() {
         <div className="relative my-10 flex items-center justify-center">
           <div className="w-full h-px bg-outline-variant opacity-20" />
           <span className="absolute px-4 text-[10px] font-label font-bold text-outline uppercase tracking-widest bg-[#f6f6f8]">
-            Or Register With
+            または
           </span>
         </div>
 
@@ -572,7 +576,7 @@ export default function SignupPage() {
                 </div>
                 <div className="relative flex justify-center text-xs">
                   <span className="bg-surface-container-lowest px-4 text-on-surface-variant font-label tracking-widest uppercase font-bold">
-                    または他サービスで登録
+                    または
                   </span>
                 </div>
               </div>
@@ -583,7 +587,7 @@ export default function SignupPage() {
                   className="flex items-center justify-center gap-3 py-3 border border-surface-variant rounded-lg hover:bg-surface-container transition-colors active:scale-[0.98]"
                 >
                   <img alt="" className="w-5 h-5" src={GOOGLE_G_IMG} />
-                  <span className="text-xs font-bold text-on-surface-variant">Google</span>
+                  <span className="text-xs font-bold text-on-surface-variant">Googleで続ける</span>
                 </a>
                 <button
                   type="button"
@@ -593,7 +597,7 @@ export default function SignupPage() {
                   <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>
                     chat
                   </span>
-                  <span className="text-xs font-bold">LINE</span>
+                  <span className="text-xs font-bold">LINEで続ける</span>
                 </button>
               </div>
 

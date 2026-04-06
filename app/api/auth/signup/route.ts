@@ -15,6 +15,24 @@ type Body = {
   termsAccepted?: boolean;
 };
 
+/** Supabase GoTrue duplicate-email / existing identity signals (message varies by version). */
+function isEmailAlreadyRegisteredError(err: { message?: string; code?: string } | null | undefined): boolean {
+  if (!err) return false;
+  const msg = (err.message ?? "").toLowerCase();
+  const code = (err.code ?? "").toLowerCase();
+  if (code === "user_already_exists" || code === "email_exists") return true;
+  if (
+    msg.includes("already registered") ||
+    msg.includes("already been registered") ||
+    msg.includes("user already exists") ||
+    msg.includes("email address is already registered") ||
+    msg.includes("email already exists")
+  ) {
+    return true;
+  }
+  return false;
+}
+
 /**
  * POST /api/auth/signup — email/password + display name in user_metadata only.
  */
@@ -61,6 +79,9 @@ export async function POST(req: Request) {
       },
     });
     if (error) {
+      if (isEmailAlreadyRegisteredError(error)) {
+        return NextResponse.json({ ok: false, error: "email_already_registered" }, { status: 400 });
+      }
       console.error("auth_signup_supabase", error.message);
       return NextResponse.json({ ok: false, error: "signup_failed" }, { status: 400 });
     }

@@ -59,8 +59,23 @@ type PaginationState = {
 type AdminUserTrialRow = {
   userId: string
   email: string | null
+  createdAt: string | null
   trialLinkedCount: number
   hasTrialHistory: boolean
+}
+
+type AdminTab = 'trial' | 'academy' | 'payment' | 'members'
+
+const ADMIN_TABS: { id: AdminTab; label: string }[] = [
+  { id: 'trial', label: '体験' },
+  { id: 'academy', label: '学園権限' },
+  { id: 'payment', label: '決済権限' },
+  { id: 'members', label: '会員' },
+]
+
+function shortUserId(id: string): string {
+  if (id.length <= 12) return id
+  return `${id.slice(0, 8)}…`
 }
 
 function paymentMethodLabel(m: string): string {
@@ -200,9 +215,11 @@ export default function TrialApplicationsAdminPage() {
   const [sort, setSort] = useState<SortKey>('created_desc')
   const [pagination, setPagination] = useState<PaginationState | null>(null)
 
+  const [activeTab, setActiveTab] = useState<AdminTab>('trial')
   const [sessionAdminUsers, setSessionAdminUsers] = useState<
-    AdminUserTrialRow[] | 'loading' | 'unavailable' | 'error'
-  >('loading')
+    AdminUserTrialRow[] | 'idle' | 'loading' | 'unavailable' | 'error'
+  >('idle')
+  const [expandedMemberId, setExpandedMemberId] = useState<string | null>(null)
 
   const filterKeyRef = useRef({
     debouncedSearch: '',
@@ -219,8 +236,10 @@ export default function TrialApplicationsAdminPage() {
   }, [searchInput])
 
   useEffect(() => {
+    if (activeTab !== 'members') return
     let cancelled = false
     void (async () => {
+      setSessionAdminUsers('loading')
       try {
         const res = await fetch(apiUrl('/api/admin/users'), { credentials: 'include' })
         if (cancelled) return
@@ -234,7 +253,12 @@ export default function TrialApplicationsAdminPage() {
         }
         const data = (await res.json()) as { ok?: boolean; users?: AdminUserTrialRow[] }
         if (data.ok && Array.isArray(data.users)) {
-          setSessionAdminUsers(data.users)
+          setSessionAdminUsers(
+            data.users.map((u) => ({
+              ...u,
+              createdAt: u.createdAt ?? null,
+            }))
+          )
         } else {
           setSessionAdminUsers('error')
         }
@@ -245,7 +269,7 @@ export default function TrialApplicationsAdminPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [activeTab])
 
   const fetchList = useCallback(async (t: string, pageForRequest: number) => {
     setLoading(true)
@@ -303,6 +327,7 @@ export default function TrialApplicationsAdminPage() {
   }, [paymentMethodFilter, debouncedSearch, sort])
 
   useEffect(() => {
+    if (activeTab !== 'trial') return
     const prev = filterKeyRef.current
     const filtersChanged =
       prev.debouncedSearch !== debouncedSearch ||
@@ -321,7 +346,7 @@ export default function TrialApplicationsAdminPage() {
     const sig = `${token}|${debouncedSearch}|${paymentMethodFilter}|${sort}|${page}`
     if (lastFetchedSigRef.current === sig) return
     void fetchList(token, page)
-  }, [token, page, debouncedSearch, paymentMethodFilter, sort, fetchList])
+  }, [activeTab, token, page, debouncedSearch, paymentMethodFilter, sort, fetchList])
 
   const fetchExtensionLogs = useCallback(
     async (applicationId: string, t: string) => {
@@ -509,9 +534,9 @@ export default function TrialApplicationsAdminPage() {
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-[#595c5e]">Admin</p>
-            <h1 className="font-['Plus_Jakarta_Sans'] text-2xl font-extrabold text-[#2c2f32]">体験申込 · アクセス管理</h1>
+            <h1 className="font-['Plus_Jakarta_Sans'] text-2xl font-extrabold text-[#2c2f32]">管理コンソール</h1>
             <p className="mt-1 text-sm text-[#595c5e]">
-              カード・銀行振込を問わず、体験アクセスの再送・延長・履歴を管理します。
+              体験・学園権限・決済・会員の運用。体験タブは従来どおり BFF トークンで一覧・操作します。
             </p>
           </div>
           <Link
@@ -522,51 +547,28 @@ export default function TrialApplicationsAdminPage() {
           </Link>
         </div>
 
-        {sessionAdminUsers === 'loading' ? (
-          <p className="mb-4 text-xs text-[#595c5e]">登録ユーザー（体験紐付け）を確認中…</p>
-        ) : sessionAdminUsers === 'unavailable' ? null : sessionAdminUsers === 'error' ? (
-          <div className="mb-6 rounded-lg border border-dashed border-[#abadb0]/40 bg-white/60 px-3 py-2 text-xs text-[#595c5e]">
-            登録ユーザー別の体験紐付け件数を表示できません（管理者アカウントでログインしているか確認してください）。
-          </div>
-        ) : (
-          <div className="mb-6 rounded-xl border border-[#abadb0]/20 bg-white p-4 shadow-sm">
-            <h2 className="text-sm font-bold text-[#2c2f32]">登録ユーザー（体験紐付け）</h2>
-            <p className="mt-1 text-xs text-[#595c5e]">Supabase 管理者セッションのみ。最大500件。</p>
-            <div className="mt-3 max-h-52 overflow-y-auto">
-              {sessionAdminUsers.length === 0 ? (
-                <p className="text-xs text-[#595c5e]">登録ユーザーがありません。</p>
-              ) : (
-                <table className="w-full min-w-[280px] table-fixed text-left text-xs">
-                  <thead className="border-b border-[#eef1f4] text-[#595c5e]">
-                    <tr>
-                      <th className="py-2 pr-2 font-semibold">メール</th>
-                      <th className="w-28 py-2 font-semibold">体験</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sessionAdminUsers.map((u) => (
-                      <tr key={u.userId} className="border-b border-[#f0f2f4]">
-                        <td className="truncate py-2 pr-2 text-[#2c2f32]" title={u.email ?? undefined}>
-                          {u.email ?? '—'}
-                        </td>
-                        <td className="py-2">
-                          {u.hasTrialHistory ? (
-                            <span className="inline-block rounded-full bg-[#e8f0f8] px-2 py-0.5 font-semibold text-[#4052b6]">
-                              体験 {u.trialLinkedCount}件
-                            </span>
-                          ) : (
-                            <span className="text-[#abadb0]">—</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </div>
-        )}
+        <div className="mb-6 flex flex-wrap gap-1 border-b border-[#e2e5e8]">
+          {ADMIN_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => {
+                setActiveTab(tab.id)
+                if (tab.id !== 'members') setExpandedMemberId(null)
+              }}
+              className={`-mb-px border-b-2 px-3 py-2 text-sm font-semibold transition-colors ${
+                activeTab === tab.id
+                  ? 'border-[#4052b6] text-[#4052b6]'
+                  : 'border-transparent text-[#595c5e] hover:text-[#2c2f32]'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
 
+        {activeTab === 'trial' && (
+          <>
         {!token ? (
           <div className="rounded-xl border border-[#abadb0]/20 bg-white p-6 shadow-sm">
             <p className="mb-3 text-sm text-[#595c5e]">
@@ -997,9 +999,106 @@ export default function TrialApplicationsAdminPage() {
           </div>
         ) : null}
 
-        {token && loading && rows === null ? (
-          <p className="text-center text-sm text-[#595c5e]">読み込み中…</p>
-        ) : null}
+            {token && loading && rows === null ? (
+              <p className="text-center text-sm text-[#595c5e]">読み込み中…</p>
+            ) : null}
+          </>
+        )}
+
+        {activeTab === 'academy' && (
+          <div className="rounded-xl border border-[#abadb0]/20 bg-white p-10 text-center text-sm text-[#595c5e] shadow-sm">
+            学園権限の一覧・操作は準備中です。
+          </div>
+        )}
+
+        {activeTab === 'payment' && (
+          <div className="rounded-xl border border-[#abadb0]/20 bg-white p-10 text-center text-sm text-[#595c5e] shadow-sm">
+            決済権限（受講・エンタイトルメント）の一覧は準備中です。
+          </div>
+        )}
+
+        {activeTab === 'members' && (
+          <div className="rounded-xl border border-[#abadb0]/20 bg-white p-4 shadow-sm">
+            <h2 className="text-sm font-bold text-[#2c2f32]">会員（ログインアカウント）</h2>
+            <p className="mt-1 text-xs text-[#595c5e]">
+              Supabase 管理者セッションのみ。体験申込との紐付け件数を表示します（最大500件）。
+            </p>
+            {sessionAdminUsers === 'idle' || sessionAdminUsers === 'loading' ? (
+              <p className="mt-4 text-xs text-[#595c5e]">読み込み中…</p>
+            ) : sessionAdminUsers === 'unavailable' ? (
+              <p className="mt-4 text-xs text-[#595c5e]">
+                表示するには管理者アカウントでログインしてください。
+              </p>
+            ) : sessionAdminUsers === 'error' ? (
+              <p className="mt-4 text-xs text-[#8b1a1a]">会員一覧の取得に失敗しました。</p>
+            ) : sessionAdminUsers.length === 0 ? (
+              <p className="mt-4 text-xs text-[#595c5e]">登録ユーザーがありません。</p>
+            ) : (
+              <div className="mt-3 max-h-[min(70vh,32rem)] overflow-x-auto overflow-y-auto">
+                <table className="w-full min-w-[720px] table-fixed text-left text-xs">
+                  <thead className="sticky top-0 border-b border-[#eef1f4] bg-[#f8fafc] text-[#595c5e]">
+                    <tr>
+                      <th className="py-2 pr-2 font-semibold">メール</th>
+                      <th className="w-[10rem] py-2 font-semibold">ユーザーID</th>
+                      <th className="w-36 py-2 font-semibold">登録日</th>
+                      <th className="w-32 py-2 font-semibold">体験紐付け</th>
+                      <th className="w-20 py-2 font-semibold"> </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sessionAdminUsers.map((u) => {
+                      const open = expandedMemberId === u.userId
+                      return (
+                        <Fragment key={u.userId}>
+                          <tr className="border-b border-[#f0f2f4] align-middle">
+                            <td className="truncate py-2 pr-2 text-[#2c2f32]" title={u.email ?? undefined}>
+                              {u.email ?? '—'}
+                            </td>
+                            <td
+                              className="font-mono text-[11px] text-[#595c5e]"
+                              title={u.userId}
+                            >
+                              {shortUserId(u.userId)}
+                            </td>
+                            <td className="whitespace-nowrap text-[#595c5e]">
+                              {u.createdAt ? formatJaDate(u.createdAt) : '—'}
+                            </td>
+                            <td className="py-2">
+                              {u.hasTrialHistory ? (
+                                <span className="inline-block rounded-full bg-[#e8f0f8] px-2 py-0.5 font-semibold text-[#4052b6]">
+                                  体験あり · {u.trialLinkedCount}件
+                                </span>
+                              ) : (
+                                <span className="text-[#abadb0]">—</span>
+                              )}
+                            </td>
+                            <td className="py-2">
+                              <button
+                                type="button"
+                                onClick={() => setExpandedMemberId(open ? null : u.userId)}
+                                className="rounded-full border border-[#abadb0]/40 bg-white px-2 py-1 text-[11px] font-semibold text-[#595c5e] hover:bg-[#f8fafc]"
+                              >
+                                {open ? '閉じる' : '詳細'}
+                              </button>
+                            </td>
+                          </tr>
+                          {open ? (
+                            <tr className="bg-[#f8fafc]">
+                              <td colSpan={5} className="px-3 py-2 text-[11px] text-[#595c5e]">
+                                <p className="font-mono break-all text-[#2c2f32]">ID: {u.userId}</p>
+                                <p className="mt-2 text-[#95999c]">会員詳細（権限・履歴の横断表示）は今後追加予定です。</p>
+                              </td>
+                            </tr>
+                          ) : null}
+                        </Fragment>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

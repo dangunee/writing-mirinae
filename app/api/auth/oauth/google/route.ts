@@ -8,6 +8,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * GET /api/auth/oauth/google — starts Supabase OAuth (PKCE + state handled by @supabase/ssr).
+ * Uses signInWithOAuth (same as login): existing Google identity signs into the same auth user; no app-side "signup" fork.
  */
 export async function GET(request: Request) {
   const origin = resolveOAuthRedirectOrigin(request);
