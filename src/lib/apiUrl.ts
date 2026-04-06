@@ -10,6 +10,8 @@
  * `/api/writing/*` も常に同一オリジン。`writing_trial_access` 等の Cookie は writing-mirinae のホストに
  * 紐づくため、`mirinae-api` へ `GET /api/writing/sessions/current` を送ると Cookie が付かず体験判定が壊れる。
  *
+ * `/api/admin/*` はこのデプロイの Route Handler（例: ユーザー一覧・体験紐付け件数）用。セッション Cookie が必要。
+ *
  * 体験決済（trial-payment）は writing-mirinae 同一デプロイの `api/writing/trial-payment/*` を叩く必要がある。
  * `VITE_API_BASE_URL` が mirinae-api 等を指していると Next/Vercel 側のハンドラに届かないため、
  * `trialPaymentApiUrl` は常に相対パス（同一オリジン）を返す。
@@ -25,6 +27,9 @@ function resolveApiUrl(path: string): string {
     return p
   }
   if (p.startsWith('/api/writing/')) {
+    return p
+  }
+  if (p.startsWith('/api/admin')) {
     return p
   }
   const raw = import.meta.env.VITE_API_BASE_URL?.trim() ?? ''

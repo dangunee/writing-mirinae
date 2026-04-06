@@ -49,3 +49,17 @@ export async function getSessionUserId(): Promise<string | null> {
   }
   return user.id;
 }
+
+/** Session user id + email from Supabase cookie only (never from request body). */
+export async function getSessionUser(): Promise<{ id: string; email: string | null } | null> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+  if (error || !user) {
+    return null;
+  }
+  const email = user.email?.trim();
+  return { id: user.id, email: email && email.length > 0 ? email : null };
+}

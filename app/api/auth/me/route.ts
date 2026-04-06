@@ -7,6 +7,7 @@ import {
 } from "../../../../server/lib/authMe";
 import { getDb } from "../../../../server/db/client";
 import { createSupabaseServerClient } from "../../../../server/lib/supabaseServer";
+import { linkTrialApplicationsToUserByEmail } from "../../../../server/services/trialApplicationLinkService";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -53,6 +54,14 @@ export async function GET() {
     let role: AuthRole | null = null;
     try {
       const db = getDb();
+      const email = user.email?.trim();
+      if (email) {
+        try {
+          await linkTrialApplicationsToUserByEmail(db, user.id, email);
+        } catch {
+          /* Trial linkage is best-effort; must not affect auth/me. */
+        }
+      }
       entitlements = await computeEntitlementsForUser(db, user.id);
       role = resolveRoleFromEnv(user.id);
     } catch (dbErr) {

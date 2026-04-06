@@ -6,7 +6,7 @@
  */
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { trialAdminBffApiUrl } from '../lib/apiUrl'
+import { apiUrl, trialAdminBffApiUrl } from '../lib/apiUrl'
 
 const STORAGE_KEY = 'writing_trial_admin_bff_token'
 
@@ -54,6 +54,13 @@ type PaginationState = {
   pageSize: number
   totalItems: number
   totalPages: number
+}
+
+type AdminUserTrialRow = {
+  userId: string
+  email: string | null
+  trialLinkedCount: number
+  hasTrialHistory: boolean
 }
 
 function paymentMethodLabel(m: string): string {
@@ -193,6 +200,10 @@ export default function TrialApplicationsAdminPage() {
   const [sort, setSort] = useState<SortKey>('created_desc')
   const [pagination, setPagination] = useState<PaginationState | null>(null)
 
+  const [sessionAdminUsers, setSessionAdminUsers] = useState<
+    AdminUserTrialRow[] | 'loading' | 'unavailable' | 'error'
+  >('loading')
+
   const filterKeyRef = useRef({
     debouncedSearch: '',
     paymentMethodFilter: 'all' as PaymentMethodFilter,
@@ -206,6 +217,35 @@ export default function TrialApplicationsAdminPage() {
     }, 300)
     return () => window.clearTimeout(id)
   }, [searchInput])
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await fetch(apiUrl('/api/admin/users'), { credentials: 'include' })
+        if (cancelled) return
+        if (res.status === 401 || res.status === 403) {
+          setSessionAdminUsers('unavailable')
+          return
+        }
+        if (!res.ok) {
+          setSessionAdminUsers('error')
+          return
+        }
+        const data = (await res.json()) as { ok?: boolean; users?: AdminUserTrialRow[] }
+        if (data.ok && Array.isArray(data.users)) {
+          setSessionAdminUsers(data.users)
+        } else {
+          setSessionAdminUsers('error')
+        }
+      } catch {
+        if (!cancelled) setSessionAdminUsers('error')
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const fetchList = useCallback(async (t: string, pageForRequest: number) => {
     setLoading(true)
@@ -481,6 +521,51 @@ export default function TrialApplicationsAdminPage() {
             サイトへ戻る
           </Link>
         </div>
+
+        {sessionAdminUsers === 'loading' ? (
+          <p className="mb-4 text-xs text-[#595c5e]">登録ユーザー（体験紐付け）を確認中…</p>
+        ) : sessionAdminUsers === 'unavailable' ? null : sessionAdminUsers === 'error' ? (
+          <div className="mb-6 rounded-lg border border-dashed border-[#abadb0]/40 bg-white/60 px-3 py-2 text-xs text-[#595c5e]">
+            登録ユーザー別の体験紐付け件数を表示できません（管理者アカウントでログインしているか確認してください）。
+          </div>
+        ) : (
+          <div className="mb-6 rounded-xl border border-[#abadb0]/20 bg-white p-4 shadow-sm">
+            <h2 className="text-sm font-bold text-[#2c2f32]">登録ユーザー（体験紐付け）</h2>
+            <p className="mt-1 text-xs text-[#595c5e]">Supabase 管理者セッションのみ。最大500件。</p>
+            <div className="mt-3 max-h-52 overflow-y-auto">
+              {sessionAdminUsers.length === 0 ? (
+                <p className="text-xs text-[#595c5e]">登録ユーザーがありません。</p>
+              ) : (
+                <table className="w-full min-w-[280px] table-fixed text-left text-xs">
+                  <thead className="border-b border-[#eef1f4] text-[#595c5e]">
+                    <tr>
+                      <th className="py-2 pr-2 font-semibold">メール</th>
+                      <th className="w-28 py-2 font-semibold">体験</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sessionAdminUsers.map((u) => (
+                      <tr key={u.userId} className="border-b border-[#f0f2f4]">
+                        <td className="truncate py-2 pr-2 text-[#2c2f32]" title={u.email ?? undefined}>
+                          {u.email ?? '—'}
+                        </td>
+                        <td className="py-2">
+                          {u.hasTrialHistory ? (
+                            <span className="inline-block rounded-full bg-[#e8f0f8] px-2 py-0.5 font-semibold text-[#4052b6]">
+                              体験 {u.trialLinkedCount}件
+                            </span>
+                          ) : (
+                            <span className="text-[#abadb0]">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        )}
 
         {!token ? (
           <div className="rounded-xl border border-[#abadb0]/20 bg-white p-6 shadow-sm">

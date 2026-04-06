@@ -322,6 +322,44 @@ export const academyUnlimitedGrants = writing.table(
   (t) => [index("idx_academy_unlimited_grants_invite_id").on(t.inviteId)]
 );
 
+/** Trial applications (mirrors mirinae-api / sql/writing_trial_entitlements.sql + extensions). */
+export const trialApplications = writing.table(
+  "trial_applications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    applicantName: text("applicant_name").notNull(),
+    applicantEmail: text("applicant_email").notNull(),
+    koreanLevel: text("korean_level"),
+    inquiry: text("inquiry"),
+    paymentMethod: text("payment_method").notNull(),
+    paymentStatus: text("payment_status").notNull().default("pending"),
+    accessStatus: text("access_status").notNull().default("pending"),
+    stripeCheckoutSessionId: text("stripe_checkout_session_id"),
+    stripePaymentIntentId: text("stripe_payment_intent_id"),
+    stripeCustomerEmail: text("stripe_customer_email"),
+    amountJpy: integer("amount_jpy").notNull(),
+    currency: text("currency").notNull().default("jpy"),
+    bankTransferConfirmedAt: timestamp("bank_transfer_confirmed_at", { withTimezone: true }),
+    bankTransferConfirmedBy: uuid("bank_transfer_confirmed_by"),
+    accessReadyAt: timestamp("access_ready_at", { withTimezone: true }),
+    accessUsedAt: timestamp("access_used_at", { withTimezone: true }),
+    accessExpiresAt: timestamp("access_expires_at", { withTimezone: true }),
+    lastExtendedAt: timestamp("last_extended_at", { withTimezone: true }),
+    extendCount: integer("extend_count").notNull().default(0),
+    accessEmailSentAt: timestamp("access_email_sent_at", { withTimezone: true }),
+    adminNote: text("admin_note"),
+    userId: uuid("user_id").references(() => authUsers.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("trial_applications_stripe_checkout_session_id_unique").on(t.stripeCheckoutSessionId),
+    index("trial_applications_applicant_email_idx").on(t.applicantEmail),
+    index("trial_applications_stripe_checkout_session_id_idx").on(t.stripeCheckoutSessionId),
+    index("trial_applications_user_id_idx").on(t.userId),
+  ]
+);
+
 export const writingSessions = writing.table(
   "sessions",
   {
