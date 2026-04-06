@@ -19,60 +19,73 @@ function mirinaeApiBase(): string | null {
   return base.replace(/\/$/, "");
 }
 
-/**
- * GET /api/writing/sessions/current
- * Identity: Supabase session (student) → trial cookie (upstream) → regular mail-link cookie.
- * No client-supplied userId / grantId.
- */
-export async function GET(req: Request) {
-  const db = getDb();
-  const userId = await getSessionUserId();
-  if (userId) {
-    const result = await getCurrentSessionForStudent(db, userId);
-    if (!result.ok) {
-      return NextResponse.json({ error: result.error }, { status: 404 });
-    }
-    return NextResponse.json(result);
-  }
-
+async function tryTrialSessionFromCookie(req: Request, db: ReturnType<typeof getDb>) {
   const cookieHeader = req.headers.get("cookie") ?? "";
-
   const trialBase = mirinaeApiBase();
-  if (trialBase && cookieHeader.includes("writing_trial_access=")) {
-    try {
-      const upstream = await fetch(`${trialBase}/api/writing/trial/session/current`, {
-        headers: { Cookie: cookieHeader },
-      });
-      if (upstream.ok) {
-        const j = (await upstream.json()) as {
-          ok?: boolean;
-          application?: { id?: string; accessExpiresAt?: string | null };
-        };
-        if (j?.ok === true && j.application?.id) {
-          const applicationId = j.application.id;
-          const accessExpiresAt = j.application.accessExpiresAt ?? null;
-          const trialCourseId = process.env.WRITING_TRIAL_COURSE_ID?.trim();
-          if (trialCourseId) {
-            const trialSession = await getCurrentSessionForTrialApplication(db, applicationId);
-            if (trialSession.ok === true && trialSession.accessKind === "trial") {
-              return NextResponse.json({
-                ...trialSession,
-                accessExpiresAt: accessExpiresAt ?? trialSession.accessExpiresAt,
-              });
-            }
-          }
+  if (!trialBase || !cookieHeader.includes("writing_trial_access=")) {
+    return null;
+  }
+  try {
+    const upstream = await fetch(`${trialBase}/api/writing/trial/session/current`, {
+      headers: { Cookie: cookieHeader },
+    });
+    if (!upstream.ok) {
+      return null;
+    }
+    const j = (await upstream.json()) as {
+      ok?: boolean;
+      application?: { id?: string; accessExpiresAt?: string | null };
+    };
+    if (j?.ok === true && j.application?.id) {
+      const applicationId = j.application.id;
+      const accessExpiresAt = j.application.accessExpiresAt ?? null;
+      const trialCourseId = process.env.WRITING_TRIAL_COURSE_ID?.trim();
+      if (trialCourseId) {
+        const trialSession = await getCurrentSessionForTrialApplication(db, applicationId);
+        if (trialSession.ok === true && trialSession.accessKind === "trial") {
           return NextResponse.json({
-            ok: true,
-            accessKind: "trial" as const,
-            applicationId,
-            canSubmit: true,
-            expiresAt: accessExpiresAt,
+            ...trialSession,
+            accessExpiresAt: accessExpiresAt ?? trialSession.accessExpiresAt,
           });
         }
       }
-    } catch (e) {
-      console.warn("sessions_current_trial_upstream", e);
+      return NextResponse.json({
+        ok: true,
+        accessKind: "trial" as const,
+        applicationId,
+        canSubmit: true,
+        expiresAt: accessExpiresAt,
+      });
     }
+  } catch (e) {
+    console.warn("sessions_current_trial_upstream", e);
+  }
+  return null;
+}
+
+/**
+ * GET /api/writing/sessions/current
+ * Identity: Supabase session (student) → trial cookie (upstream) → regular mail-link cookie.
+ * If logged in but no platform course, still try trial / regular grant (trial mail users may be logged in).
+ */
+export async function GET(req: Request) {
+  const db = getDb();
+  const cookieHeader = req.headers.get("cookie") ?? "";
+
+  const userId = await getSessionUserId();
+  let studentError: string | undefined;
+
+  if (userId) {
+    const result = await getCurrentSessionForStudent(db, userId);
+    if (result.ok) {
+      return NextResponse.json(result);
+    }
+    studentError = "error" in result ? String(result.error) : "no_active_course";
+  }
+
+  const trialRes = await tryTrialSessionFromCookie(req, db);
+  if (trialRes) {
+    return trialRes;
   }
 
   const grantId = parseRegularWritingGrantIdFromCookieHeader(cookieHeader);
@@ -87,6 +100,10 @@ export async function GET(req: Request) {
       advancedToNextCourse: advance.advanced,
       previousCourseId: advance.previousCourseId,
     });
+  }
+
+  if (userId) {
+    return NextResponse.json({ error: studentError ?? "not_found" }, { status: 404 });
   }
 
   return NextResponse.json({ error: "unauthorized" }, { status: 401 });
