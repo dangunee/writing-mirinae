@@ -62,22 +62,35 @@ async function lineNeedsEmailOnboarding(userId: string): Promise<boolean> {
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const origin = getPublicOrigin(request);
+  const code = url.searchParams.get("code");
+  const oauthErr = url.searchParams.get("error") ?? url.searchParams.get("error_description");
+
+  /* Temporary LINE OAuth diagnostics — remove after verifying production flow */
+  console.log("[auth/callback] request", {
+    url: request.url,
+    pathname: url.pathname,
+    hasCode: Boolean(code),
+    hasOAuthErrorParam: Boolean(oauthErr),
+    next: url.searchParams.get("next"),
+  });
 
   if (!isAllowedOrigin(origin)) {
+    console.log("[auth/callback] reject", { reason: "origin_not_allowed", origin });
     return NextResponse.redirect(`${origin}${LOGIN_WITH_AUTH_ERROR}?auth_error=exchange_failed`);
   }
 
-  const oauthErr = url.searchParams.get("error") ?? url.searchParams.get("error_description");
   if (oauthErr) {
+    console.log("[auth/callback] reject", { reason: "oauth_error_query", oauthErr });
     return NextResponse.redirect(`${origin}${LOGIN_WITH_AUTH_ERROR}?auth_error=access_denied`);
   }
 
-  const code = url.searchParams.get("code");
   if (!code) {
+    console.log("[auth/callback] reject", { reason: "missing_code" });
     return NextResponse.redirect(`${origin}${LOGIN_WITH_AUTH_ERROR}?auth_error=missing_code`);
   }
 
   const nextPath = normalizeNext(url.searchParams.get("next"));
+  console.log("[auth/callback] normalized_next", { nextPath });
 
   try {
     const { url: supabaseUrl, anon } = requireSupabaseEnv();
@@ -100,8 +113,11 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (error) {
       console.error("auth_callback_exchange_failed", error.message);
+      console.log("[auth/callback] exchange", { ok: false, message: error.message });
       return NextResponse.redirect(`${origin}${LOGIN_WITH_AUTH_ERROR}?auth_error=exchange_failed`);
     }
+
+    console.log("[auth/callback] exchange", { ok: true });
 
     const {
       data: { user },
@@ -125,10 +141,13 @@ export async function GET(request: Request) {
       }
     });
 
-    console.log("[auth/callback] exchange_ok", { nextPath: redirectPath });
+    const finalUrl = `${origin}${redirectPath}`;
+    console.log("[auth/callback] final_redirect", { redirectPath, finalUrl, userId: user?.id ?? null });
+
     return out;
   } catch (e) {
     console.error("auth_callback_failed", e);
+    console.log("[auth/callback] reject", { reason: "exception" });
     return NextResponse.redirect(`${origin}${LOGIN_WITH_AUTH_ERROR}?auth_error=exchange_failed`);
   }
 }

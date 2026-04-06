@@ -41,7 +41,7 @@
       "destination": "/api/writing/admin/regular-access-grants/dev-seed"
     },
     {
-      "source": "/((?!api/).*)",
+      "source": "/((?!api/)(?!auth/).*)",
       "destination": "/index.html"
     }
   ]
