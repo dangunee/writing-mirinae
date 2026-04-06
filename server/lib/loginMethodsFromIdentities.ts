@@ -14,6 +14,6 @@ export function loginMethodsFromIdentities(identities: UserIdentity[] | undefine
   return {
     email: set.has("email"),
     google: set.has("google"),
-    line: set.has("line"),
+    line: set.has("line") || set.has("custom:line"),
   };
 }

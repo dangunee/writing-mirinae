@@ -29,6 +29,18 @@ export async function getIdentityProvidersForUserId(userId: string): Promise<str
   return (r as { provider: string }[]).map((x) => x.provider);
 }
 
+/**
+ * LINE may appear as `line` or `custom:line` (browser OAuth) in auth.identities.provider.
+ */
+export function isLineIdentityProvider(provider: string): boolean {
+  return provider === "line" || provider === "custom:line";
+}
+
+export async function userHasLineIdentity(userId: string): Promise<boolean> {
+  const providers = await getIdentityProvidersForUserId(userId);
+  return providers.some(isLineIdentityProvider);
+}
+
 export async function userHasProvider(userId: string, provider: string): Promise<boolean> {
   const providers = await getIdentityProvidersForUserId(userId);
   return providers.includes(provider);

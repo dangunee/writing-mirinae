@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { profiles } from "../../../../../../db/schema";
 import { getDb } from "../../../../../../server/db/client";
 import { findAuthUserIdByEmail } from "../../../../../../server/lib/authUsersLookup";
-import { userHasProvider } from "../../../../../../server/lib/authIdentitiesLookup";
+import { userHasLineIdentity } from "../../../../../../server/lib/authIdentitiesLookup";
 import { getSessionUser } from "../../../../../../server/lib/supabaseServer";
 
 export const runtime = "nodejs";
@@ -44,7 +44,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 
-  const hasLine = await userHasProvider(session.id, "line");
+  const hasLine = await userHasLineIdentity(session.id);
   if (!hasLine) {
     return NextResponse.json({ ok: false, error: "invalid_session" }, { status: 400 });
   }

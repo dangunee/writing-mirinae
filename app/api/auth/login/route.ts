@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 
+import {
+  getIdentityProvidersForUserId,
+  isLineIdentityProvider,
+} from "../../../../server/lib/authIdentitiesLookup";
 import { findAuthUserIdByEmail } from "../../../../server/lib/authUsersLookup";
-import { getIdentityProvidersForUserId } from "../../../../server/lib/authIdentitiesLookup";
 import { createSupabaseServerClient } from "../../../../server/lib/supabaseServer";
 
 export const runtime = "nodejs";
@@ -45,7 +48,7 @@ export async function POST(req: Request) {
               { status: 401 }
             );
           }
-          if (providers.includes("line")) {
+          if (providers.some(isLineIdentityProvider)) {
             return NextResponse.json(
               { ok: false, error: "wrong_login_method", expected: "line" },
               { status: 401 }

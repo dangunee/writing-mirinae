@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { Provider } from "@supabase/supabase-js";
 
 import { getPublicOrigin, isAllowedOrigin } from "../../../../../server/lib/authOrigin";
-import { userHasProvider } from "../../../../../server/lib/authIdentitiesLookup";
+import { userHasLineIdentity } from "../../../../../server/lib/authIdentitiesLookup";
 import { createSupabaseServerClient } from "../../../../../server/lib/supabaseServer";
 
 export const runtime = "nodejs";
@@ -22,7 +22,7 @@ async function startLineLink(request: Request): Promise<Response> {
     if (!user) {
       return NextResponse.redirect(`${origin}/writing/login`);
     }
-    if (await userHasProvider(user.id, "line")) {
+    if (await userHasLineIdentity(user.id)) {
       return NextResponse.json({ ok: false, error: "already_linked" }, { status: 400 });
     }
     const { data, error } = await supabase.auth.linkIdentity({

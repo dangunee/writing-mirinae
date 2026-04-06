@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { findAuthUserIdByEmail } from "../../../../../../server/lib/authUsersLookup";
-import { userHasProvider } from "../../../../../../server/lib/authIdentitiesLookup";
+import { userHasLineIdentity } from "../../../../../../server/lib/authIdentitiesLookup";
 import { resolveAuthAppOrigin } from "../../../../../../server/lib/authOrigin";
 import { createEmailVerificationToken } from "../../../../../../server/lib/emailVerificationToken";
 import { getSessionUser } from "../../../../../../server/lib/supabaseServer";
@@ -35,7 +35,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const hasLine = await userHasProvider(session.id, "line");
+    const hasLine = await userHasLineIdentity(session.id);
     if (!hasLine) {
       return NextResponse.json({ ok: true });
     }

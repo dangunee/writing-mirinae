@@ -5,7 +5,10 @@ import { NextResponse } from "next/server";
 
 import { profiles } from "../../../db/schema";
 import { getDb } from "../../../server/db/client";
-import { userHasProvider } from "../../../server/lib/authIdentitiesLookup";
+import {
+  getIdentityProvidersForUserId,
+  isLineIdentityProvider,
+} from "../../../server/lib/authIdentitiesLookup";
 import { getPublicOrigin, isAllowedOrigin } from "../../../server/lib/authOrigin";
 
 export const runtime = "nodejs";
@@ -43,19 +46,6 @@ function normalizeNext(next: string | null): string {
   return fallback;
 }
 
-async function lineNeedsEmailOnboarding(userId: string): Promise<boolean> {
-  const hasLine = await userHasProvider(userId, "line");
-  if (!hasLine) return false;
-  const db = getDb();
-  const rows = await db
-    .select({ onboardingCompletedAt: profiles.onboardingCompletedAt })
-    .from(profiles)
-    .where(eq(profiles.id, userId))
-    .limit(1);
-  const p = rows[0];
-  return p?.onboardingCompletedAt == null;
-}
-
 /**
  * LINE OAuth completes here (`/auth/callback`) — exchange session cookies, then optional redirect to onboarding.
  */
@@ -65,7 +55,6 @@ export async function GET(request: Request) {
   const code = url.searchParams.get("code");
   const oauthErr = url.searchParams.get("error") ?? url.searchParams.get("error_description");
 
-  /* Temporary LINE OAuth diagnostics — remove after verifying production flow */
   console.log("[auth/callback] request", {
     url: request.url,
     pathname: url.pathname,
@@ -123,15 +112,64 @@ export async function GET(request: Request) {
       data: { user },
     } = await supabase.auth.getUser();
 
-    let redirectPath = nextPath;
+    const jwtProviders = (user?.identities ?? []).map((i) => i.provider);
+    const jwtIdentitiesDetail = (user?.identities ?? []).map((i) => ({
+      provider: i.provider,
+      identityId: i.identity_id ?? i.id,
+    }));
+
+    let dbProviders: string[] = [];
     if (user?.id) {
       try {
-        if (await lineNeedsEmailOnboarding(user.id)) {
-          redirectPath = "/writing/onboarding";
-        }
+        dbProviders = await getIdentityProvidersForUserId(user.id);
       } catch (e) {
-        console.error("auth_callback_onboarding_check_failed", e);
+        console.error("[auth/callback] db_providers_failed", e);
       }
+    }
+
+    const mergedProviders = [...new Set([...jwtProviders, ...dbProviders])];
+    const isLineUser = mergedProviders.some(isLineIdentityProvider);
+
+    console.log("[auth/callback] providers", mergedProviders);
+    console.log("[auth/callback] identities_jwt", jwtIdentitiesDetail);
+    console.log("[auth/callback] providers_db", dbProviders);
+    console.log("[auth/callback] isLineUser", isLineUser);
+
+    let profileExists = false;
+    let onboardingCompletedAt: Date | null = null;
+    if (user?.id) {
+      try {
+        const db = getDb();
+        const rows = await db
+          .select({ onboardingCompletedAt: profiles.onboardingCompletedAt })
+          .from(profiles)
+          .where(eq(profiles.id, user.id))
+          .limit(1);
+        profileExists = rows.length > 0;
+        onboardingCompletedAt = rows[0]?.onboardingCompletedAt ?? null;
+      } catch (e) {
+        console.error("[auth/callback] profile_lookup_failed", e);
+      }
+    }
+
+    console.log("[auth/callback] profile exists", profileExists);
+    console.log("[auth/callback] onboarding_completed_at", onboardingCompletedAt?.toISOString() ?? null);
+
+    let redirectPath = nextPath;
+    if (user?.id && isLineUser) {
+      const needsOnboarding = !profileExists || onboardingCompletedAt == null;
+      console.log("[auth/callback] final decision", {
+        needsOnboarding,
+        chosenPath: needsOnboarding ? "/writing/onboarding" : nextPath,
+      });
+      if (needsOnboarding) {
+        redirectPath = "/writing/onboarding";
+      }
+    } else {
+      console.log("[auth/callback] final decision", {
+        reason: user?.id ? "not_line_user_skip_onboarding_gate" : "no_user",
+        chosenPath: nextPath,
+      });
     }
 
     const out = NextResponse.redirect(`${origin}${redirectPath}`);
