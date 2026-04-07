@@ -5,6 +5,10 @@
  * 3) Fragment / text flooding: caps on fragment count and per-field length; reject oversized payloads before DB.
  * 4) Double-publish / race: single UPDATE ... WHERE status = 'draft' + DB triggers; concurrent publishes surface as failed update.
  * 5) Audit / future assignment: log teacherUserId + submissionId on mutations (structured console in v1); course-level teacher_id can restrict queue later.
+ *
+ * Structured correction data: writing.corrections (rich_document_json, improved_text) plus correction_feedback_items,
+ * correction_annotations, correction_evaluations. Legacy writing.fragments + writing.evaluations remain for current UI;
+ * fragments replace dual-writes feedback_items; evaluation save dual-writes correction_evaluations (publish trigger still reads writing.evaluations).
  */
 
 import { PostgresError } from "postgres";
@@ -16,8 +20,13 @@ import { getSignedImageUrl } from "./writingStudentService";
 const EDITABLE_SUBMISSION_STATUSES = ["submitted", "in_review"] as const;
 
 const MAX_FRAGMENTS = 500;
+const MAX_FEEDBACK_ITEMS = 500;
+const MAX_ANNOTATIONS = 500;
 const MAX_FRAGMENT_FIELD_CHARS = 12_000;
 const MAX_CORRECTION_FIELD_CHARS = 100_000;
+const MAX_RICH_JSON_CHARS = 500_000;
+const MAX_FEEDBACK_CATEGORY_CHARS = 80;
+const MAX_SUBCATEGORY_CHARS = 120;
 
 const ERROR_CATEGORIES = [
   "grammar",
@@ -40,6 +49,33 @@ function nonEmptyTrimmed(s: string | null | undefined): boolean {
 
 function isValidScore(n: unknown): n is number {
   return typeof n === "number" && Number.isInteger(n) && n >= 0 && n <= 100;
+}
+
+/** Structured rich text (ProseMirror-like JSON): non-empty object/array; excludes `{}` and `[]`. */
+export function isNonEmptyRichJson(v: unknown): boolean {
+  if (v == null) return false;
+  if (typeof v !== "object") return false;
+  try {
+    const s = JSON.stringify(v);
+    return s.length > 2;
+  } catch {
+    return false;
+  }
+}
+
+function validateRichDocumentJson(
+  v: unknown
+): { ok: true; value: unknown } | { ok: false; code: string } {
+  if (v === undefined) return { ok: true, value: undefined };
+  if (v === null) return { ok: true, value: null };
+  if (typeof v !== "object") return { ok: false, code: "invalid_rich_document_json" };
+  try {
+    const s = JSON.stringify(v);
+    if (s.length > MAX_RICH_JSON_CHARS) return { ok: false, code: "rich_document_too_large" };
+    return { ok: true, value: JSON.parse(s) as unknown };
+  } catch {
+    return { ok: false, code: "invalid_rich_document_json" };
+  }
 }
 
 function queueSortKeyFromItem(it: QueueItem): number {
@@ -118,47 +154,79 @@ export async function getTeacherQueueGrouped(db: Db): Promise<QueueGroupedRespon
 }
 
 export type TeacherSubmissionDetail = {
-      submission: {
-        id: string;
-        /** Logged-in student; null for mail-link regular access. */
-        userId: string | null;
-        regularAccessGrantId: string | null;
-        status: string;
-        bodyText: string | null;
-        imageMimeType: string | null;
-        imageUrl: string | null;
-        submittedAt: string | null;
-        createdAt: string;
-        updatedAt: string;
-      };
-      session: { id: string; index: number; status: string; unlockAt: string };
-      course: { id: string; status: string; sessionCount: number };
-      correction: null | {
-        id: string;
-        teacherId: string;
-        status: string;
-        polishedSentence: string | null;
-        modelAnswer: string | null;
-        teacherComment: string | null;
-        publishedAt: string | null;
-        createdAt: string;
-        updatedAt: string;
-      };
-      fragments: Array<{
-        id: string;
-        orderIndex: number;
-        originalText: string;
-        correctedText: string;
-        category: string;
-        startOffset: number | null;
-        endOffset: number | null;
-      }>;
-      evaluation: null | {
-        grammarAccuracy: number | null;
-        vocabularyUsage: number | null;
-        contextualFluency: number | null;
-      };
-    };
+  submission: {
+    id: string;
+    /** Logged-in student; null for mail-link regular access. */
+    userId: string | null;
+    regularAccessGrantId: string | null;
+    status: string;
+    bodyText: string | null;
+    imageMimeType: string | null;
+    imageUrl: string | null;
+    submittedAt: string | null;
+    createdAt: string;
+    updatedAt: string;
+  };
+  session: {
+    id: string;
+    index: number;
+    status: string;
+    runtimeStatus: string | null;
+    unlockAt: string;
+  };
+  course: { id: string; status: string; sessionCount: number };
+  correction: null | {
+    id: string;
+    teacherId: string;
+    status: string;
+    polishedSentence: string | null;
+    modelAnswer: string | null;
+    teacherComment: string | null;
+    richDocumentJson: unknown | null;
+    improvedText: string | null;
+    publishedAt: string | null;
+    createdAt: string;
+    updatedAt: string;
+  };
+  fragments: Array<{
+    id: string;
+    orderIndex: number;
+    originalText: string;
+    correctedText: string;
+    category: string;
+    startOffset: number | null;
+    endOffset: number | null;
+  }>;
+  feedbackItems: Array<{
+    id: string;
+    sortOrder: number;
+    category: string;
+    subcategory: string | null;
+    originalText: string;
+    correctedText: string;
+    explanation: string | null;
+  }>;
+  annotations: Array<{
+    id: string;
+    sortOrder: number;
+    targetType: string;
+    anchorText: string | null;
+    startOffset: number | null;
+    endOffset: number | null;
+    commentText: string;
+  }>;
+  evaluation: null | {
+    grammarAccuracy: number | null;
+    vocabularyUsage: number | null;
+    contextualFluency: number | null;
+  };
+  correctionEvaluation: null | {
+    grammar: number | null;
+    vocabulary: number | null;
+    flow: number | null;
+    coherence: number | null;
+  };
+};
 
 export async function getTeacherSubmissionDetail(
   db: Db,
@@ -176,7 +244,16 @@ export async function getTeacherSubmissionDetail(
   const fragments = correction
     ? await repo.listFragmentsForCorrection(db, correction.id)
     : [];
+  const feedbackItems = correction
+    ? await repo.listFeedbackItemsForCorrection(db, correction.id)
+    : [];
+  const annotations = correction
+    ? await repo.listAnnotationsForCorrection(db, correction.id)
+    : [];
   const evaluation = await repo.getEvaluationBySubmission(db, submissionId);
+  const correctionEvaluation = correction
+    ? await repo.getCorrectionEvaluationByCorrectionId(db, correction.id)
+    : null;
 
   return {
     submission: {
@@ -195,6 +272,7 @@ export async function getTeacherSubmissionDetail(
       id: row.session.id,
       index: row.session.index,
       status: row.session.status,
+      runtimeStatus: row.session.runtimeStatus ?? null,
       unlockAt: row.session.unlockAt.toISOString(),
     },
     course: {
@@ -210,6 +288,8 @@ export async function getTeacherSubmissionDetail(
           polishedSentence: correction.polishedSentence,
           modelAnswer: correction.modelAnswer,
           teacherComment: correction.teacherComment,
+          richDocumentJson: correction.richDocumentJson ?? null,
+          improvedText: correction.improvedText,
           publishedAt: correction.publishedAt?.toISOString() ?? null,
           createdAt: correction.createdAt.toISOString(),
           updatedAt: correction.updatedAt.toISOString(),
@@ -224,11 +304,37 @@ export async function getTeacherSubmissionDetail(
       startOffset: f.startOffset,
       endOffset: f.endOffset,
     })),
+    feedbackItems: feedbackItems.map((f) => ({
+      id: f.id,
+      sortOrder: f.sortOrder,
+      category: f.category,
+      subcategory: f.subcategory,
+      originalText: f.originalText,
+      correctedText: f.correctedText,
+      explanation: f.explanation,
+    })),
+    annotations: annotations.map((a) => ({
+      id: a.id,
+      sortOrder: a.sortOrder,
+      targetType: a.targetType,
+      anchorText: a.anchorText,
+      startOffset: a.startOffset,
+      endOffset: a.endOffset,
+      commentText: a.commentText,
+    })),
     evaluation: evaluation
       ? {
           grammarAccuracy: evaluation.grammarAccuracy,
           vocabularyUsage: evaluation.vocabularyUsage,
           contextualFluency: evaluation.contextualFluency,
+        }
+      : null,
+    correctionEvaluation: correctionEvaluation
+      ? {
+          grammar: correctionEvaluation.grammar,
+          vocabulary: correctionEvaluation.vocabulary,
+          flow: correctionEvaluation.flow,
+          coherence: correctionEvaluation.coherence,
         }
       : null,
   };
@@ -284,6 +390,8 @@ async function ensureCorrectionDraftForTeacher(
       polishedSentence: null,
       modelAnswer: null,
       teacherComment: null,
+      richDocumentJson: null,
+      improvedText: null,
       publishedAt: null,
     });
     await maybeSetInReview(db, submissionId, submissionStatus);
@@ -300,24 +408,25 @@ export type SaveCorrectionBody = {
   polishedSentence?: string | null;
   modelAnswer?: string | null;
   teacherComment?: string | null;
+  richDocumentJson?: unknown;
+  improvedText?: string | null;
 };
 
-export type ServiceError =
-  | { ok: false; status: number; code: string };
+export type ServiceError = { ok: false; status: number; code: string };
 
 export async function saveCorrectionDraft(
   db: Db,
   teacherId: string,
   submissionId: string,
   body: SaveCorrectionBody
-): Promise<{ ok: true; correctionId: string } | ServiceError> {
+): Promise<{ ok: true; correctionId: string; status: string } | ServiceError> {
   const row = await repo.getSubmissionFullForTeacher(db, submissionId);
   if (!row) return { ok: false, status: 404, code: "not_found" };
 
   const el = assertEditableSubmission(row.submission.status);
   if (!el.ok) return { ok: false, status: 409, code: el.code };
 
-  for (const v of [body.polishedSentence, body.modelAnswer, body.teacherComment]) {
+  for (const v of [body.polishedSentence, body.modelAnswer, body.teacherComment, body.improvedText]) {
     if (typeof v === "string" && v.length > MAX_CORRECTION_FIELD_CHARS) {
       return { ok: false, status: 400, code: "field_too_long" };
     }
@@ -326,17 +435,26 @@ export async function saveCorrectionDraft(
   const ensured = await ensureCorrectionDraftForTeacher(db, teacherId, submissionId, row.submission.status);
   if (!ensured.ok) return { ok: false, status: ensured.status, code: ensured.code };
 
-  const patch: {
-    polishedSentence?: string | null;
-    modelAnswer?: string | null;
-    teacherComment?: string | null;
-  } = {};
+  const patch: Partial<{
+    polishedSentence: string | null;
+    modelAnswer: string | null;
+    teacherComment: string | null;
+    richDocumentJson: unknown;
+    improvedText: string | null;
+  }> = {};
+
   if ("polishedSentence" in body) patch.polishedSentence = body.polishedSentence ?? null;
   if ("modelAnswer" in body) patch.modelAnswer = body.modelAnswer ?? null;
   if ("teacherComment" in body) patch.teacherComment = body.teacherComment ?? null;
+  if ("improvedText" in body) patch.improvedText = body.improvedText ?? null;
+  if ("richDocumentJson" in body) {
+    const vr = validateRichDocumentJson(body.richDocumentJson);
+    if (!vr.ok) return { ok: false, status: 400, code: vr.code };
+    patch.richDocumentJson = vr.value;
+  }
 
   if (Object.keys(patch).length === 0) {
-    return { ok: true, correctionId: ensured.correction.id };
+    return { ok: true, correctionId: ensured.correction.id, status: ensured.correction.status };
   }
 
   const updated = await repo.updateCorrectionDraft(db, ensured.correction.id, teacherId, patch);
@@ -354,7 +472,7 @@ export async function saveCorrectionDraft(
     })
   );
 
-  return { ok: true, correctionId: updated.id };
+  return { ok: true, correctionId: updated.id, status: updated.status };
 }
 
 export type FragmentInput = {
@@ -408,11 +526,7 @@ export async function replaceSubmissionFragments(
     if (eo !== undefined && eo !== null && (!Number.isInteger(eo) || eo < 0)) {
       return { ok: false, status: 400, code: "invalid_offset" };
     }
-    if (
-      so != null &&
-      eo != null &&
-      eo < so
-    ) {
+    if (so != null && eo != null && eo < so) {
       return { ok: false, status: 400, code: "invalid_offset_range" };
     }
   }
@@ -433,6 +547,21 @@ export async function replaceSubmissionFragments(
         }))
       );
     }
+    await repo.deleteFeedbackItemsForCorrection(tx, ensured.correction.id);
+    if (fragments.length > 0) {
+      await repo.insertFeedbackItemsBatch(
+        tx,
+        fragments.map((f) => ({
+          correctionId: ensured.correction.id,
+          sortOrder: f.orderIndex,
+          category: f.category,
+          subcategory: null,
+          originalText: f.originalText,
+          correctedText: f.correctedText,
+          explanation: null,
+        }))
+      );
+    }
     await maybeSetInReview(tx, submissionId, row.submission.status);
   });
 
@@ -447,6 +576,197 @@ export async function replaceSubmissionFragments(
   );
 
   return { ok: true, correctionId: ensured.correction.id, fragmentCount: fragments.length };
+}
+
+export type FeedbackItemInput = {
+  category: string;
+  subcategory?: string | null;
+  originalText: string;
+  correctedText: string;
+  explanation?: string | null;
+  sortOrder: number;
+};
+
+/** Replaces writing.correction_feedback_items only (does not touch writing.fragments). Use fragments endpoint to sync legacy fragments + feedback together. */
+export async function replaceSubmissionFeedbackItems(
+  db: Db,
+  teacherId: string,
+  submissionId: string,
+  items: FeedbackItemInput[]
+): Promise<{ ok: true; correctionId: string; count: number } | ServiceError> {
+  if (items.length > MAX_FEEDBACK_ITEMS) {
+    return { ok: false, status: 400, code: "too_many_feedback_items" };
+  }
+
+  const row = await repo.getSubmissionFullForTeacher(db, submissionId);
+  if (!row) return { ok: false, status: 404, code: "not_found" };
+
+  const ensured = await ensureCorrectionDraftForTeacher(db, teacherId, submissionId, row.submission.status);
+  if (!ensured.ok) return { ok: false, status: ensured.status, code: ensured.code };
+
+  const sortOrders = new Set<number>();
+  for (const it of items) {
+    if (typeof it.originalText !== "string" || typeof it.correctedText !== "string") {
+      return { ok: false, status: 400, code: "invalid_feedback_item" };
+    }
+    if (
+      it.originalText.length > MAX_FRAGMENT_FIELD_CHARS ||
+      it.correctedText.length > MAX_FRAGMENT_FIELD_CHARS
+    ) {
+      return { ok: false, status: 400, code: "feedback_field_too_long" };
+    }
+    const cat = typeof it.category === "string" ? it.category.trim() : "";
+    if (!cat || cat.length > MAX_FEEDBACK_CATEGORY_CHARS) {
+      return { ok: false, status: 400, code: "invalid_feedback_category" };
+    }
+    if (!isErrorCategory(cat)) {
+      return { ok: false, status: 400, code: "invalid_feedback_category" };
+    }
+    const sub = it.subcategory;
+    if (sub != null && typeof sub === "string" && sub.length > MAX_SUBCATEGORY_CHARS) {
+      return { ok: false, status: 400, code: "invalid_feedback_subcategory" };
+    }
+    const expl = it.explanation;
+    if (expl != null && typeof expl === "string" && expl.length > MAX_CORRECTION_FIELD_CHARS) {
+      return { ok: false, status: 400, code: "feedback_field_too_long" };
+    }
+    if (!Number.isInteger(it.sortOrder) || it.sortOrder < 0) {
+      return { ok: false, status: 400, code: "invalid_feedback_sort_order" };
+    }
+    if (sortOrders.has(it.sortOrder)) {
+      return { ok: false, status: 400, code: "duplicate_feedback_sort_order" };
+    }
+    sortOrders.add(it.sortOrder);
+  }
+
+  await db.transaction(async (tx) => {
+    await repo.deleteFeedbackItemsForCorrection(tx, ensured.correction.id);
+    if (items.length > 0) {
+      await repo.insertFeedbackItemsBatch(
+        tx,
+        items.map((it) => ({
+          correctionId: ensured.correction.id,
+          sortOrder: it.sortOrder,
+          category: it.category.trim(),
+          subcategory: it.subcategory != null && String(it.subcategory).trim() !== "" ? it.subcategory : null,
+          originalText: it.originalText,
+          correctedText: it.correctedText,
+          explanation: it.explanation != null && String(it.explanation).trim() !== "" ? it.explanation : null,
+        }))
+      );
+    }
+    await maybeSetInReview(tx, submissionId, row.submission.status);
+  });
+
+  console.info(
+    JSON.stringify({
+      audit: "writing_teacher_feedback_items_replaced",
+      teacherUserId: teacherId,
+      submissionId,
+      correctionId: ensured.correction.id,
+      count: items.length,
+    })
+  );
+
+  return { ok: true, correctionId: ensured.correction.id, count: items.length };
+}
+
+const ANNOTATION_TARGETS = ["original", "corrected", "improved"] as const;
+
+export type AnnotationInput = {
+  targetType: (typeof ANNOTATION_TARGETS)[number];
+  anchorText?: string | null;
+  startOffset?: number | null;
+  endOffset?: number | null;
+  commentText: string;
+  sortOrder: number;
+};
+
+function isAnnotationTarget(s: string): s is AnnotationInput["targetType"] {
+  return (ANNOTATION_TARGETS as readonly string[]).includes(s);
+}
+
+export async function replaceSubmissionAnnotations(
+  db: Db,
+  teacherId: string,
+  submissionId: string,
+  annotations: AnnotationInput[]
+): Promise<{ ok: true; correctionId: string; count: number } | ServiceError> {
+  if (annotations.length > MAX_ANNOTATIONS) {
+    return { ok: false, status: 400, code: "too_many_annotations" };
+  }
+
+  const row = await repo.getSubmissionFullForTeacher(db, submissionId);
+  if (!row) return { ok: false, status: 404, code: "not_found" };
+
+  const ensured = await ensureCorrectionDraftForTeacher(db, teacherId, submissionId, row.submission.status);
+  if (!ensured.ok) return { ok: false, status: ensured.status, code: ensured.code };
+
+  const sortOrders = new Set<number>();
+  for (const a of annotations) {
+    if (typeof a.commentText !== "string" || !a.commentText.trim()) {
+      return { ok: false, status: 400, code: "invalid_annotation" };
+    }
+    if (a.commentText.length > MAX_FRAGMENT_FIELD_CHARS) {
+      return { ok: false, status: 400, code: "annotation_comment_too_long" };
+    }
+    if (!isAnnotationTarget(a.targetType)) {
+      return { ok: false, status: 400, code: "invalid_annotation_target" };
+    }
+    const at = a.anchorText;
+    if (at != null && typeof at === "string" && at.length > MAX_CORRECTION_FIELD_CHARS) {
+      return { ok: false, status: 400, code: "annotation_field_too_long" };
+    }
+    const so = a.startOffset;
+    const eo = a.endOffset;
+    if (so !== undefined && so !== null && (!Number.isInteger(so) || so < 0)) {
+      return { ok: false, status: 400, code: "invalid_offset" };
+    }
+    if (eo !== undefined && eo !== null && (!Number.isInteger(eo) || eo < 0)) {
+      return { ok: false, status: 400, code: "invalid_offset" };
+    }
+    if (so != null && eo != null && eo < so) {
+      return { ok: false, status: 400, code: "invalid_offset_range" };
+    }
+    if (!Number.isInteger(a.sortOrder) || a.sortOrder < 0) {
+      return { ok: false, status: 400, code: "invalid_annotation_sort_order" };
+    }
+    if (sortOrders.has(a.sortOrder)) {
+      return { ok: false, status: 400, code: "duplicate_annotation_sort_order" };
+    }
+    sortOrders.add(a.sortOrder);
+  }
+
+  await db.transaction(async (tx) => {
+    await repo.deleteAnnotationsForCorrection(tx, ensured.correction.id);
+    if (annotations.length > 0) {
+      await repo.insertAnnotationsBatch(
+        tx,
+        annotations.map((a) => ({
+          correctionId: ensured.correction.id,
+          sortOrder: a.sortOrder,
+          targetType: a.targetType,
+          anchorText: a.anchorText != null && String(a.anchorText).trim() !== "" ? a.anchorText : null,
+          startOffset: a.startOffset ?? null,
+          endOffset: a.endOffset ?? null,
+          commentText: a.commentText,
+        }))
+      );
+    }
+    await maybeSetInReview(tx, submissionId, row.submission.status);
+  });
+
+  console.info(
+    JSON.stringify({
+      audit: "writing_teacher_annotations_replaced",
+      teacherUserId: teacherId,
+      submissionId,
+      correctionId: ensured.correction.id,
+      count: annotations.length,
+    })
+  );
+
+  return { ok: true, correctionId: ensured.correction.id, count: annotations.length };
 }
 
 export type EvaluationInput = {
@@ -503,6 +823,7 @@ export async function saveEvaluationDraft(
   }
 
   await repo.mergeEvaluationScores(db, submissionId, patch);
+  await repo.upsertCorrectionEvaluationFromSubmissionScores(db, ensured.correction.id, submissionId);
   await maybeSetInReview(db, submissionId, row.submission.status);
 
   console.info(
@@ -516,11 +837,20 @@ export async function saveEvaluationDraft(
   return { ok: true };
 }
 
+export type PublishTeacherCorrectionResult =
+  | {
+      ok: true;
+      correctionId: string;
+      publishedAt: string;
+      session: { id: string; status: string; runtimeStatus: string | null };
+    }
+  | ServiceError;
+
 export async function publishTeacherCorrection(
   db: Db,
   teacherId: string,
   submissionId: string
-): Promise<{ ok: true; correctionId: string; publishedAt: string } | ServiceError> {
+): Promise<PublishTeacherCorrectionResult> {
   const row = await repo.getSubmissionFullForTeacher(db, submissionId);
   if (!row) return { ok: false, status: 404, code: "not_found" };
 
@@ -535,11 +865,15 @@ export async function publishTeacherCorrection(
     return { ok: false, status: 409, code: "correction_already_published" };
   }
 
-  if (
-    !nonEmptyTrimmed(correction.polishedSentence) ||
-    !nonEmptyTrimmed(correction.modelAnswer) ||
-    !nonEmptyTrimmed(correction.teacherComment)
-  ) {
+  const hasRich = isNonEmptyRichJson(correction.richDocumentJson);
+  const hasLegacyText = nonEmptyTrimmed(correction.polishedSentence);
+  if (!hasRich && !hasLegacyText) {
+    return { ok: false, status: 422, code: "publish_incomplete_correction_text" };
+  }
+  if (hasRich && !nonEmptyTrimmed(correction.improvedText)) {
+    return { ok: false, status: 422, code: "publish_incomplete_improved_text" };
+  }
+  if (!nonEmptyTrimmed(correction.modelAnswer) || !nonEmptyTrimmed(correction.teacherComment)) {
     return { ok: false, status: 422, code: "publish_incomplete_correction_text" };
   }
 
@@ -560,6 +894,8 @@ export async function publishTeacherCorrection(
     return { ok: false, status: 422, code: "publish_invalid_evaluation" };
   }
 
+  await repo.upsertCorrectionEvaluationFromSubmissionScores(db, correction.id, submissionId);
+
   try {
     const result = await db.transaction(async (tx) => {
       const pub = await repo.publishCorrectionRow(tx, correction.id, teacherId);
@@ -568,6 +904,7 @@ export async function publishTeacherCorrection(
       }
       return pub;
     });
+    const after = await repo.getSubmissionFullForTeacher(db, submissionId);
     console.info(
       JSON.stringify({
         audit: "writing_teacher_correction_published",
@@ -580,6 +917,11 @@ export async function publishTeacherCorrection(
       ok: true,
       correctionId: result.id,
       publishedAt: result.publishedAt!.toISOString(),
+      session: {
+        id: after?.session.id ?? row.session.id,
+        status: after?.session.status ?? row.session.status,
+        runtimeStatus: after?.session.runtimeStatus ?? null,
+      },
     };
   } catch (e) {
     if (e instanceof PostgresError) {

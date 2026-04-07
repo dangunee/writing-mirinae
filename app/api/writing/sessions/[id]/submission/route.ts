@@ -4,7 +4,9 @@ import { getDb } from "../../../../../../server/db/client";
 import { parseRegularWritingGrantIdFromCookieHeader } from "../../../../../../server/lib/regularSessionCookie";
 import { fetchTrialApplicationIdFromMirinaeSessionCookie } from "../../../../../../server/lib/writingTrialUpstream";
 import { requireWritingSubmissionEntitlement, resolveRoleFromEnv } from "../../../../../../server/lib/authMe";
+import { parseSubmissionMode } from "../../../../../../server/lib/writingSubmissionMode";
 import { getSessionUserId } from "../../../../../../server/lib/supabaseServer";
+import type { PreparedAttachment } from "../../../../../../server/services/writingSubmissionInternal";
 import * as writingStudentRepo from "../../../../../../server/repositories/writingStudentRepository";
 import {
   saveOrSubmitSubmission,
@@ -59,8 +61,8 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
 
   let action: "save" | "submit" = "save";
   let bodyText: string | null = null;
-  let imageBuffer: Buffer | null = null;
-  let imageMimeType: string | null = null;
+  const attachments: PreparedAttachment[] = [];
+  let submissionMode = null as ReturnType<typeof parseSubmissionMode>;
 
   if (contentType.includes("multipart/form-data")) {
     const form = await req.formData();
@@ -86,10 +88,24 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     action = act === "submit" ? "submit" : "save";
     const bt = form.get("bodyText");
     bodyText = typeof bt === "string" ? bt : null;
-    const file = form.get("image");
-    if (file instanceof File && file.size > 0) {
-      imageBuffer = Buffer.from(await file.arrayBuffer());
-      imageMimeType = file.type || "application/octet-stream";
+    const sm = form.get("submissionMode");
+    submissionMode = typeof sm === "string" ? parseSubmissionMode(sm) : null;
+    const legacyImage = form.get("image");
+    if (legacyImage instanceof File && legacyImage.size > 0) {
+      attachments.push({
+        buffer: Buffer.from(await legacyImage.arrayBuffer()),
+        mimeType: legacyImage.type || "application/octet-stream",
+        originalFilename: legacyImage.name || "image",
+      });
+    }
+    for (const entry of form.getAll("files")) {
+      if (entry instanceof File && entry.size > 0) {
+        attachments.push({
+          buffer: Buffer.from(await entry.arrayBuffer()),
+          mimeType: entry.type || "application/octet-stream",
+          originalFilename: entry.name || "file",
+        });
+      }
     }
   } else if (contentType.includes("application/json")) {
     let json: Record<string, unknown>;
@@ -118,6 +134,8 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     }
     action = json.action === "submit" ? "submit" : "save";
     bodyText = typeof json.bodyText === "string" ? json.bodyText : null;
+    submissionMode =
+      typeof json.submissionMode === "string" ? parseSubmissionMode(json.submissionMode) : null;
   } else {
     return NextResponse.json({ error: "unsupported_content_type" }, { status: 415 });
   }
@@ -128,8 +146,8 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
         sessionId,
         action,
         bodyText,
-        imageBuffer,
-        imageMimeType,
+        submissionMode,
+        attachments,
       })
     : grantId
       ? await saveOrSubmitSubmissionForRegular(db, {
@@ -137,16 +155,16 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
           sessionId,
           action,
           bodyText,
-          imageBuffer,
-          imageMimeType,
+          submissionMode,
+          attachments,
         })
       : await saveOrSubmitSubmission(db, {
           userId: userId!,
           sessionId,
           action,
           bodyText,
-          imageBuffer,
-          imageMimeType,
+          submissionMode,
+          attachments,
         });
 
   if (!result.ok) {

@@ -1,9 +1,10 @@
+import { getDb } from "../db/client";
+import { resolveWritingRoleFromDbOrEnv } from "./writingAuthRoles";
 import { getSessionUserId } from "./supabaseServer";
 
 /**
- * Teacher-only access (v1): session user id must appear in TEACHER_USER_IDS (comma-separated UUIDs).
+ * Teacher or admin (DB writing.user_roles or TEACHER_USER_IDS / ADMIN_USER_IDS env).
  * Set TEACHER_ALLOW_ALL=true only for local dev — never in production.
- * Future: role table or course.teacher_id; audit logs should record teacherUserId on mutations.
  */
 export async function requireTeacherUserId(): Promise<
   { ok: true; userId: string } | { ok: false; reason: "unauthorized" | "forbidden" }
@@ -17,19 +18,10 @@ export async function requireTeacherUserId(): Promise<
     return { ok: true, userId };
   }
 
-  const raw = process.env.TEACHER_USER_IDS ?? "";
-  const allowed = raw
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-
-  if (allowed.length === 0) {
-    return { ok: false, reason: "forbidden" };
+  const db = getDb();
+  const role = await resolveWritingRoleFromDbOrEnv(db, userId);
+  if (role === "teacher" || role === "admin") {
+    return { ok: true, userId };
   }
-
-  if (!allowed.includes(userId)) {
-    return { ok: false, reason: "forbidden" };
-  }
-
-  return { ok: true, userId };
+  return { ok: false, reason: "forbidden" };
 }

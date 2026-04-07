@@ -2,12 +2,15 @@ import { NextResponse } from "next/server";
 
 import { getDb } from "../../../../../../../server/db/client";
 import { requireTeacherUserId } from "../../../../../../../server/lib/teacherAuth";
-import { saveCorrectionDraft } from "../../../../../../../server/services/writingTeacherService";
+import {
+  replaceSubmissionAnnotations,
+  type AnnotationInput,
+} from "../../../../../../../server/services/writingTeacherService";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** POST /api/teacher/writing/submissions/:id/correction — upsert draft inline correction fields. */
+/** POST /api/teacher/writing/submissions/:id/annotations — replace speech-bubble / offset annotations for the correction. */
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
   const auth = await requireTeacherUserId();
   if (!auth.ok) {
@@ -28,21 +31,26 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     return NextResponse.json({ error: "invalid_body" }, { status: 400 });
   }
 
-  const b = body as Record<string, unknown>;
-  const payload = {
-    polishedSentence: "polishedSentence" in b ? (b.polishedSentence as string | null | undefined) : undefined,
-    modelAnswer: "modelAnswer" in b ? (b.modelAnswer as string | null | undefined) : undefined,
-    teacherComment: "teacherComment" in b ? (b.teacherComment as string | null | undefined) : undefined,
-    improvedText: "improvedText" in b ? (b.improvedText as string | null | undefined) : undefined,
-    richDocumentJson: "richDocumentJson" in b ? b.richDocumentJson : undefined,
-  };
+  const raw = (body as { annotations?: unknown }).annotations;
+  if (!Array.isArray(raw)) {
+    return NextResponse.json({ error: "annotations_array_required" }, { status: 400 });
+  }
 
   const { id: submissionId } = await context.params;
   const db = getDb();
-  const result = await saveCorrectionDraft(db, auth.userId, submissionId, payload);
+  const result = await replaceSubmissionAnnotations(
+    db,
+    auth.userId,
+    submissionId,
+    raw as unknown as AnnotationInput[]
+  );
   if (!result.ok) {
     return NextResponse.json({ error: result.code }, { status: result.status });
   }
 
-  return NextResponse.json({ ok: true, correctionId: result.correctionId, status: result.status });
+  return NextResponse.json({
+    ok: true,
+    correctionId: result.correctionId,
+    count: result.count,
+  });
 }

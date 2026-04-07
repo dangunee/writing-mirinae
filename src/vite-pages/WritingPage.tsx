@@ -21,6 +21,8 @@ type CurrentSessionOk = {
     index: number
     unlockAt: string
     status: string
+    /** When present: only navigate to result for corrected | missed */
+    runtimeStatus?: string | null
   } | null
   submission: {
     id: string
@@ -357,6 +359,14 @@ function SessionRow({
     submission != null &&
     submission.status !== 'draft' &&
     submission.status !== 'published'
+  const rs = session.runtimeStatus
+  const canOpenResult =
+    submission?.id &&
+    (rs === 'corrected' ||
+      rs === 'missed' ||
+      (rs == null || rs === ''
+        ? isPublished || session.status === 'missed'
+        : false))
 
   return (
     <tr>
@@ -379,7 +389,7 @@ function SessionRow({
         )}
       </td>
       <td>
-        {isPublished && submission?.id ? (
+        {canOpenResult ? (
           <Link to={`/writing/app/view/${submission.id}`} className="status-badge status corrected">
             완료
             <br />
@@ -396,8 +406,8 @@ function SessionRow({
         )}
       </td>
       <td>
-        {/* [FIX] published + id 있을 때만 View (draft/진행 중 결과 페이지 노출 방지) */}
-        {isPublished && submission?.id ? (
+        {/* [FIX] runtimeStatus corrected|missed 또는 레거시 published / session missed 일 때만 결과 (draft·locked 제외) */}
+        {canOpenResult ? (
           <div className="view-links">
             <Link to={`/writing/app/view/${submission.id}`} className="view-link">
               결과 보기

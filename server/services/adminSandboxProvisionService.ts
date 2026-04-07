@@ -3,7 +3,7 @@ import { PostgresError } from "postgres";
 
 import { products } from "../../db/schema";
 import type { Db } from "../db/client";
-import { resolveRoleFromEnv } from "../lib/authMe";
+import { resolveWritingRoleFromDbOrEnv } from "../lib/writingAuthRoles";
 import { assertIsoDateOnly, DEFAULT_TZ } from "../lib/schedule";
 import type { CourseInterval } from "../types/writing";
 import * as repo from "../repositories/platformWritingRepository";
@@ -19,10 +19,11 @@ function calendarIsoInTokyo(): string {
 
 /**
  * Idempotent: creates one active admin sandbox course + single session for UX testing.
- * Only for resolveRoleFromEnv === admin; never for real students.
+ * Only for admin role (DB or env); never for real students.
  */
 export async function ensureAdminSandboxCourse(db: Db, userId: string): Promise<void> {
-  if (resolveRoleFromEnv(userId) !== "admin") {
+  const role = await resolveWritingRoleFromDbOrEnv(db, userId);
+  if (role !== "admin") {
     return;
   }
 

@@ -6,13 +6,16 @@
  * Rate limiting / WAF: configure at the edge; optional per-user caps can wrap these handlers later.
  */
 
-import { PostgresError } from "postgres";
-
-import { writingCourses } from "../../db/schema";
+import { writingCourses, writingSessions, writingSubmissions } from "../../db/schema";
 import type { Db } from "../db/client";
-import { validateImageUpload, buildStorageObjectKey } from "../lib/writingUploads";
+import { checkSessionEligibleForWriting } from "../lib/writingSubmissionEligibility";
+import { validateSubmissionFileUpload } from "../lib/writingUploads";
 import { getServiceRoleClient } from "../lib/supabaseServiceRole";
 import * as repo from "../repositories/writingStudentRepository";
+import type { PublishedResultRow } from "../repositories/writingStudentRepository";
+import type { PreparedAttachment } from "./writingSubmissionInternal";
+import { executeSubmissionWrite } from "./writingSubmissionInternal";
+import type { SubmissionMode } from "../lib/writingSubmissionMode";
 
 type WritingCourseRow = typeof writingCourses.$inferSelect;
 
@@ -25,6 +28,11 @@ const MAX_BODY_TEXT_CHARS = (() => {
   const n = parseInt(raw, 10);
   return Number.isFinite(n) && n > 0 ? n : 50_000;
 })();
+
+/** Prior sessions are "done" for progression when corrected or missed (deadline). */
+function sessionIsTerminalForProgression(status: string): boolean {
+  return status === "completed" || status === "missed";
+}
 
 export type CurrentSessionResponse =
   | {
@@ -155,12 +163,12 @@ async function buildOwnedCourseCurrentSession(
 
   const now = new Date();
   for (const s of sessions) {
-    if (s.status === "completed") continue;
+    if (sessionIsTerminalForProgression(s.status)) continue;
 
     const lower = sessions.filter((x) => x.index < s.index);
-    const prevAllCompleted = lower.every((x) => x.status === "completed");
+    const prevAllCompleted = lower.every((x) => sessionIsTerminalForProgression(x.status));
     if (!prevAllCompleted) {
-      const blocker = lower.find((x) => x.status !== "completed");
+      const blocker = lower.find((x) => !sessionIsTerminalForProgression(x.status));
       if (blocker) {
         return {
           ok: true,
@@ -314,12 +322,12 @@ export async function getCurrentSessionForRegularGrant(db: Db, grantId: string):
   }
 
   for (const s of sessions) {
-    if (s.status === "completed") continue;
+    if (sessionIsTerminalForProgression(s.status)) continue;
 
     const lower = sessions.filter((x) => x.index < s.index);
-    const prevAllCompleted = lower.every((x) => x.status === "completed");
+    const prevAllCompleted = lower.every((x) => sessionIsTerminalForProgression(x.status));
     if (!prevAllCompleted) {
-      const blocker = lower.find((x) => x.status !== "completed");
+      const blocker = lower.find((x) => !sessionIsTerminalForProgression(x.status));
       if (blocker) {
         return {
           ok: true,
@@ -461,12 +469,12 @@ export async function getCurrentSessionForTrialApplication(
 
   const now = new Date();
   for (const s of sessions) {
-    if (s.status === "completed") continue;
+    if (sessionIsTerminalForProgression(s.status)) continue;
 
     const lower = sessions.filter((x) => x.index < s.index);
-    const prevAllCompleted = lower.every((x) => x.status === "completed");
+    const prevAllCompleted = lower.every((x) => sessionIsTerminalForProgression(x.status));
     if (!prevAllCompleted) {
-      const blocker = lower.find((x) => x.status !== "completed");
+      const blocker = lower.find((x) => !sessionIsTerminalForProgression(x.status));
       if (blocker) {
         return {
           ok: true,
@@ -548,20 +556,13 @@ export async function getCurrentSessionForTrialApplication(
   };
 }
 
-function hasSubstantiveContent(bodyText: string | null | undefined, imageKey: string | null | undefined) {
-  const t = bodyText?.trim() ?? "";
-  if (t.length > 0) return true;
-  if (imageKey && imageKey.length > 0) return true;
-  return false;
-}
-
 export type SaveSubmissionInput = {
   userId: string;
   sessionId: string;
   action: "save" | "submit";
   bodyText: string | null;
-  imageBuffer: Buffer | null;
-  imageMimeType: string | null;
+  submissionMode: SubmissionMode | null;
+  attachments: PreparedAttachment[];
 };
 
 export type SaveSubmissionRegularInput = {
@@ -569,8 +570,8 @@ export type SaveSubmissionRegularInput = {
   sessionId: string;
   action: "save" | "submit";
   bodyText: string | null;
-  imageBuffer: Buffer | null;
-  imageMimeType: string | null;
+  submissionMode: SubmissionMode | null;
+  attachments: PreparedAttachment[];
 };
 
 export type SaveSubmissionTrialInput = {
@@ -578,8 +579,8 @@ export type SaveSubmissionTrialInput = {
   sessionId: string;
   action: "save" | "submit";
   bodyText: string | null;
-  imageBuffer: Buffer | null;
-  imageMimeType: string | null;
+  submissionMode: SubmissionMode | null;
+  attachments: PreparedAttachment[];
 };
 
 export type SaveSubmissionResult =
@@ -625,16 +626,14 @@ export async function saveOrSubmitSubmission(
   const session = refreshed.session;
 
   const now = new Date();
-  if (session.status === "completed") {
-    return { ok: false, status: 409, code: "session_completed" };
-  }
-  if (session.unlockAt > now) {
-    return { ok: false, status: 409, code: "session_locked" };
+  const elig = checkSessionEligibleForWriting(session, now);
+  if (!elig.ok) {
+    return { ok: false, status: 409, code: elig.code };
   }
 
   const sessions = await repo.listSessionsForCourseOrdered(db, row.course.id);
   const lower = sessions.filter((x) => x.index < session.index);
-  if (!lower.every((x) => x.status === "completed")) {
+  if (!lower.every((x) => sessionIsTerminalForProgression(x.status))) {
     return { ok: false, status: 409, code: "complete_previous_sessions_first" };
   }
 
@@ -656,150 +655,26 @@ export async function saveOrSubmitSubmission(
     return { ok: false, status: 409, code: "submission_not_editable" };
   }
 
-  let imageKey = existing?.imageStorageKey ?? null;
-  let imageMime = existing?.imageMimeType ?? null;
-
-  if (input.imageBuffer && input.imageMimeType) {
-    const v = validateImageUpload({
-      mimeType: input.imageMimeType,
-      byteLength: input.imageBuffer.length,
-    });
+  for (const a of input.attachments) {
+    const v = validateSubmissionFileUpload({ mimeType: a.mimeType, byteLength: a.buffer.length });
     if (!v.ok) {
       return { ok: false, status: 400, code: v.reason };
     }
   }
 
-  try {
-    return await db.transaction(async (tx) => {
-    let submissionId = existing?.id;
+  const replaceAttachmentFiles = input.attachments.length > 0;
 
-    if (input.imageBuffer && input.imageMimeType) {
-      const v = validateImageUpload({
-        mimeType: input.imageMimeType,
-        byteLength: input.imageBuffer.length,
-      });
-      if (!v.ok) {
-        return { ok: false, status: 400, code: v.reason };
-      }
-
-      if (!submissionId) {
-        try {
-          const ins = await repo.insertSubmission(tx, {
-            sessionId: input.sessionId,
-            courseId: row.course.id,
-            userId: input.userId,
-            status: "draft",
-            bodyText: input.bodyText,
-            imageStorageKey: null,
-            imageMimeType: null,
-            submittedAt: null,
-          });
-          submissionId = ins.id;
-        } catch (e) {
-          if (e instanceof PostgresError && e.code === "23505") {
-            return { ok: false, status: 409, code: "active_submission_conflict" };
-          }
-          throw e;
-        }
-      }
-
-      const { storageKey } = buildStorageObjectKey({
-        userId: input.userId,
-        submissionId: submissionId!,
-        mimeType: input.imageMimeType,
-      });
-
-      const supabase = getServiceRoleClient();
-      const up = await supabase.storage
-        .from(BUCKET)
-        .upload(storageKey, input.imageBuffer, {
-          contentType: input.imageMimeType.split(";")[0]?.trim(),
-          upsert: false,
-        });
-      if (up.error) {
-        console.error("storage_upload_failed", up.error.message);
-        return { ok: false, status: 500, code: "storage_upload_failed" };
-      }
-
-      imageKey = storageKey;
-      imageMime = input.imageMimeType.split(";")[0]?.trim() ?? input.imageMimeType;
-
-      const updated = await repo.updateSubmissionDraft(tx, submissionId!, {
-        bodyText: input.bodyText,
-        imageStorageKey: imageKey,
-        imageMimeType: imageMime,
-      });
-      if (!updated) {
-        return { ok: false, status: 409, code: "submission_not_editable" };
-      }
-
-      if (input.action === "submit") {
-        if (!hasSubstantiveContent(updated.bodyText, updated.imageStorageKey)) {
-          return { ok: false, status: 422, code: "empty_submission" };
-        }
-        const fin = await repo.submitSubmissionFinal(tx, submissionId!, input.userId);
-        if (!fin) {
-          return { ok: false, status: 409, code: "submit_failed" };
-        }
-        return { ok: true, submissionId: fin.id, status: fin.status };
-      }
-      return { ok: true, submissionId: updated.id, status: updated.status };
-    }
-
-    if (!submissionId) {
-      try {
-        const ins = await repo.insertSubmission(tx, {
-          sessionId: input.sessionId,
-          courseId: row.course.id,
-          userId: input.userId,
-          status: "draft",
-          bodyText: input.bodyText,
-          imageStorageKey: imageKey,
-          imageMimeType: imageMime,
-          submittedAt: null,
-        });
-        submissionId = ins.id;
-      } catch (e) {
-        if (e instanceof PostgresError && e.code === "23505") {
-          return { ok: false, status: 409, code: "active_submission_conflict" };
-        }
-        throw e;
-      }
-    } else {
-      const updated = await repo.updateSubmissionDraft(tx, submissionId, {
-        bodyText: input.bodyText,
-        imageStorageKey: imageKey,
-        imageMimeType: imageMime,
-      });
-      if (!updated) {
-        return { ok: false, status: 409, code: "submission_not_editable" };
-      }
-    }
-
-    const sub = await repo.getSubmissionByIdForUser(tx, submissionId!, input.userId);
-    if (!sub) {
-      return { ok: false, status: 500, code: "submission_missing" };
-    }
-
-    if (input.action === "submit") {
-      if (!hasSubstantiveContent(sub.bodyText, sub.imageStorageKey)) {
-        return { ok: false, status: 422, code: "empty_submission" };
-      }
-      const fin = await repo.submitSubmissionFinal(tx, submissionId!, input.userId);
-      if (!fin) {
-        return { ok: false, status: 409, code: "submit_failed" };
-      }
-      return { ok: true, submissionId: fin.id, status: fin.status };
-    }
-
-    return { ok: true, submissionId: sub.id, status: sub.status };
-    });
-  } catch (e) {
-    if (e instanceof PostgresError && e.code === "23505") {
-      return { ok: false, status: 409, code: "active_submission_conflict" };
-    }
-    throw e;
-  }
+  return executeSubmissionWrite(db, {
+    courseId: row.course.id,
+    sessionId: input.sessionId,
+    action: input.action,
+    submissionMode: input.submissionMode,
+    bodyText: input.bodyText,
+    attachments: input.attachments,
+    replaceAttachmentFiles,
+    existing,
+    identity: { type: "user", userId: input.userId },
+  });
 }
 
 /**
@@ -844,16 +719,14 @@ export async function saveOrSubmitSubmissionForRegular(
   const session = refreshed.session;
 
   const now = new Date();
-  if (session.status === "completed") {
-    return { ok: false, status: 409, code: "session_completed" };
-  }
-  if (session.unlockAt > now) {
-    return { ok: false, status: 409, code: "session_locked" };
+  const elig = checkSessionEligibleForWriting(session, now);
+  if (!elig.ok) {
+    return { ok: false, status: 409, code: elig.code };
   }
 
   const sessions = await repo.listSessionsForCourseOrdered(db, row.course.id);
   const lower = sessions.filter((x) => x.index < session.index);
-  if (!lower.every((x) => x.status === "completed")) {
+  if (!lower.every((x) => sessionIsTerminalForProgression(x.status))) {
     return { ok: false, status: 409, code: "complete_previous_sessions_first" };
   }
 
@@ -875,152 +748,26 @@ export async function saveOrSubmitSubmissionForRegular(
     return { ok: false, status: 409, code: "submission_not_editable" };
   }
 
-  let imageKey = existing?.imageStorageKey ?? null;
-  let imageMime = existing?.imageMimeType ?? null;
-
-  if (input.imageBuffer && input.imageMimeType) {
-    const v = validateImageUpload({
-      mimeType: input.imageMimeType,
-      byteLength: input.imageBuffer.length,
-    });
+  for (const a of input.attachments) {
+    const v = validateSubmissionFileUpload({ mimeType: a.mimeType, byteLength: a.buffer.length });
     if (!v.ok) {
       return { ok: false, status: 400, code: v.reason };
     }
   }
 
-  try {
-    return await db.transaction(async (tx) => {
-      let submissionId = existing?.id;
+  const replaceAttachmentFiles = input.attachments.length > 0;
 
-      if (input.imageBuffer && input.imageMimeType) {
-        const v = validateImageUpload({
-          mimeType: input.imageMimeType,
-          byteLength: input.imageBuffer.length,
-        });
-        if (!v.ok) {
-          return { ok: false, status: 400, code: v.reason };
-        }
-
-        if (!submissionId) {
-          try {
-            const ins = await repo.insertSubmission(tx, {
-              sessionId: input.sessionId,
-              courseId: row.course.id,
-              userId: null,
-              regularAccessGrantId: input.grantId,
-              status: "draft",
-              bodyText: input.bodyText,
-              imageStorageKey: null,
-              imageMimeType: null,
-              submittedAt: null,
-            });
-            submissionId = ins.id;
-          } catch (e) {
-            if (e instanceof PostgresError && e.code === "23505") {
-              return { ok: false, status: 409, code: "active_submission_conflict" };
-            }
-            throw e;
-          }
-        }
-
-        const { storageKey } = buildStorageObjectKey({
-          regularAccessGrantId: input.grantId,
-          submissionId: submissionId!,
-          mimeType: input.imageMimeType,
-        });
-
-        const supabase = getServiceRoleClient();
-        const up = await supabase.storage
-          .from(BUCKET)
-          .upload(storageKey, input.imageBuffer, {
-            contentType: input.imageMimeType.split(";")[0]?.trim(),
-            upsert: false,
-          });
-        if (up.error) {
-          console.error("storage_upload_failed", up.error.message);
-          return { ok: false, status: 500, code: "storage_upload_failed" };
-        }
-
-        imageKey = storageKey;
-        imageMime = input.imageMimeType.split(";")[0]?.trim() ?? input.imageMimeType;
-
-        const updated = await repo.updateSubmissionDraftForGrant(tx, submissionId!, input.grantId, {
-          bodyText: input.bodyText,
-          imageStorageKey: imageKey,
-          imageMimeType: imageMime,
-        });
-        if (!updated) {
-          return { ok: false, status: 409, code: "submission_not_editable" };
-        }
-
-        if (input.action === "submit") {
-          if (!hasSubstantiveContent(updated.bodyText, updated.imageStorageKey)) {
-            return { ok: false, status: 422, code: "empty_submission" };
-          }
-          const fin = await repo.submitSubmissionFinalForGrant(tx, submissionId!, input.grantId);
-          if (!fin) {
-            return { ok: false, status: 409, code: "submit_failed" };
-          }
-          return { ok: true, submissionId: fin.id, status: fin.status };
-        }
-        return { ok: true, submissionId: updated.id, status: updated.status };
-      }
-
-      if (!submissionId) {
-        try {
-          const ins = await repo.insertSubmission(tx, {
-            sessionId: input.sessionId,
-            courseId: row.course.id,
-            userId: null,
-            regularAccessGrantId: input.grantId,
-            status: "draft",
-            bodyText: input.bodyText,
-            imageStorageKey: imageKey,
-            imageMimeType: imageMime,
-            submittedAt: null,
-          });
-          submissionId = ins.id;
-        } catch (e) {
-          if (e instanceof PostgresError && e.code === "23505") {
-            return { ok: false, status: 409, code: "active_submission_conflict" };
-          }
-          throw e;
-        }
-      } else {
-        const updated = await repo.updateSubmissionDraftForGrant(tx, submissionId, input.grantId, {
-          bodyText: input.bodyText,
-          imageStorageKey: imageKey,
-          imageMimeType: imageMime,
-        });
-        if (!updated) {
-          return { ok: false, status: 409, code: "submission_not_editable" };
-        }
-      }
-
-      const sub = await repo.getSubmissionByIdForGrant(tx, submissionId!, input.grantId);
-      if (!sub) {
-        return { ok: false, status: 500, code: "submission_missing" };
-      }
-
-      if (input.action === "submit") {
-        if (!hasSubstantiveContent(sub.bodyText, sub.imageStorageKey)) {
-          return { ok: false, status: 422, code: "empty_submission" };
-        }
-        const fin = await repo.submitSubmissionFinalForGrant(tx, submissionId!, input.grantId);
-        if (!fin) {
-          return { ok: false, status: 409, code: "submit_failed" };
-        }
-        return { ok: true, submissionId: fin.id, status: fin.status };
-      }
-
-      return { ok: true, submissionId: sub.id, status: sub.status };
-    });
-  } catch (e) {
-    if (e instanceof PostgresError && e.code === "23505") {
-      return { ok: false, status: 409, code: "active_submission_conflict" };
-    }
-    throw e;
-  }
+  return executeSubmissionWrite(db, {
+    courseId: row.course.id,
+    sessionId: input.sessionId,
+    action: input.action,
+    submissionMode: input.submissionMode,
+    bodyText: input.bodyText,
+    attachments: input.attachments,
+    replaceAttachmentFiles,
+    existing,
+    identity: { type: "grant", grantId: input.grantId },
+  });
 }
 
 /**
@@ -1060,16 +807,14 @@ export async function saveOrSubmitSubmissionForTrial(
   const session = refreshed.session;
 
   const now = new Date();
-  if (session.status === "completed") {
-    return { ok: false, status: 409, code: "session_completed" };
-  }
-  if (session.unlockAt > now) {
-    return { ok: false, status: 409, code: "session_locked" };
+  const elig = checkSessionEligibleForWriting(session, now);
+  if (!elig.ok) {
+    return { ok: false, status: 409, code: elig.code };
   }
 
   const sessions = await repo.listSessionsForCourseOrdered(db, row.course.id);
   const lower = sessions.filter((x) => x.index < session.index);
-  if (!lower.every((x) => x.status === "completed")) {
+  if (!lower.every((x) => sessionIsTerminalForProgression(x.status))) {
     return { ok: false, status: 409, code: "complete_previous_sessions_first" };
   }
 
@@ -1091,154 +836,26 @@ export async function saveOrSubmitSubmissionForTrial(
     return { ok: false, status: 409, code: "submission_not_editable" };
   }
 
-  let imageKey = existing?.imageStorageKey ?? null;
-  let imageMime = existing?.imageMimeType ?? null;
-
-  if (input.imageBuffer && input.imageMimeType) {
-    const v = validateImageUpload({
-      mimeType: input.imageMimeType,
-      byteLength: input.imageBuffer.length,
-    });
+  for (const a of input.attachments) {
+    const v = validateSubmissionFileUpload({ mimeType: a.mimeType, byteLength: a.buffer.length });
     if (!v.ok) {
       return { ok: false, status: 400, code: v.reason };
     }
   }
 
-  try {
-    return await db.transaction(async (tx) => {
-      let submissionId = existing?.id;
+  const replaceAttachmentFiles = input.attachments.length > 0;
 
-      if (input.imageBuffer && input.imageMimeType) {
-        const v = validateImageUpload({
-          mimeType: input.imageMimeType,
-          byteLength: input.imageBuffer.length,
-        });
-        if (!v.ok) {
-          return { ok: false, status: 400, code: v.reason };
-        }
-
-        if (!submissionId) {
-          try {
-            const ins = await repo.insertSubmission(tx, {
-              sessionId: input.sessionId,
-              courseId: row.course.id,
-              userId: null,
-              regularAccessGrantId: null,
-              trialApplicationId: input.trialApplicationId,
-              status: "draft",
-              bodyText: input.bodyText,
-              imageStorageKey: null,
-              imageMimeType: null,
-              submittedAt: null,
-            });
-            submissionId = ins.id;
-          } catch (e) {
-            if (e instanceof PostgresError && e.code === "23505") {
-              return { ok: false, status: 409, code: "active_submission_conflict" };
-            }
-            throw e;
-          }
-        }
-
-        const { storageKey } = buildStorageObjectKey({
-          trialApplicationId: input.trialApplicationId,
-          submissionId: submissionId!,
-          mimeType: input.imageMimeType,
-        });
-
-        const supabase = getServiceRoleClient();
-        const up = await supabase.storage
-          .from(BUCKET)
-          .upload(storageKey, input.imageBuffer, {
-            contentType: input.imageMimeType.split(";")[0]?.trim(),
-            upsert: false,
-          });
-        if (up.error) {
-          console.error("storage_upload_failed", up.error.message);
-          return { ok: false, status: 500, code: "storage_upload_failed" };
-        }
-
-        imageKey = storageKey;
-        imageMime = input.imageMimeType.split(";")[0]?.trim() ?? input.imageMimeType;
-
-        const updated = await repo.updateSubmissionDraftForTrial(tx, submissionId!, input.trialApplicationId, {
-          bodyText: input.bodyText,
-          imageStorageKey: imageKey,
-          imageMimeType: imageMime,
-        });
-        if (!updated) {
-          return { ok: false, status: 409, code: "submission_not_editable" };
-        }
-
-        if (input.action === "submit") {
-          if (!hasSubstantiveContent(updated.bodyText, updated.imageStorageKey)) {
-            return { ok: false, status: 422, code: "empty_submission" };
-          }
-          const fin = await repo.submitSubmissionFinalForTrial(tx, submissionId!, input.trialApplicationId);
-          if (!fin) {
-            return { ok: false, status: 409, code: "submit_failed" };
-          }
-          return { ok: true, submissionId: fin.id, status: fin.status };
-        }
-        return { ok: true, submissionId: updated.id, status: updated.status };
-      }
-
-      if (!submissionId) {
-        try {
-          const ins = await repo.insertSubmission(tx, {
-            sessionId: input.sessionId,
-            courseId: row.course.id,
-            userId: null,
-            regularAccessGrantId: null,
-            trialApplicationId: input.trialApplicationId,
-            status: "draft",
-            bodyText: input.bodyText,
-            imageStorageKey: imageKey,
-            imageMimeType: imageMime,
-            submittedAt: null,
-          });
-          submissionId = ins.id;
-        } catch (e) {
-          if (e instanceof PostgresError && e.code === "23505") {
-            return { ok: false, status: 409, code: "active_submission_conflict" };
-          }
-          throw e;
-        }
-      } else {
-        const updated = await repo.updateSubmissionDraftForTrial(tx, submissionId, input.trialApplicationId, {
-          bodyText: input.bodyText,
-          imageStorageKey: imageKey,
-          imageMimeType: imageMime,
-        });
-        if (!updated) {
-          return { ok: false, status: 409, code: "submission_not_editable" };
-        }
-      }
-
-      const sub = await repo.getSubmissionByIdForTrial(tx, submissionId!, input.trialApplicationId);
-      if (!sub) {
-        return { ok: false, status: 500, code: "submission_missing" };
-      }
-
-      if (input.action === "submit") {
-        if (!hasSubstantiveContent(sub.bodyText, sub.imageStorageKey)) {
-          return { ok: false, status: 422, code: "empty_submission" };
-        }
-        const fin = await repo.submitSubmissionFinalForTrial(tx, submissionId!, input.trialApplicationId);
-        if (!fin) {
-          return { ok: false, status: 409, code: "submit_failed" };
-        }
-        return { ok: true, submissionId: fin.id, status: fin.status };
-      }
-
-      return { ok: true, submissionId: sub.id, status: sub.status };
-    });
-  } catch (e) {
-    if (e instanceof PostgresError && e.code === "23505") {
-      return { ok: false, status: 409, code: "active_submission_conflict" };
-    }
-    throw e;
-  }
+  return executeSubmissionWrite(db, {
+    courseId: row.course.id,
+    sessionId: input.sessionId,
+    action: input.action,
+    submissionMode: input.submissionMode,
+    bodyText: input.bodyText,
+    attachments: input.attachments,
+    replaceAttachmentFiles,
+    existing,
+    identity: { type: "trial", trialApplicationId: input.trialApplicationId },
+  });
 }
 
 export async function getSignedImageUrl(storageKey: string, expiresSec = 3600): Promise<string | null> {
@@ -1252,6 +869,174 @@ export async function getSignedImageUrl(storageKey: string, expiresSec = 3600): 
   return data.signedUrl;
 }
 
+/** Signed URL for arbitrary bucket/key (submission_attachments may use same or WRITING_UPLOADS_BUCKET). */
+async function getSignedStorageUrl(
+  bucket: string,
+  storageKey: string,
+  expiresSec = 3600
+): Promise<string | null> {
+  const supabase = getServiceRoleClient();
+  const { data, error } = await supabase.storage.from(bucket).createSignedUrl(storageKey, expiresSec);
+  if (error || !data?.signedUrl) return null;
+  return data.signedUrl;
+}
+
+async function listSubmissionAttachmentsForApi(db: Db, submissionId: string) {
+  const rows = await repo.listSubmissionAttachmentsBySubmissionId(db, submissionId);
+  const out: Array<{
+    id: string;
+    mimeType: string;
+    byteSize: number;
+    sortOrder: number;
+    originalFilename: string | null;
+    pageCount: number | null;
+    downloadUrl: string | null;
+  }> = [];
+  for (const a of rows) {
+    const downloadUrl = await getSignedStorageUrl(a.storageBucket, a.storageKey);
+    out.push({
+      id: a.id,
+      mimeType: a.mimeType,
+      byteSize: a.byteSize,
+      sortOrder: a.sortOrder,
+      originalFilename: a.originalFilename ?? null,
+      pageCount: a.pageCount ?? null,
+      downloadUrl,
+    });
+  }
+  return out;
+}
+
+function sessionIsMissed(s: { runtimeStatus: string | null; status: string }): boolean {
+  return s.runtimeStatus === "missed" || s.status === "missed";
+}
+
+async function buildPublishedResultPayload(
+  db: Db,
+  row: PublishedResultRow,
+  session: typeof writingSessions.$inferSelect
+) {
+  const submissionId = row.submission.id;
+  const correctionId = row.correction.id;
+  const [
+    fragments,
+    feedbackItems,
+    annotations,
+    evaluationRow,
+    correctionEvalRow,
+    attachments,
+  ] = await Promise.all([
+    repo.listFragmentsForCorrection(db, correctionId),
+    repo.listCorrectionFeedbackItemsForCorrection(db, correctionId),
+    repo.listCorrectionAnnotationsForCorrection(db, correctionId),
+    repo.getEvaluationForSubmission(db, submissionId),
+    repo.getCorrectionEvaluationByCorrectionId(db, correctionId),
+    listSubmissionAttachmentsForApi(db, submissionId),
+  ]);
+
+  return {
+    outcome: "published" as const,
+    submissionId: row.submission.id,
+    session: {
+      id: session.id,
+      index: session.index,
+      status: session.status,
+      runtimeStatus: session.runtimeStatus ?? null,
+      unlockAt: session.unlockAt.toISOString(),
+      availableFrom: session.availableFrom?.toISOString() ?? null,
+      dueAt: session.dueAt?.toISOString() ?? null,
+      missedAt: session.missedAt?.toISOString() ?? null,
+    },
+    submission: {
+      bodyText: row.submission.bodyText,
+      submittedAt: row.submission.submittedAt?.toISOString() ?? null,
+      submissionMode: row.submission.submissionMode ?? null,
+    },
+    attachments,
+    correction: {
+      polishedSentence: row.correction.polishedSentence,
+      modelAnswer: row.correction.modelAnswer,
+      teacherComment: row.correction.teacherComment,
+      richDocumentJson: row.correction.richDocumentJson ?? null,
+      improvedText: row.correction.improvedText,
+      publishedAt: row.correction.publishedAt?.toISOString() ?? null,
+    },
+    fragments: fragments.map((f) => ({
+      orderIndex: f.orderIndex,
+      originalText: f.originalText,
+      correctedText: f.correctedText,
+      category: f.category,
+    })),
+    feedbackItems: feedbackItems.map((f) => ({
+      id: f.id,
+      sortOrder: f.sortOrder,
+      category: f.category,
+      subcategory: f.subcategory,
+      originalText: f.originalText,
+      correctedText: f.correctedText,
+      explanation: f.explanation,
+    })),
+    annotations: annotations.map((a) => ({
+      id: a.id,
+      sortOrder: a.sortOrder,
+      targetType: a.targetType,
+      anchorText: a.anchorText,
+      startOffset: a.startOffset,
+      endOffset: a.endOffset,
+      commentText: a.commentText,
+    })),
+    evaluation: evaluationRow
+      ? {
+          grammarAccuracy: evaluationRow.grammarAccuracy,
+          vocabularyUsage: evaluationRow.vocabularyUsage,
+          contextualFluency: evaluationRow.contextualFluency,
+        }
+      : null,
+    correctionEvaluation: correctionEvalRow
+      ? {
+          grammar: correctionEvalRow.grammar,
+          vocabulary: correctionEvalRow.vocabulary,
+          flow: correctionEvalRow.flow,
+          coherence: correctionEvalRow.coherence,
+        }
+      : null,
+  };
+}
+
+async function buildMissedResultPayload(
+  submission: typeof writingSubmissions.$inferSelect,
+  session: typeof writingSessions.$inferSelect,
+  attachments: Awaited<ReturnType<typeof listSubmissionAttachmentsForApi>>
+) {
+  return {
+    outcome: "missed" as const,
+    submissionId: submission.id,
+    session: {
+      id: session.id,
+      index: session.index,
+      status: session.status,
+      runtimeStatus: session.runtimeStatus ?? null,
+      unlockAt: session.unlockAt.toISOString(),
+      availableFrom: session.availableFrom?.toISOString() ?? null,
+      dueAt: session.dueAt?.toISOString() ?? null,
+      missedAt: session.missedAt?.toISOString() ?? null,
+      modelAnswerSnapshot: session.modelAnswerSnapshot,
+    },
+    submission: {
+      bodyText: submission.bodyText,
+      submittedAt: submission.submittedAt?.toISOString() ?? null,
+      submissionMode: submission.submissionMode ?? null,
+    },
+    attachments,
+    correction: null,
+    fragments: [],
+    feedbackItems: [],
+    annotations: [],
+    evaluation: null,
+    correctionEvaluation: null,
+  };
+}
+
 /** Owner-only submission detail; image returned as short-lived signed URL (never raw storage path to untrusted clients). */
 export async function getSubmissionDetailForStudent(
   db: Db,
@@ -1260,10 +1045,12 @@ export async function getSubmissionDetailForStudent(
 ) {
   const sub = await repo.getSubmissionByIdForUser(db, submissionId, userId);
   if (!sub) return null;
+  await repo.lazyUnlockDueSessions(db, sub.courseId);
   let imageUrl: string | null = null;
   if (sub.imageStorageKey) {
     imageUrl = await getSignedImageUrl(sub.imageStorageKey);
   }
+  const attachments = await listSubmissionAttachmentsForApi(db, submissionId);
   return {
     id: sub.id,
     sessionId: sub.sessionId,
@@ -1272,6 +1059,8 @@ export async function getSubmissionDetailForStudent(
     bodyText: sub.bodyText,
     imageMimeType: sub.imageMimeType,
     imageUrl,
+    submissionMode: sub.submissionMode ?? null,
+    attachments,
     submittedAt: sub.submittedAt?.toISOString() ?? null,
     createdAt: sub.createdAt.toISOString(),
     updatedAt: sub.updatedAt.toISOString(),
@@ -1285,10 +1074,12 @@ export async function getSubmissionDetailForRegularGrant(
 ) {
   const sub = await repo.getSubmissionByIdForGrant(db, submissionId, grantId);
   if (!sub) return null;
+  await repo.lazyUnlockDueSessions(db, sub.courseId);
   let imageUrl: string | null = null;
   if (sub.imageStorageKey) {
     imageUrl = await getSignedImageUrl(sub.imageStorageKey);
   }
+  const attachments = await listSubmissionAttachmentsForApi(db, submissionId);
   return {
     id: sub.id,
     sessionId: sub.sessionId,
@@ -1297,75 +1088,58 @@ export async function getSubmissionDetailForRegularGrant(
     bodyText: sub.bodyText,
     imageMimeType: sub.imageMimeType,
     imageUrl,
+    submissionMode: sub.submissionMode ?? null,
+    attachments,
     submittedAt: sub.submittedAt?.toISOString() ?? null,
     createdAt: sub.createdAt.toISOString(),
     updatedAt: sub.updatedAt.toISOString(),
   };
 }
 
-/** Published correction + fragments + scores only (draft corrections invisible). */
+/**
+ * Student result: reconcile → missed-safe payload OR published-only correction (draft never returned).
+ * Regular session + cookie grant paths.
+ */
 export async function getPublishedStudentResult(db: Db, userId: string, submissionId: string) {
+  const sub = await repo.getSubmissionByIdForUser(db, submissionId, userId);
+  if (!sub) return null;
+  await repo.lazyUnlockDueSessions(db, sub.courseId);
+  const joined = await repo.getSubmissionWithSessionForUser(db, submissionId, userId);
+  if (!joined) return null;
+  const { submission, session } = joined;
+  const attachments = await listSubmissionAttachmentsForApi(db, submissionId);
+
+  if (sessionIsMissed(session)) {
+    return buildMissedResultPayload(submission, session, attachments);
+  }
+
+  if (submission.status !== "published") {
+    return null;
+  }
+
   const row = await repo.getPublishedResultForSubmission(db, submissionId, userId);
   if (!row) return null;
-  const fragments = await repo.listFragmentsForCorrection(db, row.correction.id);
-  const evaluationRow = await repo.getEvaluationForSubmission(db, submissionId);
-  return {
-    submissionId: row.submission.id,
-    submission: {
-      bodyText: row.submission.bodyText,
-      submittedAt: row.submission.submittedAt?.toISOString() ?? null,
-    },
-    correction: {
-      polishedSentence: row.correction.polishedSentence,
-      modelAnswer: row.correction.modelAnswer,
-      teacherComment: row.correction.teacherComment,
-      publishedAt: row.correction.publishedAt?.toISOString() ?? null,
-    },
-    fragments: fragments.map((f) => ({
-      orderIndex: f.orderIndex,
-      originalText: f.originalText,
-      correctedText: f.correctedText,
-      category: f.category,
-    })),
-    evaluation: evaluationRow
-      ? {
-          grammarAccuracy: evaluationRow.grammarAccuracy,
-          vocabularyUsage: evaluationRow.vocabularyUsage,
-          contextualFluency: evaluationRow.contextualFluency,
-        }
-      : null,
-  };
+  return buildPublishedResultPayload(db, row, session);
 }
 
 export async function getPublishedRegularResult(db: Db, grantId: string, submissionId: string) {
+  const sub = await repo.getSubmissionByIdForGrant(db, submissionId, grantId);
+  if (!sub) return null;
+  await repo.lazyUnlockDueSessions(db, sub.courseId);
+  const joined = await repo.getSubmissionWithSessionForGrant(db, submissionId, grantId);
+  if (!joined) return null;
+  const { submission, session } = joined;
+  const attachments = await listSubmissionAttachmentsForApi(db, submissionId);
+
+  if (sessionIsMissed(session)) {
+    return buildMissedResultPayload(submission, session, attachments);
+  }
+
+  if (submission.status !== "published") {
+    return null;
+  }
+
   const row = await repo.getPublishedResultForSubmissionGrant(db, submissionId, grantId);
   if (!row) return null;
-  const fragments = await repo.listFragmentsForCorrection(db, row.correction.id);
-  const evaluationRow = await repo.getEvaluationForSubmission(db, submissionId);
-  return {
-    submissionId: row.submission.id,
-    submission: {
-      bodyText: row.submission.bodyText,
-      submittedAt: row.submission.submittedAt?.toISOString() ?? null,
-    },
-    correction: {
-      polishedSentence: row.correction.polishedSentence,
-      modelAnswer: row.correction.modelAnswer,
-      teacherComment: row.correction.teacherComment,
-      publishedAt: row.correction.publishedAt?.toISOString() ?? null,
-    },
-    fragments: fragments.map((f) => ({
-      orderIndex: f.orderIndex,
-      originalText: f.originalText,
-      correctedText: f.correctedText,
-      category: f.category,
-    })),
-    evaluation: evaluationRow
-      ? {
-          grammarAccuracy: evaluationRow.grammarAccuracy,
-          vocabularyUsage: evaluationRow.vocabularyUsage,
-          contextualFluency: evaluationRow.contextualFluency,
-        }
-      : null,
-  };
+  return buildPublishedResultPayload(db, row, session);
 }

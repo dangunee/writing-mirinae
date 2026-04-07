@@ -1,15 +1,20 @@
-import { and, asc, eq, inArray, lte } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 
 import {
   regularAccessGrants,
+  writingCorrectionAnnotations,
+  writingCorrectionEvaluations,
+  writingCorrectionFeedbackItems,
   writingCorrections,
   writingCourses,
   writingEvaluations,
   writingFragments,
   writingSessions,
+  writingSubmissionAttachments,
   writingSubmissions,
 } from "../../db/schema";
 import type { Db } from "../db/client";
+import { reconcileCourseSessions } from "../services/writingSessionReconciliationService";
 
 export async function findActiveWritingCourseForUser(db: Db, userId: string) {
   const rows = await db
@@ -47,19 +52,9 @@ export async function getWritingCourseById(db: Db, courseId: string) {
   return rows[0] ?? null;
 }
 
-/** Unlock sessions whose time has passed (lazy unlock; no cron required). */
+/** Unlock + missed reconciliation (lazy; no cron required). Replaces time-only lazy unlock. */
 export async function lazyUnlockDueSessions(db: Db, courseId: string) {
-  const now = new Date();
-  await db
-    .update(writingSessions)
-    .set({ status: "unlocked", updatedAt: now })
-    .where(
-      and(
-        eq(writingSessions.courseId, courseId),
-        eq(writingSessions.status, "locked"),
-        lte(writingSessions.unlockAt, now)
-      )
-    );
+  await reconcileCourseSessions(db, courseId);
 }
 
 export async function listSessionsForCourseOrdered(db: Db, courseId: string) {
@@ -112,6 +107,42 @@ export async function getSubmissionByIdForUser(db: Db, submissionId: string, use
     .select()
     .from(writingSubmissions)
     .where(and(eq(writingSubmissions.id, submissionId), eq(writingSubmissions.userId, userId)))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function getSubmissionWithSessionForUser(
+  db: Db,
+  submissionId: string,
+  userId: string
+) {
+  const rows = await db
+    .select({
+      submission: writingSubmissions,
+      session: writingSessions,
+    })
+    .from(writingSubmissions)
+    .innerJoin(writingSessions, eq(writingSubmissions.sessionId, writingSessions.id))
+    .where(and(eq(writingSubmissions.id, submissionId), eq(writingSubmissions.userId, userId)))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function getSubmissionWithSessionForGrant(
+  db: Db,
+  submissionId: string,
+  grantId: string
+) {
+  const rows = await db
+    .select({
+      submission: writingSubmissions,
+      session: writingSessions,
+    })
+    .from(writingSubmissions)
+    .innerJoin(writingSessions, eq(writingSubmissions.sessionId, writingSessions.id))
+    .where(
+      and(eq(writingSubmissions.id, submissionId), eq(writingSubmissions.regularAccessGrantId, grantId))
+    )
     .limit(1);
   return rows[0] ?? null;
 }
@@ -187,6 +218,7 @@ export async function updateSubmissionDraft(
     bodyText: string | null;
     imageStorageKey: string | null;
     imageMimeType: string | null;
+    submissionMode?: string | null;
   }
 ) {
   const [updated] = await db
@@ -217,7 +249,14 @@ export async function submitSubmissionFinal(db: Db, submissionId: string, userId
       )
     )
     .returning();
-  return updated ?? null;
+  if (!updated) {
+    return null;
+  }
+  await db
+    .update(writingSessions)
+    .set({ runtimeStatus: "submitted", updatedAt: now })
+    .where(eq(writingSessions.id, updated.sessionId));
+  return updated;
 }
 
 export async function getRegularGrantWithCourse(db: Db, grantId: string) {
@@ -268,6 +307,7 @@ export async function updateSubmissionDraftForGrant(
     bodyText: string | null;
     imageStorageKey: string | null;
     imageMimeType: string | null;
+    submissionMode?: string | null;
   }
 ) {
   const [updated] = await db
@@ -304,7 +344,14 @@ export async function submitSubmissionFinalForGrant(db: Db, submissionId: string
       )
     )
     .returning();
-  return updated ?? null;
+  if (!updated) {
+    return null;
+  }
+  await db
+    .update(writingSessions)
+    .set({ runtimeStatus: "submitted", updatedAt: now })
+    .where(eq(writingSessions.id, updated.sessionId));
+  return updated;
 }
 
 export async function updateSubmissionDraftForTrial(
@@ -315,6 +362,7 @@ export async function updateSubmissionDraftForTrial(
     bodyText: string | null;
     imageStorageKey: string | null;
     imageMimeType: string | null;
+    submissionMode?: string | null;
   }
 ) {
   const [updated] = await db
@@ -351,7 +399,36 @@ export async function submitSubmissionFinalForTrial(db: Db, submissionId: string
       )
     )
     .returning();
-  return updated ?? null;
+  if (!updated) {
+    return null;
+  }
+  await db
+    .update(writingSessions)
+    .set({ runtimeStatus: "submitted", updatedAt: now })
+    .where(eq(writingSessions.id, updated.sessionId));
+  return updated;
+}
+
+export async function deleteSubmissionAttachmentsBySubmissionId(db: Db, submissionId: string) {
+  await db
+    .delete(writingSubmissionAttachments)
+    .where(eq(writingSubmissionAttachments.submissionId, submissionId));
+}
+
+export async function listSubmissionAttachmentsBySubmissionId(db: Db, submissionId: string) {
+  return db
+    .select()
+    .from(writingSubmissionAttachments)
+    .where(eq(writingSubmissionAttachments.submissionId, submissionId))
+    .orderBy(asc(writingSubmissionAttachments.sortOrder));
+}
+
+export async function insertSubmissionAttachmentRow(
+  db: Db,
+  row: typeof writingSubmissionAttachments.$inferInsert
+) {
+  const [created] = await db.insert(writingSubmissionAttachments).values(row).returning();
+  return created ?? null;
 }
 
 export async function getSubmissionByIdForTrial(db: Db, submissionId: string, applicationId: string) {
@@ -424,6 +501,31 @@ export async function listFragmentsForCorrection(db: Db, correctionId: string) {
     .from(writingFragments)
     .where(eq(writingFragments.correctionId, correctionId))
     .orderBy(asc(writingFragments.orderIndex));
+}
+
+export async function listCorrectionFeedbackItemsForCorrection(db: Db, correctionId: string) {
+  return db
+    .select()
+    .from(writingCorrectionFeedbackItems)
+    .where(eq(writingCorrectionFeedbackItems.correctionId, correctionId))
+    .orderBy(asc(writingCorrectionFeedbackItems.sortOrder), asc(writingCorrectionFeedbackItems.id));
+}
+
+export async function listCorrectionAnnotationsForCorrection(db: Db, correctionId: string) {
+  return db
+    .select()
+    .from(writingCorrectionAnnotations)
+    .where(eq(writingCorrectionAnnotations.correctionId, correctionId))
+    .orderBy(asc(writingCorrectionAnnotations.sortOrder), asc(writingCorrectionAnnotations.id));
+}
+
+export async function getCorrectionEvaluationByCorrectionId(db: Db, correctionId: string) {
+  const rows = await db
+    .select()
+    .from(writingCorrectionEvaluations)
+    .where(eq(writingCorrectionEvaluations.correctionId, correctionId))
+    .limit(1);
+  return rows[0] ?? null;
 }
 
 export async function getEvaluationForSubmission(db: Db, submissionId: string) {

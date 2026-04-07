@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import StudentAccountPanel from '../components/student/StudentAccountPanel'
 import { apiUrl } from '../lib/apiUrl'
 
@@ -19,8 +20,53 @@ type MypageSummary = {
 }
 
 type MypageSessionItem = {
+  sessionId: string
   index: number
+  unlockAt: string
+  sessionStatus: string
+  /** Server reconciliation: locked | available | submitted | corrected | missed */
+  runtimeStatus: string | null
+  availableFrom: string | null
+  dueAt: string | null
+  missedAt: string | null
+  missed: boolean
+  submission: null | {
+    id: string
+    status: string
+    workflowStage: string
+    submittedAt: string | null
+  }
+  correctionAvailable: boolean
+  publishedAt: string | null
   correctionRate: number | null
+  evaluation: null | { grammar: number; vocabulary: number; context: number }
+}
+
+function canNavigateToSessionResult(s: MypageSessionItem): boolean {
+  const id = s.submission?.id
+  if (!id) return false
+  const rs = s.runtimeStatus
+  if (rs === 'corrected' || rs === 'missed') return true
+  if (rs != null && rs !== '') return false
+  if (s.missed || s.sessionStatus === 'missed') return true
+  if (s.submission?.status === 'published') return true
+  return false
+}
+
+function sessionStatusLabel(s: MypageSessionItem): string {
+  const rs = s.runtimeStatus
+  if (rs != null && rs !== '') {
+    if (rs === 'missed') return '期限後'
+    if (rs === 'corrected') return '添削済'
+    if (rs === 'submitted') return '提出済'
+    if (rs === 'available') return '受付中'
+    if (rs === 'locked') return '未開放'
+    return rs
+  }
+  if (s.missed) return '期限後'
+  if (s.correctionAvailable) return '添削済'
+  if (s.submission?.submittedAt) return '提出済'
+  return '—'
 }
 
 type MypageCommentItem = {
@@ -108,6 +154,7 @@ export default function MypagePage() {
 
   // [API 연결] summary / sessions / comments / frequent-mistakes 병렬 fetch
   // [VERIFY] draft 비노출: 서버 writingMypageService·Repository가 published 만 집계/반환
+  // TODO: Calendar UI — when a calendar section exists, wire GET /api/writing/mypage/calendar (submitted / corrected / missed markers).
   useEffect(() => {
     const opts: RequestInit = { credentials: 'include' }
     let cancelled = false
@@ -481,14 +528,43 @@ export default function MypagePage() {
                               Number.isFinite(s.index) &&
                               highlightSessionIndex >= 0 &&
                               s.index === highlightSessionIndex
-                            return (
-                              <div key={s.index} className="bar-group">
+                            const goResult = canNavigateToSessionResult(s) && s.submission?.id
+                            const barBody = (
+                              <>
                                 <div className={isCurrent ? 'bar current' : 'bar'} style={{ height: `${h}%` }} />
                                 <span
                                   className={`text-[9px] font-bold mt-2 ${isCurrent ? 'text-indigo-950' : 'text-stone-400'}`}
                                 >
                                   S{s.index}
                                 </span>
+                                <span className="text-[7px] font-medium text-stone-500 mt-0.5 text-center leading-tight px-0.5">
+                                  {sessionStatusLabel(s)}
+                                </span>
+                                <span className="text-[7px] text-stone-400 mt-0.5 text-center leading-tight px-0.5">
+                                  発{formatSessionDate(s.availableFrom ?? s.unlockAt)} 締{formatSessionDate(s.dueAt)}
+                                  {s.submission?.submittedAt
+                                    ? ` 提${formatSessionDate(s.submission.submittedAt)}`
+                                    : ''}
+                                </span>
+                                {s.missed || s.runtimeStatus === 'missed' ? (
+                                  <span className="bg-error-container text-on-error-container px-1 py-0.5 text-[8px] font-bold rounded mt-0.5">
+                                    期限後
+                                  </span>
+                                ) : null}
+                              </>
+                            )
+                            return goResult ? (
+                              <Link
+                                key={s.index}
+                                to={`/writing/app/view/${s.submission!.id}`}
+                                className="bar-group no-underline text-inherit"
+                                title="結果を見る"
+                              >
+                                {barBody}
+                              </Link>
+                            ) : (
+                              <div key={s.index} className="bar-group">
+                                {barBody}
                               </div>
                             )
                           })}
@@ -1005,8 +1081,9 @@ export default function MypagePage() {
                       Number.isFinite(s.index) &&
                       s.index === highlightSessionIndex &&
                       s.correctionRate != null
-                    return (
-                      <div key={`mbar-${s.index}`} className="w-full flex flex-col items-center justify-end flex-1 min-w-0 relative">
+                    const goResult = canNavigateToSessionResult(s) && s.submission?.id
+                    const col = (
+                      <>
                         {isHi ? (
                           <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-bold text-primary whitespace-nowrap">
                             {currentSessionAccuracy}%
@@ -1016,6 +1093,27 @@ export default function MypagePage() {
                           className={`w-full rounded-t-sm ${isHi ? 'bg-primary' : 'bg-primary/10'}`}
                           style={{ height: `${h}%` }}
                         />
+                        <span className="text-[7px] text-on-surface-variant mt-1 text-center leading-tight w-full px-0.5">
+                          {sessionStatusLabel(s)}
+                          {s.missed || s.runtimeStatus === 'missed' ? (
+                            <span className="ml-0.5 text-error font-bold">·期限後</span>
+                          ) : null}
+                        </span>
+                      </>
+                    )
+                    return (
+                      <div key={`mbar-${s.index}`} className="w-full flex flex-col items-center justify-end flex-1 min-w-0 relative">
+                        {goResult ? (
+                          <Link
+                            to={`/writing/app/view/${s.submission!.id}`}
+                            className="w-full flex flex-col items-center justify-end no-underline text-inherit min-h-0"
+                            title="結果を見る"
+                          >
+                            {col}
+                          </Link>
+                        ) : (
+                          col
+                        )}
                       </div>
                     )
                   })}

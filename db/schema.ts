@@ -57,7 +57,7 @@ export const courseStatusEnum = pgEnum("course_status", [
   "cancelled",
 ]);
 
-export const sessionStatusEnum = pgEnum("session_status", ["locked", "unlocked", "completed"]);
+export const sessionStatusEnum = pgEnum("session_status", ["locked", "unlocked", "completed", "missed"]);
 
 export const submissionStatusEnum = pgEnum("submission_status", [
   "draft",
@@ -255,6 +255,67 @@ export const emailVerificationTokens = pgTable(
 
 const writing = pgSchema("writing");
 
+export const writingAppRoleEnum = writing.enum("app_role", ["student", "teacher", "admin"]);
+
+export const writingSessionRuntimeEnum = writing.enum("session_runtime", [
+  "locked",
+  "available",
+  "submitted",
+  "corrected",
+  "missed",
+]);
+
+export const writingAnnotationTargetEnum = writing.enum("annotation_target", ["original", "corrected", "improved"]);
+
+export const writingTerms = writing.table(
+  "terms",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sortOrder: integer("sort_order").notNull().default(0),
+    title: text("title").notNull(),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("idx_writing_terms_sort").on(t.sortOrder)]
+);
+
+export const writingAssignmentMasters = writing.table(
+  "assignment_masters",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    termId: uuid("term_id")
+      .notNull()
+      .references(() => writingTerms.id, { onDelete: "cascade" }),
+    slotIndex: smallint("slot_index").notNull(),
+    theme: text("theme").notNull(),
+    requiredExpressions: jsonb("required_expressions").notNull().default(sql`'[]'::jsonb`),
+    modelAnswer: text("model_answer").notNull(),
+    difficulty: smallint("difficulty").notNull().default(1),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check("writing_assignment_masters_slot_range", sql`slot_index >= 1 AND slot_index <= 10`),
+    check("writing_assignment_masters_difficulty_range", sql`difficulty >= 1 AND difficulty <= 5`),
+    unique("writing_assignment_masters_term_slot_unique").on(t.termId, t.slotIndex),
+    index("idx_writing_assignment_masters_term_id").on(t.termId),
+  ]
+);
+
+export const writingUserRoles = writing.table(
+  "user_roles",
+  {
+    userId: uuid("user_id")
+      .primaryKey()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    role: writingAppRoleEnum("role").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("idx_writing_user_roles_role").on(t.role)]
+);
+
 export const writingCourses = writing.table(
   "courses",
   {
@@ -272,6 +333,10 @@ export const writingCourses = writing.table(
     sessionCount: smallint("session_count").notNull(),
     /** Internal admin test course; excluded from student entitlement resolution. */
     isAdminSandbox: boolean("is_admin_sandbox").notNull().default(false),
+    /** Optional link to assignment master term (course generator snapshots assignments). */
+    termId: uuid("term_id").references(() => writingTerms.id, { onDelete: "set null" }),
+    /** When true, sequential unlock + missed rules apply in reconciliation. */
+    strictSessionProgression: boolean("strict_session_progression").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -286,6 +351,7 @@ export const writingCourses = writing.table(
     ),
     index("idx_writing_courses_user_id").on(t.userId),
     index("idx_writing_courses_status").on(t.status),
+    index("idx_writing_courses_term_id").on(t.termId),
   ]
 );
 
@@ -418,6 +484,18 @@ export const writingSessions = writing.table(
     index: smallint("index").notNull(),
     unlockAt: timestamp("unlock_at", { withTimezone: true }).notNull(),
     status: sessionStatusEnum("status").notNull().default("locked"),
+    runtimeStatus: writingSessionRuntimeEnum("runtime_status"),
+    availableFrom: timestamp("available_from", { withTimezone: true }),
+    dueAt: timestamp("due_at", { withTimezone: true }),
+    missedAt: timestamp("missed_at", { withTimezone: true }),
+    themeSnapshot: text("theme_snapshot"),
+    requiredExpressionsSnapshot: jsonb("required_expressions_snapshot"),
+    modelAnswerSnapshot: text("model_answer_snapshot"),
+    difficultySnapshot: smallint("difficulty_snapshot"),
+    termId: uuid("term_id").references(() => writingTerms.id, { onDelete: "set null" }),
+    assignmentMasterId: uuid("assignment_master_id").references(() => writingAssignmentMasters.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -427,6 +505,8 @@ export const writingSessions = writing.table(
     index("idx_writing_sessions_course_id").on(t.courseId),
     index("idx_writing_sessions_course_unlock").on(t.courseId, t.unlockAt),
     index("idx_writing_sessions_status").on(t.courseId, t.status),
+    index("idx_writing_sessions_course_runtime").on(t.courseId, t.runtimeStatus),
+    index("idx_writing_sessions_due_at").on(t.courseId, t.dueAt),
   ]
 );
 
@@ -447,6 +527,7 @@ export const writingSubmissions = writing.table(
     /** 体験申込 (writing.trial_applications)。提出の source of truth は本行の status / submitted_at（trial_applications に複製しない） */
     trialApplicationId: uuid("trial_application_id"),
     status: submissionStatusEnum("status").notNull().default("draft"),
+    submissionMode: text("submission_mode"),
     bodyText: text("body_text"),
     imageStorageKey: text("image_storage_key"),
     imageMimeType: text("image_mime_type"),
@@ -481,6 +562,28 @@ export const writingSubmissions = writing.table(
   ]
 );
 
+export const writingSubmissionAttachments = writing.table(
+  "submission_attachments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    submissionId: uuid("submission_id")
+      .notNull()
+      .references(() => writingSubmissions.id, { onDelete: "cascade" }),
+    storageBucket: text("storage_bucket").notNull().default("writing-submissions"),
+    storageKey: text("storage_key").notNull(),
+    mimeType: text("mime_type").notNull(),
+    byteSize: integer("byte_size").notNull(),
+    originalFilename: text("original_filename"),
+    pageCount: integer("page_count"),
+    sortOrder: smallint("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check("writing_submission_attachments_size_nonneg", sql`byte_size >= 0`),
+    index("idx_writing_submission_attachments_submission_id").on(t.submissionId),
+  ]
+);
+
 export const writingCorrections = writing.table(
   "corrections",
   {
@@ -496,6 +599,8 @@ export const writingCorrections = writing.table(
     polishedSentence: text("polished_sentence"),
     modelAnswer: text("model_answer"),
     teacherComment: text("teacher_comment"),
+    richDocumentJson: jsonb("rich_document_json"),
+    improvedText: text("improved_text"),
     publishedAt: timestamp("published_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -535,6 +640,76 @@ export const writingFragments = writing.table(
     ),
     index("idx_writing_fragments_correction_id").on(t.correctionId),
     index("idx_writing_fragments_category").on(t.category),
+  ]
+);
+
+export const writingCorrectionFeedbackItems = writing.table(
+  "correction_feedback_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    correctionId: uuid("correction_id")
+      .notNull()
+      .references(() => writingCorrections.id, { onDelete: "cascade" }),
+    sortOrder: integer("sort_order").notNull(),
+    category: text("category").notNull(),
+    subcategory: text("subcategory"),
+    originalText: text("original_text").notNull(),
+    correctedText: text("corrected_text").notNull(),
+    explanation: text("explanation"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique("writing_correction_feedback_items_order_unique").on(t.correctionId, t.sortOrder),
+    index("idx_writing_correction_feedback_items_correction_id").on(t.correctionId),
+    index("idx_writing_correction_feedback_items_category").on(t.category),
+  ]
+);
+
+export const writingCorrectionAnnotations = writing.table(
+  "correction_annotations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    correctionId: uuid("correction_id")
+      .notNull()
+      .references(() => writingCorrections.id, { onDelete: "cascade" }),
+    sortOrder: integer("sort_order").notNull().default(0),
+    targetType: writingAnnotationTargetEnum("target_type").notNull(),
+    anchorText: text("anchor_text"),
+    startOffset: integer("start_offset"),
+    endOffset: integer("end_offset"),
+    commentText: text("comment_text").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check(
+      "writing_correction_annotations_offset_sanity",
+      sql`end_offset IS NULL OR start_offset IS NULL OR end_offset >= start_offset`
+    ),
+    index("idx_writing_correction_annotations_correction_id").on(t.correctionId),
+    index("idx_writing_correction_annotations_correction_sort").on(t.correctionId, t.sortOrder),
+  ]
+);
+
+export const writingCorrectionEvaluations = writing.table(
+  "correction_evaluations",
+  {
+    correctionId: uuid("correction_id")
+      .primaryKey()
+      .references(() => writingCorrections.id, { onDelete: "cascade" }),
+    grammar: smallint("grammar"),
+    vocabulary: smallint("vocabulary"),
+    flow: smallint("flow"),
+    coherence: smallint("coherence"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  () => [
+    check("writing_correction_evaluations_grammar_range", sql`grammar IS NULL OR (grammar >= 0 AND grammar <= 100)`),
+    check("writing_correction_evaluations_vocab_range", sql`vocabulary IS NULL OR (vocabulary >= 0 AND vocabulary <= 100)`),
+    check("writing_correction_evaluations_flow_range", sql`flow IS NULL OR (flow >= 0 AND flow <= 100)`),
+    check("writing_correction_evaluations_coh_range", sql`coherence IS NULL OR (coherence >= 0 AND coherence <= 100)`),
   ]
 );
 
@@ -599,11 +774,28 @@ export const entitlementsRelations = relations(entitlements, ({ one }) => ({
   }),
 }));
 
+export const writingTermsRelations = relations(writingTerms, ({ many }) => ({
+  assignmentMasters: many(writingAssignmentMasters),
+  courses: many(writingCourses),
+}));
+
+export const writingAssignmentMastersRelations = relations(writingAssignmentMasters, ({ one, many }) => ({
+  term: one(writingTerms, {
+    fields: [writingAssignmentMasters.termId],
+    references: [writingTerms.id],
+  }),
+  sessions: many(writingSessions),
+}));
+
 export const writingCoursesRelations = relations(writingCourses, ({ one, many }) => ({
   user: one(authUsers, { fields: [writingCourses.userId], references: [authUsers.id] }),
   entitlement: one(entitlements, {
     fields: [writingCourses.entitlementId],
     references: [entitlements.id],
+  }),
+  term: one(writingTerms, {
+    fields: [writingCourses.termId],
+    references: [writingTerms.id],
   }),
   sessions: many(writingSessions),
   submissions: many(writingSubmissions),
@@ -630,10 +822,18 @@ export const writingSessionsRelations = relations(writingSessions, ({ one, many 
     fields: [writingSessions.courseId],
     references: [writingCourses.id],
   }),
+  term: one(writingTerms, {
+    fields: [writingSessions.termId],
+    references: [writingTerms.id],
+  }),
+  assignmentMaster: one(writingAssignmentMasters, {
+    fields: [writingSessions.assignmentMasterId],
+    references: [writingAssignmentMasters.id],
+  }),
   submissions: many(writingSubmissions),
 }));
 
-export const writingSubmissionsRelations = relations(writingSubmissions, ({ one }) => ({
+export const writingSubmissionsRelations = relations(writingSubmissions, ({ one, many }) => ({
   session: one(writingSessions, {
     fields: [writingSubmissions.sessionId],
     references: [writingSessions.id],
@@ -655,6 +855,14 @@ export const writingSubmissionsRelations = relations(writingSubmissions, ({ one 
     fields: [writingSubmissions.id],
     references: [writingEvaluations.submissionId],
   }),
+  attachments: many(writingSubmissionAttachments),
+}));
+
+export const writingSubmissionAttachmentsRelations = relations(writingSubmissionAttachments, ({ one }) => ({
+  submission: one(writingSubmissions, {
+    fields: [writingSubmissionAttachments.submissionId],
+    references: [writingSubmissions.id],
+  }),
 }));
 
 export const writingCorrectionsRelations = relations(writingCorrections, ({ one, many }) => ({
@@ -664,11 +872,35 @@ export const writingCorrectionsRelations = relations(writingCorrections, ({ one,
   }),
   teacher: one(authUsers, { fields: [writingCorrections.teacherId], references: [authUsers.id] }),
   fragments: many(writingFragments),
+  feedbackItems: many(writingCorrectionFeedbackItems),
+  annotations: many(writingCorrectionAnnotations),
+  correctionEvaluation: one(writingCorrectionEvaluations),
 }));
 
 export const writingFragmentsRelations = relations(writingFragments, ({ one }) => ({
   correction: one(writingCorrections, {
     fields: [writingFragments.correctionId],
+    references: [writingCorrections.id],
+  }),
+}));
+
+export const writingCorrectionFeedbackItemsRelations = relations(writingCorrectionFeedbackItems, ({ one }) => ({
+  correction: one(writingCorrections, {
+    fields: [writingCorrectionFeedbackItems.correctionId],
+    references: [writingCorrections.id],
+  }),
+}));
+
+export const writingCorrectionAnnotationsRelations = relations(writingCorrectionAnnotations, ({ one }) => ({
+  correction: one(writingCorrections, {
+    fields: [writingCorrectionAnnotations.correctionId],
+    references: [writingCorrections.id],
+  }),
+}));
+
+export const writingCorrectionEvaluationsRelations = relations(writingCorrectionEvaluations, ({ one }) => ({
+  correction: one(writingCorrections, {
+    fields: [writingCorrectionEvaluations.correctionId],
     references: [writingCorrections.id],
   }),
 }));

@@ -28,5 +28,6 @@ export async function POST(_req: Request, context: { params: Promise<{ id: strin
     ok: true,
     correctionId: result.correctionId,
     publishedAt: result.publishedAt,
+    session: result.session,
   });
 }

@@ -32,7 +32,7 @@ export function assertIsoDateOnly(value: string): string {
   return value.trim();
 }
 
-function intervalToMs(interval: CourseInterval): number {
+export function intervalToMs(interval: CourseInterval): number {
   const d = 24 * 60 * 60 * 1000;
   switch (interval) {
     case "interval_1d":

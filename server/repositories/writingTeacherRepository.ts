@@ -1,6 +1,9 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 
 import {
+  writingCorrectionAnnotations,
+  writingCorrectionEvaluations,
+  writingCorrectionFeedbackItems,
   writingCorrections,
   writingCourses,
   writingEvaluations,
@@ -68,7 +71,11 @@ export async function updateCorrectionDraft(
   patch: Partial<
     Pick<
       typeof writingCorrections.$inferInsert,
-      "polishedSentence" | "modelAnswer" | "teacherComment"
+      | "polishedSentence"
+      | "modelAnswer"
+      | "teacherComment"
+      | "richDocumentJson"
+      | "improvedText"
     >
   >
 ) {
@@ -120,6 +127,87 @@ export async function insertFragmentsBatch(
 ) {
   if (rows.length === 0) return;
   await db.insert(writingFragments).values(rows);
+}
+
+export async function deleteFeedbackItemsForCorrection(db: Db, correctionId: string) {
+  await db
+    .delete(writingCorrectionFeedbackItems)
+    .where(eq(writingCorrectionFeedbackItems.correctionId, correctionId));
+}
+
+export async function insertFeedbackItemsBatch(
+  db: Db,
+  rows: (typeof writingCorrectionFeedbackItems.$inferInsert)[]
+) {
+  if (rows.length === 0) return;
+  await db.insert(writingCorrectionFeedbackItems).values(rows);
+}
+
+export async function listFeedbackItemsForCorrection(db: Db, correctionId: string) {
+  return db
+    .select()
+    .from(writingCorrectionFeedbackItems)
+    .where(eq(writingCorrectionFeedbackItems.correctionId, correctionId))
+    .orderBy(asc(writingCorrectionFeedbackItems.sortOrder), asc(writingCorrectionFeedbackItems.id));
+}
+
+export async function deleteAnnotationsForCorrection(db: Db, correctionId: string) {
+  await db
+    .delete(writingCorrectionAnnotations)
+    .where(eq(writingCorrectionAnnotations.correctionId, correctionId));
+}
+
+export async function insertAnnotationsBatch(
+  db: Db,
+  rows: (typeof writingCorrectionAnnotations.$inferInsert)[]
+) {
+  if (rows.length === 0) return;
+  await db.insert(writingCorrectionAnnotations).values(rows);
+}
+
+export async function listAnnotationsForCorrection(db: Db, correctionId: string) {
+  return db
+    .select()
+    .from(writingCorrectionAnnotations)
+    .where(eq(writingCorrectionAnnotations.correctionId, correctionId))
+    .orderBy(asc(writingCorrectionAnnotations.sortOrder), asc(writingCorrectionAnnotations.id));
+}
+
+export async function getCorrectionEvaluationByCorrectionId(db: Db, correctionId: string) {
+  const rows = await db
+    .select()
+    .from(writingCorrectionEvaluations)
+    .where(eq(writingCorrectionEvaluations.correctionId, correctionId))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/** Sync writing.correction_evaluations from writing.evaluations (trigger still reads writing.evaluations). */
+export async function upsertCorrectionEvaluationFromSubmissionScores(
+  db: Db,
+  correctionId: string,
+  submissionId: string
+) {
+  const ev = await getEvaluationBySubmission(db, submissionId);
+  if (!ev) return;
+  await db
+    .insert(writingCorrectionEvaluations)
+    .values({
+      correctionId,
+      grammar: ev.grammarAccuracy,
+      vocabulary: ev.vocabularyUsage,
+      flow: ev.contextualFluency,
+      coherence: null,
+    })
+    .onConflictDoUpdate({
+      target: writingCorrectionEvaluations.correctionId,
+      set: {
+        grammar: ev.grammarAccuracy,
+        vocabulary: ev.vocabularyUsage,
+        flow: ev.contextualFluency,
+        updatedAt: new Date(),
+      },
+    });
 }
 
 /** Merge partial scores with existing row so draft saves do not null out omitted fields. */

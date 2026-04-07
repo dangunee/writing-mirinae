@@ -8,6 +8,7 @@ import {
   type AuthRole,
 } from "../../../../server/lib/authMe";
 import { getDb } from "../../../../server/db/client";
+import { resolveWritingRoleFromDbOrEnv } from "../../../../server/lib/writingAuthRoles";
 import { loginMethodsFromIdentities } from "../../../../server/lib/loginMethodsFromIdentities";
 import { createSupabaseServerClient } from "../../../../server/lib/supabaseServer";
 import { linkTrialApplicationsToUserByEmail } from "../../../../server/services/trialApplicationLinkService";
@@ -73,7 +74,7 @@ export async function GET() {
         }
       }
       entitlements = await computeEntitlementsForUser(db, user.id);
-      role = resolveRoleFromEnv(user.id);
+      role = await resolveWritingRoleFromDbOrEnv(db, user.id);
       try {
         const rows = await db
           .select({

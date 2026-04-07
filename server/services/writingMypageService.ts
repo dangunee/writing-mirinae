@@ -78,11 +78,20 @@ export async function getMypageSummary(
   const course = await requireActiveCourse(db, userId);
   if (!course) return null;
 
-  const [publishedCount, globalAvg, evalAgg] = await Promise.all([
+  const [publishedCount, globalAvg, evalFromCe] = await Promise.all([
     mypageRepo.countPublishedSubmissionsForCourse(db, course.id, userId),
     mypageRepo.getGlobalAverageSubmissionRate(db),
-    mypageRepo.getPublishedEvaluationAggregatesForCourse(db, course.id, userId),
+    mypageRepo.getPublishedEvaluationAggregatesFromCorrectionEvaluations(db, course.id, userId),
   ]);
+
+  let evalAgg = evalFromCe;
+  if (!evalAgg || evalAgg.publishedCount === "0") {
+    evalAgg = await mypageRepo.getPublishedEvaluationAggregatesFromWritingEvaluationsLegacy(
+      db,
+      course.id,
+      userId
+    );
+  }
 
   const sessionCount = course.sessionCount;
   const submissionRate = sessionCount > 0 ? publishedCount / sessionCount : 0;
@@ -136,10 +145,18 @@ export type MypageSessionItem = {
   index: number;
   unlockAt: string;
   sessionStatus: string;
+  /** Server reconciliation runtime (locked | available | submitted | corrected | missed). */
+  runtimeStatus: string | null;
+  availableFrom: string | null;
+  dueAt: string | null;
+  missedAt: string | null;
+  /** True when slot was marked missed (explicit; no fake correction). */
+  missed: boolean;
   submission: null | {
     id: string;
     status: string;
     workflowStage: WorkflowStage;
+    submittedAt: string | null;
   };
   /** True when the student has a published result for this session. */
   correctionAvailable: boolean;
@@ -166,12 +183,13 @@ export async function getMypageSessions(
   const sessions = rows.map((r) => {
     const sub = r.submission;
     const wf = workflowStage(sub?.status);
-    const published = sub?.status === "published";
-    const g = r.grammar;
-    const voc = r.vocabulary;
-    const ctx = r.context;
+    const missed = r.session.runtimeStatus === "missed" || r.session.status === "missed";
+    const published = sub?.status === "published" && !missed;
+    const g = missed ? null : r.grammar;
+    const voc = missed ? null : r.vocabulary;
+    const ctx = missed ? null : r.context;
     const evalTriple =
-      g != null && voc != null && ctx != null
+      !missed && g != null && voc != null && ctx != null
         ? { grammar: g, vocabulary: voc, context: ctx }
         : null;
     const correctionRate = evalTriple ? round1(mean3(g, voc, ctx)!) : null;
@@ -181,15 +199,21 @@ export async function getMypageSessions(
       index: r.session.index,
       unlockAt: r.session.unlockAt.toISOString(),
       sessionStatus: r.session.status,
+      runtimeStatus: r.session.runtimeStatus ?? null,
+      availableFrom: r.session.availableFrom?.toISOString() ?? null,
+      dueAt: r.session.dueAt?.toISOString() ?? null,
+      missedAt: r.session.missedAt?.toISOString() ?? null,
+      missed,
       submission: sub
         ? {
             id: sub.id,
             status: sub.status,
             workflowStage: wf,
+            submittedAt: sub.submittedAt?.toISOString() ?? null,
           }
         : null,
       correctionAvailable: published,
-      publishedAt: r.correctionPublishedAt?.toISOString() ?? null,
+      publishedAt: missed ? null : (r.correctionPublishedAt?.toISOString() ?? null),
       correctionRate,
       evaluation: evalTriple,
     };
@@ -221,7 +245,10 @@ export async function getMypageFrequentMistakes(
   const course = await requireActiveCourse(db, userId);
   if (!course) return null;
 
-  const pairs = await mypageRepo.aggregatePublishedFragmentPairsForCourse(db, course.id, userId);
+  let pairs = await mypageRepo.aggregatePublishedFeedbackItemPairsForCourse(db, course.id, userId);
+  if (pairs.length === 0) {
+    pairs = await mypageRepo.aggregatePublishedFragmentPairsForCourse(db, course.id, userId);
+  }
 
   const categoryTotals = new Map<string, number>();
   for (const p of pairs) {
@@ -246,4 +273,61 @@ export async function getMypageFrequentMistakes(
   });
 
   return { courseId: course.id, categories, totalFragments };
+}
+
+export type MypageCalendarEvent = {
+  kind: "available" | "due" | "missed" | "submitted" | "corrected";
+  sessionId: string;
+  index: number;
+  at: string;
+};
+
+/** Minimal calendar-friendly events after reconciliation (same course as sessions). */
+export async function getMypageCalendar(
+  db: Db,
+  userId: string
+): Promise<{ courseId: string; events: MypageCalendarEvent[] } | null> {
+  const course = await requireActiveCourse(db, userId);
+  if (!course) return null;
+
+  await studentRepo.lazyUnlockDueSessions(db, course.id);
+  const rows = await mypageRepo.listSessionsWithSubmissionStateForMypage(db, course.id, userId);
+
+  const events: MypageCalendarEvent[] = [];
+  for (const r of rows) {
+    const s = r.session;
+    const sub = r.submission;
+    const availAt = s.availableFrom ?? s.unlockAt;
+    events.push({
+      kind: "available",
+      sessionId: s.id,
+      index: s.index,
+      at: availAt.toISOString(),
+    });
+    if (s.dueAt) {
+      events.push({ kind: "due", sessionId: s.id, index: s.index, at: s.dueAt.toISOString() });
+    }
+    if (s.missedAt) {
+      events.push({ kind: "missed", sessionId: s.id, index: s.index, at: s.missedAt.toISOString() });
+    }
+    if (sub?.submittedAt) {
+      events.push({
+        kind: "submitted",
+        sessionId: s.id,
+        index: s.index,
+        at: sub.submittedAt.toISOString(),
+      });
+    }
+    if (r.correctionPublishedAt) {
+      events.push({
+        kind: "corrected",
+        sessionId: s.id,
+        index: s.index,
+        at: r.correctionPublishedAt.toISOString(),
+      });
+    }
+  }
+
+  events.sort((a, b) => a.at.localeCompare(b.at));
+  return { courseId: course.id, events };
 }
