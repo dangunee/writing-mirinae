@@ -17,6 +17,8 @@ export function postLoginRedirect(navigate: NavigateFunction, me: AuthMePayload)
     return
   }
   if (me.role === 'admin') {
+    /* Not /writing/teacher; leave login page without dead-end (session is already valid). */
+    navigate('/writing', { replace: true })
     return
   }
   if (canAccessWritingStudentApp(me.entitlements)) {

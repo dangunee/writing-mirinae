@@ -24,6 +24,20 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
 const INK_GRADIENT =
   'bg-gradient-to-br from-[#000666] to-[#1a237e] shadow-md hover:shadow-lg active:scale-[0.98] transition-all duration-200'
 
+/** One login form in the DOM at a time — avoids duplicate password fields + broken browser autofill. */
+function useNarrowScreen(): boolean {
+  const [narrow, setNarrow] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(max-width: 767px)').matches : false
+  )
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)')
+    const fn = () => setNarrow(mq.matches)
+    mq.addEventListener('change', fn)
+    return () => mq.removeEventListener('change', fn)
+  }, [])
+  return narrow
+}
+
 export default function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -50,6 +64,8 @@ export default function LoginPage() {
   const codeExchangeStartedForRef = useRef<string | null>(null)
   const authUrlHandledRef = useRef<string | null>(null)
   const [codeExchangeFinished, setCodeExchangeFinished] = useState(() => oauthCode.length === 0)
+
+  const narrow = useNarrowScreen()
 
   const authErrorFromQuery = useMemo(() => {
     const p = new URLSearchParams(location.search)
@@ -237,20 +253,28 @@ export default function LoginPage() {
 
   return (
     <div className="font-body text-on-surface min-h-screen min-h-[max(884px,100dvh)] flex flex-col bg-[#f6f6f8] md:bg-[#f3f4f6]">
-      <header className="md:hidden fixed top-0 w-full z-50 bg-[#f6f6f8]/80 backdrop-blur-md border-b border-stone-200/50">
-        <div className="flex justify-between items-center px-6 py-4 max-w-7xl mx-auto">
-          <div className="font-headline text-xl font-extrabold tracking-tighter text-primary">
-            ミリネ韓国語教室　作文トレーニング
+      {narrow ? (
+        <header className="fixed top-0 w-full z-50 bg-[#f6f6f8]/80 backdrop-blur-md border-b border-stone-200/50">
+          <div className="flex justify-between items-center px-6 py-4 max-w-7xl mx-auto">
+            <div className="font-headline text-xl font-extrabold tracking-tighter text-primary">
+              ミリネ韓国語教室　作文トレーニング
+            </div>
+            <span className="material-symbols-outlined text-primary" aria-hidden>
+              help_outline
+            </span>
           </div>
-          <span className="material-symbols-outlined text-primary" aria-hidden>
-            help_outline
-          </span>
-        </div>
-      </header>
+        </header>
+      ) : null}
 
-      <main className="flex-grow flex flex-col md:items-center md:justify-center px-6 pt-24 pb-12 md:pt-12 md:pb-12 md:py-24">
-        {/* Mobile: card stack */}
-        <div className="md:hidden w-full max-w-md mx-auto bg-white p-8 md:p-10 rounded-2xl shadow-xl shadow-stone-200/50 space-y-8">
+      <main
+        className={
+          narrow
+            ? 'flex-grow flex flex-col px-6 pt-24 pb-12'
+            : 'flex-grow flex flex-col items-center justify-center px-6 py-12 md:py-24'
+        }
+      >
+        {narrow ? (
+        <div className="w-full max-w-md mx-auto bg-white p-8 md:p-10 rounded-2xl shadow-xl shadow-stone-200/50 space-y-8">
           <div className="space-y-3 text-center">
             <span className="font-label text-[10px] uppercase tracking-[0.2em] text-secondary font-bold">
               Welcome Back
@@ -275,8 +299,9 @@ export default function LoginPage() {
                 <div className="relative">
                   <input
                     id="login-email"
+                    name="username"
                     type="email"
-                    autoComplete="email"
+                    autoComplete="username"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
@@ -303,6 +328,7 @@ export default function LoginPage() {
                 <div className="relative">
                   <input
                     id="login-password"
+                    name="password"
                     type={showPassword ? 'text' : 'password'}
                     autoComplete="current-password"
                     value={password}
@@ -388,9 +414,8 @@ export default function LoginPage() {
             </p>
           </div>
         </div>
-
-        {/* Desktop: split editorial layout */}
-        <div className="hidden md:grid max-w-5xl w-full grid-cols-12 gap-0 overflow-hidden bg-surface-container-lowest shadow-[0_10px_40px_rgba(30,27,19,0.04)] rounded-xl">
+        ) : (
+        <div className="grid max-w-5xl w-full grid-cols-12 gap-0 overflow-hidden bg-surface-container-lowest shadow-[0_10px_40px_rgba(30,27,19,0.04)] rounded-xl">
           <div className="md:col-span-5 bg-primary-container relative p-12 flex flex-col justify-between overflow-hidden">
             <div className="relative z-10">
               <h1 className="font-headline font-extrabold text-3xl tracking-tighter text-surface-bright mb-4">
@@ -435,8 +460,9 @@ export default function LoginPage() {
                   <div className="relative">
                     <input
                       id="login-email-desktop"
+                      name="username"
                       type="email"
-                      autoComplete="email"
+                      autoComplete="username"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
@@ -464,6 +490,7 @@ export default function LoginPage() {
                   <div className="relative group">
                     <input
                       id="login-password-desktop"
+                      name="password"
                       type={showPassword ? 'text' : 'password'}
                       autoComplete="current-password"
                       value={password}
@@ -550,6 +577,7 @@ export default function LoginPage() {
             </div>
           </div>
         </div>
+        )}
       </main>
 
       <footer className="w-full border-t border-stone-200/50 bg-[#f6f6f8] md:bg-[#f3f4f6]">
