@@ -12,8 +12,11 @@ export function postLoginRedirect(navigate: NavigateFunction, me: AuthMePayload)
     navigate('/writing/onboarding', { replace: true })
     return
   }
-  if (me.role === 'teacher' || me.role === 'admin') {
+  if (me.role === 'teacher') {
     navigate('/writing/teacher', { replace: true })
+    return
+  }
+  if (me.role === 'admin') {
     return
   }
   if (canAccessWritingStudentApp(me.entitlements)) {
