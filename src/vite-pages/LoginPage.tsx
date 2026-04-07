@@ -10,6 +10,8 @@ import { getSupabaseBrowserClient } from '../lib/supabaseBrowser'
 import { startLineOAuth } from '../lib/startLineOAuth'
 
 const GENERIC_LOGIN_ERROR = 'メールアドレスまたはパスワードが正しくありません。'
+/** Session/me step failed after sign-in returned ok (no account-enumerating detail). */
+const LOGIN_SESSION_GENERIC_ERROR = 'ログインに失敗しました。入力内容をご確認ください。'
 /** OAuth callback redirect (?error=oauth) — keep distinct from password generic */
 const OAUTH_CALLBACK_ERROR_MSG = 'ログインに失敗しました。しばらくしてからお試しください。'
 
@@ -173,12 +175,10 @@ export default function LoginPage() {
         error?: string
         expected?: 'google' | 'line'
       }>(res)
-      if (!data) {
-        setError('通信に失敗しました。')
-        return
-      }
-      if (!res.ok || data.ok !== true) {
-        if (data.error === 'wrong_login_method') {
+
+      // Primary failure: POST /api/auth/login (do not rely on /api/auth/me for wrong password).
+      if (res.status === 401 || res.status === 403) {
+        if (data?.error === 'wrong_login_method') {
           if (data.expected === 'google') {
             setError('Googleでログインしてください。')
           } else if (data.expected === 'line') {
@@ -191,9 +191,28 @@ export default function LoginPage() {
         }
         return
       }
+
+      if (!res.ok) {
+        if (res.status >= 500) {
+          setError('通信に失敗しました。')
+          return
+        }
+        if (!data) {
+          setError('通信に失敗しました。')
+          return
+        }
+        setError(GENERIC_LOGIN_ERROR)
+        return
+      }
+
+      if (!data || data.ok !== true) {
+        setError(GENERIC_LOGIN_ERROR)
+        return
+      }
+
       const sessionResult = await completeSessionLoginFlow(navigate)
       if (!sessionResult.ok) {
-        setError('セッションの確認に失敗しました。しばらくしてからお試しください。')
+        setError(LOGIN_SESSION_GENERIC_ERROR)
         return
       }
     } catch {
