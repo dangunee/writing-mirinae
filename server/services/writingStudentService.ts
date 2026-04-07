@@ -8,10 +8,13 @@
 
 import { PostgresError } from "postgres";
 
+import { writingCourses } from "../../db/schema";
 import type { Db } from "../db/client";
 import { validateImageUpload, buildStorageObjectKey } from "../lib/writingUploads";
 import { getServiceRoleClient } from "../lib/supabaseServiceRole";
 import * as repo from "../repositories/writingStudentRepository";
+
+type WritingCourseRow = typeof writingCourses.$inferSelect;
 
 const BUCKET = process.env.WRITING_UPLOADS_BUCKET ?? "writing-submissions";
 
@@ -26,7 +29,8 @@ const MAX_BODY_TEXT_CHARS = (() => {
 export type CurrentSessionResponse =
   | {
       ok: true;
-      accessKind: "student";
+      /** `admin_test` = isolated sandbox course for ADMIN_USER_IDS only (see adminSandboxProvisionService). */
+      accessKind: "student" | "admin_test";
       courseId: string;
       mode: "pipeline" | "fresh" | "all_done";
       session: {
@@ -110,23 +114,20 @@ export type CurrentSessionResponse =
  * Current session = active pipeline session, else first incomplete session (linear order).
  * Security: userId from verified session only.
  */
-export async function getCurrentSessionForStudent(
+async function buildOwnedCourseCurrentSession(
   db: Db,
-  userId: string
+  userId: string,
+  course: WritingCourseRow,
+  accessKind: "student" | "admin_test"
 ): Promise<CurrentSessionResponse> {
-  const course = await repo.findActiveWritingCourseForUser(db, userId);
-  if (!course) {
-    return { ok: false, error: "no_active_course" };
-  }
-
   await repo.lazyUnlockDueSessions(db, course.id);
   const sessions = await repo.listSessionsForCourseOrdered(db, course.id);
 
-  const pipeline = await repo.findActivePipelineSubmissionForUser(db, userId);
+  const pipeline = await repo.findActivePipelineSubmissionForUserForCourse(db, userId, course.id);
   if (pipeline) {
     return {
       ok: true,
-      accessKind: "student",
+      accessKind,
       courseId: course.id,
       mode: "pipeline",
       session: {
@@ -163,7 +164,7 @@ export async function getCurrentSessionForStudent(
       if (blocker) {
         return {
           ok: true,
-          accessKind: "student",
+          accessKind,
           courseId: course.id,
           mode: "fresh",
           session: {
@@ -184,7 +185,7 @@ export async function getCurrentSessionForStudent(
     if (!timeOk) {
       return {
         ok: true,
-        accessKind: "student",
+        accessKind,
         courseId: course.id,
         mode: "fresh",
         session: {
@@ -202,7 +203,7 @@ export async function getCurrentSessionForStudent(
 
     return {
       ok: true,
-      accessKind: "student",
+      accessKind,
       courseId: course.id,
       mode: "fresh",
       session: {
@@ -219,7 +220,7 @@ export async function getCurrentSessionForStudent(
 
   return {
     ok: true,
-    accessKind: "student",
+    accessKind,
     courseId: course.id,
     mode: "all_done",
     session: null,
@@ -227,6 +228,29 @@ export async function getCurrentSessionForStudent(
     canSubmit: false,
     reasonIfNot: "all_sessions_completed",
   };
+}
+
+export async function getCurrentSessionForStudent(
+  db: Db,
+  userId: string
+): Promise<CurrentSessionResponse> {
+  const course = await repo.findActiveWritingCourseForUser(db, userId);
+  if (!course) {
+    return { ok: false, error: "no_active_course" };
+  }
+  return buildOwnedCourseCurrentSession(db, userId, course, "student");
+}
+
+/** Admin sandbox: same UX as student; course is provisioned per admin user (is_admin_sandbox). */
+export async function getCurrentSessionForAdminSandbox(
+  db: Db,
+  userId: string
+): Promise<CurrentSessionResponse> {
+  const course = await repo.findAdminSandboxCourseForUser(db, userId);
+  if (!course) {
+    return { ok: false, error: "no_active_course" };
+  }
+  return buildOwnedCourseCurrentSession(db, userId, course, "admin_test");
 }
 
 /**
@@ -614,7 +638,7 @@ export async function saveOrSubmitSubmission(
     return { ok: false, status: 409, code: "complete_previous_sessions_first" };
   }
 
-  const pipeline = await repo.findActivePipelineSubmissionForUser(db, input.userId);
+  const pipeline = await repo.findActivePipelineSubmissionForUserForCourse(db, input.userId, row.course.id);
   if (pipeline && pipeline.session.id !== input.sessionId) {
     return { ok: false, status: 409, code: "active_submission_on_other_session" };
   }

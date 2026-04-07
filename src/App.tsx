@@ -1,7 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import './App.css'
 import Layout from './components/Layout'
-import { AuthRouteGuard, EntitlementRouteGuard, TeacherRouteGuard } from './routeGuards'
+import { AdminRouteGuard, AuthRouteGuard, EntitlementRouteGuard, TeacherRouteGuard } from './routeGuards'
 import LandingPage from './vite-pages/LandingPage'
 import WritingPage from './vite-pages/WritingPage'
 import CorrectionPage from './vite-pages/CorrectionPage'
@@ -21,6 +21,7 @@ import TrialAccessPage from './vite-pages/TrialAccessPage'
 import TrialReissuePage from './vite-pages/TrialReissuePage'
 import RegularAccessPage from './vite-pages/RegularAccessPage'
 import TrialApplicationsAdminPage from './vite-pages/TrialApplicationsAdminPage'
+import AdminDashboardPage from './vite-pages/AdminDashboardPage'
 import LoginPage from './vite-pages/LoginPage'
 import SignupPage from './vite-pages/SignupPage'
 import ForgotPasswordPage from './vite-pages/ForgotPasswordPage'
@@ -55,7 +56,10 @@ function App() {
         <Route path="/writing/trial-payment" element={<PaymentPage />} />
         <Route path="/writing/course" element={<CoursePage />} />
         <Route path="/writing/correction-detail" element={<CorrectionSystemDetailPage />} />
-        <Route path="/writing/admin/trial-applications" element={<TrialApplicationsAdminPage />} />
+        <Route element={<AdminRouteGuard />}>
+          <Route path="/writing/admin" element={<AdminDashboardPage />} />
+          <Route path="/writing/admin/trial-applications" element={<TrialApplicationsAdminPage />} />
+        </Route>
         <Route element={<AuthRouteGuard />}>
           <Route path="/writing/onboarding" element={<LineOnboardingPage />} />
           <Route path="/writing/app/settings" element={<SettingsPage />} />

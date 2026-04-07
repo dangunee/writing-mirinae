@@ -3,8 +3,9 @@ import { NextResponse } from "next/server";
 import { getDb } from "../../../../../../server/db/client";
 import { parseRegularWritingGrantIdFromCookieHeader } from "../../../../../../server/lib/regularSessionCookie";
 import { fetchTrialApplicationIdFromMirinaeSessionCookie } from "../../../../../../server/lib/writingTrialUpstream";
-import { requireWritingSubmissionEntitlement } from "../../../../../../server/lib/authMe";
+import { requireWritingSubmissionEntitlement, resolveRoleFromEnv } from "../../../../../../server/lib/authMe";
 import { getSessionUserId } from "../../../../../../server/lib/supabaseServer";
+import * as writingStudentRepo from "../../../../../../server/repositories/writingStudentRepository";
 import {
   saveOrSubmitSubmission,
   saveOrSubmitSubmissionForRegular,
@@ -16,37 +17,44 @@ export const dynamic = "force-dynamic";
 
 /**
  * POST /api/writing/sessions/:id/submission
- * Security: userId only from `getSessionUserId()` (never from body). Rejects client-supplied identity/ownership fields.
- * Logged-in users: `requireWritingSubmissionEntitlement` (Drizzle-backed) before save.
- * Trial / regular-mail: unchanged (cookie-derived trialApplicationId / grantId).
- * Abuse mitigation: body size, MIME/size on images, unique index on active pipeline.
+ * Identity: trial cookie (mirinae-api) first → regular grant cookie → Supabase session userId.
+ * Never trust userId / trialApplicationId from body (forbidden keys rejected below).
  */
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
-  const userId = await getSessionUserId();
   const cookieHeader = req.headers.get("cookie");
+  const trialApplicationId = await fetchTrialApplicationIdFromMirinaeSessionCookie(cookieHeader);
   const grantId = parseRegularWritingGrantIdFromCookieHeader(cookieHeader);
-  const trialApplicationId =
-    !userId && !grantId ? await fetchTrialApplicationIdFromMirinaeSessionCookie(cookieHeader) : null;
+  const userId = await getSessionUserId();
 
-  if (!userId && !grantId && !trialApplicationId) {
+  console.log("[submission] path:", {
+    trial: !!trialApplicationId,
+    grant: !!grantId,
+    user: !!userId,
+  });
+
+  if (!trialApplicationId && !grantId && !userId) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
-  if (userId && grantId) {
-    return NextResponse.json({ error: "ambiguous_identity" }, { status: 400 });
-  }
-  if (trialApplicationId && (userId || grantId)) {
+  if (!trialApplicationId && userId && grantId) {
     return NextResponse.json({ error: "ambiguous_identity" }, { status: 400 });
   }
 
   const db = getDb();
-  if (userId) {
-    const gate = await requireWritingSubmissionEntitlement(db, userId);
-    if (!gate.ok) {
-      return NextResponse.json({ error: "insufficient_entitlement" }, { status: 403 });
+  const { id: sessionId } = await context.params;
+
+  if (userId && !trialApplicationId && !grantId) {
+    const probe = await writingStudentRepo.getSessionByIdWithCourse(db, sessionId);
+    if (probe?.course.isAdminSandbox) {
+      if (resolveRoleFromEnv(userId) !== "admin" || probe.course.userId !== userId) {
+        return NextResponse.json({ error: "forbidden" }, { status: 403 });
+      }
+    } else {
+      const gate = await requireWritingSubmissionEntitlement(db, userId);
+      if (!gate.ok) {
+        return NextResponse.json({ error: "insufficient_entitlement" }, { status: 403 });
+      }
     }
   }
-
-  const { id: sessionId } = await context.params;
   const contentType = req.headers.get("content-type") ?? "";
 
   let action: "save" | "submit" = "save";
@@ -123,17 +131,17 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
         imageBuffer,
         imageMimeType,
       })
-    : userId
-      ? await saveOrSubmitSubmission(db, {
-          userId,
+    : grantId
+      ? await saveOrSubmitSubmissionForRegular(db, {
+          grantId,
           sessionId,
           action,
           bodyText,
           imageBuffer,
           imageMimeType,
         })
-      : await saveOrSubmitSubmissionForRegular(db, {
-          grantId: grantId!,
+      : await saveOrSubmitSubmission(db, {
+          userId: userId!,
           sessionId,
           action,
           bodyText,

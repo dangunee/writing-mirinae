@@ -174,9 +174,15 @@ export function EntitlementRouteGuard() {
           return
         }
 
-        if (data.role === 'teacher' || data.role === 'admin') {
+        if (data.role === 'teacher') {
           console.info('entitlement_guard_final_decision', { decision: 'teacher_redirect', reason: 'role' })
           setState('teacher_no_student_access')
+          return
+        }
+
+        if (data.role === 'admin') {
+          console.info('entitlement_guard_final_decision', { decision: 'allow', reason: 'admin_session_or_sandbox' })
+          setState('ok')
           return
         }
 
@@ -211,6 +217,69 @@ export function EntitlementRouteGuard() {
   }
   if (state === 'no_entitlement') {
     return <Navigate to="/writing/intro" replace />
+  }
+  if (state === 'error') {
+    return (
+      <div className="writing-page">
+        <p className="status pending">일시적으로 확인할 수 없습니다.</p>
+      </div>
+    )
+  }
+  return <Outlet />
+}
+
+type AdminGuardState = 'loading' | 'ok' | 'unauthorized' | 'forbidden' | 'error'
+
+/** ADMIN_USER_IDS のみ。GET /api/auth/me の role === admin */
+export function AdminRouteGuard() {
+  const [state, setState] = useState<AdminGuardState>('loading')
+  const location = useLocation()
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetchAuthMeWithRetry()
+        if (cancelled) return
+        if (res.status === 401) {
+          setState('unauthorized')
+          return
+        }
+        if (!res.ok) {
+          setState('error')
+          return
+        }
+        const data = (await res.json()) as AuthMePayload
+        if (!data.ok || !data.user) {
+          setState('unauthorized')
+          return
+        }
+        if (data.role !== 'admin') {
+          setState('forbidden')
+          return
+        }
+        setState('ok')
+      } catch {
+        if (!cancelled) setState('error')
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [location.pathname, location.search])
+
+  if (state === 'loading') {
+    return (
+      <div className="writing-page">
+        <p className="status pending">확인 중…</p>
+      </div>
+    )
+  }
+  if (state === 'unauthorized') {
+    return <Navigate to={loginPathWithNext(location)} replace />
+  }
+  if (state === 'forbidden') {
+    return <Navigate to="/writing" replace />
   }
   if (state === 'error') {
     return (

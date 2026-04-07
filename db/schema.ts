@@ -270,6 +270,8 @@ export const writingCourses = writing.table(
     startDate: date("start_date"),
     interval: courseIntervalEnum("interval"),
     sessionCount: smallint("session_count").notNull(),
+    /** Internal admin test course; excluded from student entitlement resolution. */
+    isAdminSandbox: boolean("is_admin_sandbox").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

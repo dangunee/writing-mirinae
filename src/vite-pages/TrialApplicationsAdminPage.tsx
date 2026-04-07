@@ -6,9 +6,7 @@
  */
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { apiUrl, trialAdminBffApiUrl } from '../lib/apiUrl'
-
-const STORAGE_KEY = 'writing_trial_admin_bff_token'
+import { apiUrl } from '../lib/apiUrl'
 
 const EXTEND_DAYS = 3
 
@@ -142,19 +140,13 @@ type ExtensionLogItem = {
   emailFailureReason: string | null
 }
 
-function authHeaders(token: string): HeadersInit {
-  const t = token.trim()
-  if (!t) return {}
-  return { Authorization: `Bearer ${t}` }
-}
-
-/** Vercel rewrite なしで単一 bff へ POST（__trial_admin_op + id） */
+/** POST to Next /api/writing/admin/bff（セッション Cookie + ADMIN_USER_IDS） */
 function trialAdminBffPostUrl(op: 'activate' | 'extend' | 'resend', applicationId: string): string {
   const q = new URLSearchParams({
     __trial_admin_op: op,
     id: applicationId,
   })
-  return trialAdminBffApiUrl(`/api/writing/admin/bff?${q.toString()}`)
+  return apiUrl(`/api/writing/admin/bff?${q.toString()}`)
 }
 
 function trialAdminFetch(input: string, init?: RequestInit): Promise<Response> {
@@ -184,14 +176,6 @@ function mailStatusLabel(log: ExtensionLogItem): string {
 }
 
 export default function TrialApplicationsAdminPage() {
-  const [tokenInput, setTokenInput] = useState('')
-  const [token, setToken] = useState(() => {
-    try {
-      return sessionStorage.getItem(STORAGE_KEY)?.trim() ?? ''
-    } catch {
-      return ''
-    }
-  })
   const [rows, setRows] = useState<Row[] | null>(null)
   const [loading, setLoading] = useState(false)
   const [listError, setListError] = useState<string | null>(null)
@@ -271,7 +255,7 @@ export default function TrialApplicationsAdminPage() {
     }
   }, [activeTab])
 
-  const fetchList = useCallback(async (t: string, pageForRequest: number) => {
+  const fetchList = useCallback(async (pageForRequest: number) => {
     setLoading(true)
     setListError(null)
     try {
@@ -287,8 +271,7 @@ export default function TrialApplicationsAdminPage() {
       q.set('sort', sort)
       const qs = q.toString()
       const listUrl = `/api/writing/admin/trial-applications?${qs}`
-      const res = await trialAdminFetch(trialAdminBffApiUrl(listUrl), {
-        headers: { ...authHeaders(t) },
+      const res = await trialAdminFetch(apiUrl(listUrl), {
         credentials: 'include',
       })
       const data = (await res.json()) as {
@@ -300,7 +283,7 @@ export default function TrialApplicationsAdminPage() {
       }
       if (res.status === 401 || res.status === 403) {
         console.error('[trial-admin] list unauthorized', res.status, data)
-        setListError('認証に失敗しました。トークンを確認してください。')
+        setListError('管理者としてログインしてください。')
         setRows(null)
         setPagination(null)
         return
@@ -314,7 +297,7 @@ export default function TrialApplicationsAdminPage() {
       }
       setRows(data.items.map(normalizeTrialAdminRow))
       setPagination(data.pagination)
-      const sig = `${t}|${debouncedSearch}|${paymentMethodFilter}|${sort}|${pageForRequest}`
+      const sig = `${debouncedSearch}|${paymentMethodFilter}|${sort}|${pageForRequest}`
       lastFetchedSigRef.current = sig
     } catch (e) {
       console.error('[trial-admin] GET /api/writing/admin/trial-applications failed', e)
@@ -337,24 +320,23 @@ export default function TrialApplicationsAdminPage() {
     if (filtersChanged) {
       filterKeyRef.current = { debouncedSearch, paymentMethodFilter, sort }
       if (page !== 1) setPage(1)
-      const sig = `${token}|${debouncedSearch}|${paymentMethodFilter}|${sort}|1`
+      const sig = `${debouncedSearch}|${paymentMethodFilter}|${sort}|1`
       if (lastFetchedSigRef.current === sig) return
-      void fetchList(token, 1)
+      void fetchList(1)
       return
     }
 
-    const sig = `${token}|${debouncedSearch}|${paymentMethodFilter}|${sort}|${page}`
+    const sig = `${debouncedSearch}|${paymentMethodFilter}|${sort}|${page}`
     if (lastFetchedSigRef.current === sig) return
-    void fetchList(token, page)
-  }, [activeTab, token, page, debouncedSearch, paymentMethodFilter, sort, fetchList])
+    void fetchList(page)
+  }, [activeTab, page, debouncedSearch, paymentMethodFilter, sort, fetchList])
 
-  const fetchExtensionLogs = useCallback(
-    async (applicationId: string, t: string) => {
+  const fetchExtensionLogs = useCallback(async (applicationId: string) => {
       setLogsByAppId((prev) => ({ ...prev, [applicationId]: 'loading' }))
       try {
         const res = await trialAdminFetch(
-          trialAdminBffApiUrl(`/api/writing/admin/trial-applications/${encodeURIComponent(applicationId)}/extension-logs`),
-          { headers: { ...authHeaders(t) } }
+          apiUrl(`/api/writing/admin/trial-applications/${encodeURIComponent(applicationId)}/extension-logs`),
+          { credentials: 'include' }
         )
         const data = (await res.json()) as { ok?: boolean; items?: ExtensionLogItem[] }
         if (!res.ok || data.ok !== true || !Array.isArray(data.items)) {
@@ -365,9 +347,7 @@ export default function TrialApplicationsAdminPage() {
       } catch {
         setLogsByAppId((prev) => ({ ...prev, [applicationId]: 'error' }))
       }
-    },
-    []
-  )
+  }, [])
 
   const toggleHistory = (applicationId: string) => {
     if (historyOpenId === applicationId) {
@@ -377,35 +357,7 @@ export default function TrialApplicationsAdminPage() {
     setHistoryOpenId(applicationId)
     const cached = logsByAppId[applicationId]
     if (cached === undefined || cached === 'error') {
-      void fetchExtensionLogs(applicationId, token)
-    }
-  }
-
-  const saveToken = () => {
-    const t = tokenInput.trim()
-    if (!t) return
-    sessionStorage.setItem(STORAGE_KEY, t)
-    lastFetchedSigRef.current = null
-    setToken(t)
-    setTokenInput('')
-    setBanner(null)
-  }
-
-  const clearToken = () => {
-    sessionStorage.removeItem(STORAGE_KEY)
-    setToken('')
-    setRows(null)
-    setPagination(null)
-    setListError(null)
-    setBanner(null)
-    setHistoryOpenId(null)
-    setLogsByAppId({})
-    setPage(1)
-    lastFetchedSigRef.current = null
-    filterKeyRef.current = {
-      debouncedSearch: '',
-      paymentMethodFilter: 'all',
-      sort: 'created_desc',
+      void fetchExtensionLogs(applicationId)
     }
   }
 
@@ -417,7 +369,8 @@ export default function TrialApplicationsAdminPage() {
     try {
       const res = await trialAdminFetch(trialAdminBffPostUrl('activate', id), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({}),
       })
       const data = (await res.json()) as { ok?: boolean }
@@ -427,7 +380,7 @@ export default function TrialApplicationsAdminPage() {
       }
       setBanner({ kind: 'ok', text: '入金確認が完了しました。' })
       lastFetchedSigRef.current = null
-      await fetchList(token, page)
+      await fetchList(page)
     } catch {
       setBanner({ kind: 'err', text: '通信に失敗しました。' })
     } finally {
@@ -462,7 +415,8 @@ export default function TrialApplicationsAdminPage() {
       }
       const res = await trialAdminFetch(trialAdminBffPostUrl('extend', id), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(body),
       })
       const data = (await res.json()) as {
@@ -493,7 +447,7 @@ export default function TrialApplicationsAdminPage() {
       setBanner({ kind: 'ok', text })
       setLogsByAppId({})
       lastFetchedSigRef.current = null
-      await fetchList(token, page)
+      await fetchList(page)
     } catch {
       setBanner({ kind: 'err', text: '通信に失敗しました。' })
     } finally {
@@ -510,7 +464,7 @@ export default function TrialApplicationsAdminPage() {
     try {
       const res = await trialAdminFetch(trialAdminBffPostUrl('resend', id), {
         method: 'POST',
-        headers: { ...authHeaders(token) },
+        credentials: 'include',
       })
       const data = (await res.json()) as { ok?: boolean }
       if (!res.ok || data.ok !== true) {
@@ -519,7 +473,7 @@ export default function TrialApplicationsAdminPage() {
       }
       setBanner({ kind: 'ok', text: 'リンクを再送信しました。' })
       lastFetchedSigRef.current = null
-      await fetchList(token, page)
+      await fetchList(page)
     } catch {
       setBanner({ kind: 'err', text: '通信に失敗しました。' })
     } finally {
@@ -536,14 +490,14 @@ export default function TrialApplicationsAdminPage() {
             <p className="text-xs font-bold uppercase tracking-widest text-[#595c5e]">Admin</p>
             <h1 className="font-['Plus_Jakarta_Sans'] text-2xl font-extrabold text-[#2c2f32]">管理コンソール</h1>
             <p className="mt-1 text-sm text-[#595c5e]">
-              体験・学園権限・決済・会員の運用。体験タブは従来どおり BFF トークンで一覧・操作します。
+              体験・学園権限・決済・会員の運用。管理者アカウントでログインした状態で一覧・操作します。
             </p>
           </div>
           <Link
-            to="/writing"
+            to="/writing/admin"
             className="inline-flex items-center justify-center rounded-full border border-[#abadb0]/40 bg-white px-4 py-2 text-sm font-semibold text-[#4052b6] shadow-sm"
           >
-            サイトへ戻る
+            管理トップ
           </Link>
         </div>
 
@@ -569,32 +523,6 @@ export default function TrialApplicationsAdminPage() {
 
         {activeTab === 'trial' && (
           <>
-        {!token ? (
-          <div className="rounded-xl border border-[#abadb0]/20 bg-white p-6 shadow-sm">
-            <p className="mb-3 text-sm text-[#595c5e]">
-              BFF 用トークン（<code className="rounded bg-[#eef1f4] px-1">TRIAL_ADMIN_BFF_TOKEN</code>
-              ）を入力してください。mirinae-api の <code className="rounded bg-[#eef1f4] px-1">TRIAL_ADMIN_SECRET</code>{' '}
-              はサーバーにのみ設定されます。
-            </p>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <input
-                type="password"
-                value={tokenInput}
-                onChange={(e) => setTokenInput(e.target.value)}
-                placeholder="BFF token"
-                className="w-full flex-1 rounded-lg border border-[#abadb0]/40 px-3 py-2 text-sm outline-none focus:border-[#4052b6]"
-                autoComplete="off"
-              />
-              <button
-                type="button"
-                onClick={saveToken}
-                className="rounded-full bg-[#4052b6] px-6 py-2 text-sm font-bold text-white shadow-md shadow-[#4052b6]/20"
-              >
-                保存して続行
-              </button>
-            </div>
-          </div>
-        ) : (
           <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end lg:gap-x-5 lg:gap-y-3">
             <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm text-[#595c5e] lg:min-w-[min(100%,22rem)] lg:max-w-xl xl:max-w-2xl">
               <span className="font-semibold">🔍 メール・名前で検索</span>
@@ -636,23 +564,15 @@ export default function TrialApplicationsAdminPage() {
                 type="button"
                 onClick={() => {
                   lastFetchedSigRef.current = null
-                  void fetchList(token, page)
+                  void fetchList(page)
                 }}
                 disabled={loading}
                 className="shrink-0 rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#2c2f32] shadow-sm ring-1 ring-[#abadb0]/30 disabled:opacity-50"
               >
                 {loading ? '読み込み中…' : '再読み込み'}
               </button>
-              <button
-                type="button"
-                onClick={clearToken}
-                className="shrink-0 rounded-full border border-[#abadb0]/40 bg-transparent px-4 py-2 text-sm font-semibold text-[#595c5e]"
-              >
-                トークンを消去
-              </button>
             </div>
           </div>
-        )}
 
         {banner ? (
           <div
@@ -723,7 +643,7 @@ export default function TrialApplicationsAdminPage() {
           </div>
         ) : null}
 
-        {token && !listError && rows !== null && pagination !== null ? (
+        {!listError && rows !== null && pagination !== null ? (
           <div
             className={`w-full min-w-0 overflow-x-auto rounded-xl border border-[#abadb0]/15 bg-white shadow-sm ${loading ? 'opacity-[0.72]' : ''}`}
           >
@@ -999,7 +919,7 @@ export default function TrialApplicationsAdminPage() {
           </div>
         ) : null}
 
-            {token && loading && rows === null ? (
+            {loading && rows === null ? (
               <p className="text-center text-sm text-[#595c5e]">読み込み中…</p>
             ) : null}
           </>

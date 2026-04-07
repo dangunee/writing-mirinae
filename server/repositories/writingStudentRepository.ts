@@ -15,7 +15,29 @@ export async function findActiveWritingCourseForUser(db: Db, userId: string) {
   const rows = await db
     .select()
     .from(writingCourses)
-    .where(and(eq(writingCourses.userId, userId), eq(writingCourses.status, "active")))
+    .where(
+      and(
+        eq(writingCourses.userId, userId),
+        eq(writingCourses.status, "active"),
+        eq(writingCourses.isAdminSandbox, false)
+      )
+    )
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/** Admin sandbox only — never used for real student flows. */
+export async function findAdminSandboxCourseForUser(db: Db, userId: string) {
+  const rows = await db
+    .select()
+    .from(writingCourses)
+    .where(
+      and(
+        eq(writingCourses.userId, userId),
+        eq(writingCourses.status, "active"),
+        eq(writingCourses.isAdminSandbox, true)
+      )
+    )
     .limit(1);
   return rows[0] ?? null;
 }
@@ -61,8 +83,12 @@ export async function getSessionByIdWithCourse(db: Db, sessionId: string) {
   return rows[0] ?? null;
 }
 
-/** One row if user has an in-flight submission (draft..corrected) platform-wide. */
-export async function findActivePipelineSubmissionForUser(db: Db, userId: string) {
+/** One in-flight submission (draft..corrected) for this user within a single course (isolates admin sandbox vs real student course). */
+export async function findActivePipelineSubmissionForUserForCourse(
+  db: Db,
+  userId: string,
+  courseId: string
+) {
   const rows = await db
     .select({
       submission: writingSubmissions,
@@ -73,6 +99,7 @@ export async function findActivePipelineSubmissionForUser(db: Db, userId: string
     .where(
       and(
         eq(writingSubmissions.userId, userId),
+        eq(writingSessions.courseId, courseId),
         inArray(writingSubmissions.status, ["draft", "submitted", "in_review", "corrected"])
       )
     )

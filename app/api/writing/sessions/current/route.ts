@@ -2,9 +2,12 @@ import { NextResponse } from "next/server";
 
 import { getDb } from "../../../../../server/db/client";
 import { parseRegularWritingGrantIdFromCookieHeader } from "../../../../../server/lib/regularSessionCookie";
+import { resolveRoleFromEnv } from "../../../../../server/lib/authMe";
 import { getSessionUserId } from "../../../../../server/lib/supabaseServer";
+import { ensureAdminSandboxCourse } from "../../../../../server/services/adminSandboxProvisionService";
 import { advanceRegularGrantToNextCourseIfNeeded } from "../../../../../server/services/regularGrantAdvanceService";
 import {
+  getCurrentSessionForAdminSandbox,
   getCurrentSessionForRegularGrant,
   getCurrentSessionForStudent,
   getCurrentSessionForTrialApplication,
@@ -49,13 +52,10 @@ async function tryTrialSessionFromCookie(req: Request, db: ReturnType<typeof get
           });
         }
       }
-      return NextResponse.json({
-        ok: true,
-        accessKind: "trial" as const,
-        applicationId,
-        canSubmit: true,
-        expiresAt: accessExpiresAt,
-      });
+      return NextResponse.json(
+        { ok: false, code: "TRIAL_SESSION_NOT_READY" as const },
+        { status: 403 }
+      );
     }
   } catch (e) {
     console.warn("sessions_current_trial_upstream", e);
@@ -100,6 +100,14 @@ export async function GET(req: Request) {
       advancedToNextCourse: advance.advanced,
       previousCourseId: advance.previousCourseId,
     });
+  }
+
+  if (userId && resolveRoleFromEnv(userId) === "admin") {
+    await ensureAdminSandboxCourse(db, userId);
+    const adminSandbox = await getCurrentSessionForAdminSandbox(db, userId);
+    if (adminSandbox.ok) {
+      return NextResponse.json(adminSandbox);
+    }
   }
 
   if (userId) {

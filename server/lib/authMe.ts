@@ -66,6 +66,11 @@ function skuImpliesTrial(sku: string): boolean {
   return s.includes("trial") || s === "writing_trial_lesson";
 }
 
+/** Internal admin sandbox product — must not grant student app access via entitlements. */
+function skuImpliesAdminSandbox(sku: string): boolean {
+  return sku === "writing_admin_sandbox_v1";
+}
+
 function logOutcome(userId: string, e: AuthEntitlements): void {
   console.info("entitlement_trial_result", { userId, hasTrial: e.hasTrial });
   console.info("entitlement_paid_result", { userId, hasActiveCourse: e.hasActiveCourse });
@@ -132,6 +137,9 @@ export async function computeEntitlementsForUser(db: Db, userId: string): Promis
       .limit(100);
 
     for (const r of activeSkuRows) {
+      if (skuImpliesAdminSandbox(r.sku)) {
+        continue;
+      }
       if (skuImpliesTrial(r.sku)) {
         hasTrial = true;
       } else {
@@ -153,7 +161,9 @@ export async function computeEntitlementsForUser(db: Db, userId: string): Promis
         .where(eq(entitlements.id, course.entitlementId))
         .limit(1);
       const sku = rows[0]?.sku ?? "";
-      if (skuImpliesTrial(sku)) {
+      if (skuImpliesAdminSandbox(sku)) {
+        /* sandbox course excluded from student routing */
+      } else if (skuImpliesTrial(sku)) {
         hasTrial = true;
       } else {
         hasActiveCourse = true;

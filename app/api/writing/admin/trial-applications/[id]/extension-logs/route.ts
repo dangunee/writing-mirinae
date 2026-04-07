@@ -1,67 +1,27 @@
+import { NextResponse } from "next/server";
+
+import { requireAdminSessionUserId } from "../../../../../../../server/lib/requireAdminSession";
+import { proxyTrialApplicationExtensionLogs } from "../../../../../../../server/lib/trialAdminMirinaeProxy";
+
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-function json(data: unknown, status: number): Response {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { "Content-Type": "application/json; charset=utf-8" },
-  });
-}
-
-function assertTrialAdminBff(req: Request): void {
-  const expected = process.env.TRIAL_ADMIN_BFF_TOKEN?.trim();
-  if (!expected) {
-    throw new Error("bff_misconfigured");
-  }
-  const h = req.headers.get("authorization")?.trim() ?? "";
-  const bearer = h.toLowerCase().startsWith("bearer ") ? h.slice(7).trim() : null;
-  if (bearer !== expected) {
-    throw new Error("unauthorized");
-  }
-}
-
-function mirinaeBaseAndSecret(): { base: string; secret: string } | null {
-  const base = process.env.MIRINAE_API_BASE_URL?.trim() ?? "";
-  const secret = process.env.TRIAL_ADMIN_SECRET?.trim() ?? "";
-  if (!base || !secret) {
-    return null;
-  }
-  return { base: base.replace(/\/$/, ""), secret };
-}
-
-export async function GET(req: Request, { params }: { params: { id: string } }) {
-  try {
-    assertTrialAdminBff(req);
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "";
-    if (msg === "bff_misconfigured") {
-      return json({ ok: false, error: "server_misconfigured" }, 500);
-    }
-    return json({ ok: false, error: "request_failed" }, 401);
+export async function GET(_req: Request, context: { params: Promise<{ id: string }> }) {
+  const admin = await requireAdminSessionUserId();
+  if (!admin.ok) {
+    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: admin.status });
   }
 
-  const applicationId = params.id?.trim() ?? "";
+  const { id } = await context.params;
+  const applicationId = id?.trim() ?? "";
   if (!applicationId) {
-    return json({ ok: false, error: "invalid_request" }, 400);
+    return NextResponse.json({ ok: false, error: "invalid_request" }, { status: 400 });
   }
 
-  const cfg = mirinaeBaseAndSecret();
-  if (!cfg) {
-    return json({ ok: false, error: "server_misconfigured" }, 500);
-  }
-
-  const url = `${cfg.base}/api/admin/trial-applications/${encodeURIComponent(applicationId)}/extension-logs`;
   try {
-    const res = await fetch(url, {
-      method: "GET",
-      headers: { Authorization: `Bearer ${cfg.secret}` },
-    });
-    const text = await res.text();
-    return new Response(text, {
-      status: res.status,
-      headers: { "Content-Type": "application/json; charset=utf-8" },
-    });
+    return await proxyTrialApplicationExtensionLogs(applicationId);
   } catch (e) {
-    console.error("trial_admin_extension_logs_fetch_error", e);
-    return json({ ok: false, error: "upstream_error" }, 502);
+    console.error("trial_admin_extension_logs_route_error", e);
+    return NextResponse.json({ ok: false, error: "server_error" }, { status: 500 });
   }
 }

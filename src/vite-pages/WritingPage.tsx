@@ -8,7 +8,7 @@ import type { AccessContext } from '../types/writingAccess'
 /** GET /api/writing/sessions/current — student / regular / trial course session (unified) */
 type CurrentSessionOk = {
   ok: true
-  accessKind?: 'student' | 'regular' | 'trial'
+  accessKind?: 'student' | 'regular' | 'trial' | 'admin_test'
   applicationId?: string
   grantId?: string
   accessExpiresAt?: string | null
@@ -45,6 +45,7 @@ export default function WritingPage() {
   const [accessContext, setAccessContext] = useState<AccessContext>({ type: 'student' })
   const [content, setContent] = useState('')
   const [saving, setSaving] = useState(false)
+  const [refetchAfterSubmit, setRefetchAfterSubmit] = useState(false)
   const submitLockRef = useRef(false)
 
   const loadCurrent = useCallback(async () => {
@@ -123,10 +124,6 @@ export default function WritingPage() {
     }
   }, [loading, current])
 
-  const handleSubmitSuccess = () => {
-    void loadCurrent()
-  }
-
   const showSessionTable = Boolean(current?.ok && current.session)
   const session = current?.session ?? null
   const submission = current?.submission ?? null
@@ -141,7 +138,7 @@ export default function WritingPage() {
   const activeSessionDescription = '今回の作文を下記入力欄に作成して提出してください。'
 
   const hasSession = session != null
-  const canUseForm = Boolean(canSubmit && session?.id)
+  const canUseForm = Boolean(canSubmit && session?.id && !refetchAfterSubmit)
 
   const emptyAssignmentsText = (() => {
     if (current?.ok && current.mode === 'all_done') return '모든 과제를 완료했습니다.'
@@ -173,12 +170,16 @@ export default function WritingPage() {
         body: JSON.stringify({ action: 'submit', bodyText: content.trim() }),
       })
       if (!res.ok) return
+      const data = (await res.json()) as { submissionId?: string; status?: string; error?: string }
+      if (!data.submissionId || data.error) return
       setContent('')
-      handleSubmitSuccess()
+      setRefetchAfterSubmit(true)
+      await loadCurrent()
     } catch {
       /* minimal: 실패 시 버튼만 다시 활성화 */
     } finally {
       submitLockRef.current = false
+      setRefetchAfterSubmit(false)
       setSaving(false)
     }
   }
@@ -263,8 +264,10 @@ export default function WritingPage() {
         text={content}
         onTextChange={setContent}
         onPrimarySubmit={() => void handleSubmit()}
-        primarySubmitDisabled={saving || !content.trim() || !session?.id || !canSubmit}
-        primarySubmitLoading={saving}
+        primarySubmitDisabled={
+          saving || refetchAfterSubmit || !content.trim() || !session?.id || !canSubmit
+        }
+        primarySubmitLoading={saving || refetchAfterSubmit}
         textareaDisabled={!canUseForm}
         showDraftButton={false}
         assignmentTitle={activeSessionTitle}

@@ -109,6 +109,14 @@ export default function LandingNav({ goApp, anchorBase = '', curriculumHref }: P
               >
                 マイページ
               </Link>
+              {me.role === 'admin' ? (
+                <Link
+                  to="/writing/admin"
+                  className="font-['Manrope'] text-sm font-bold text-[#4052b6] hover:underline"
+                >
+                  관리 콘솔
+                </Link>
+              ) : null}
               <button
                 type="button"
                 onClick={() => void handleLogout()}
@@ -161,6 +169,11 @@ export default function LandingNav({ goApp, anchorBase = '', curriculumHref }: P
               >
                 マイページ
               </Link>
+              {me.role === 'admin' ? (
+                <Link to="/writing/admin" className="font-['Manrope'] text-xs font-bold text-[#4052b6] px-1">
+                  관리
+                </Link>
+              ) : null}
               <button
                 type="button"
                 onClick={() => void handleLogout()}
