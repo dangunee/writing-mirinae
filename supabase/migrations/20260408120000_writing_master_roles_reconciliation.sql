@@ -143,9 +143,11 @@ UPDATE writing.sessions s
 SET runtime_status = 'corrected'::writing.session_runtime
 WHERE s.runtime_status IS NULL AND s.status = 'completed';
 
+-- NOTE: Compare status as text so this runs in the same txn as ALTER TYPE ... ADD VALUE 'missed'
+-- (PG 55P04: new enum values are not usable until commit.)
 UPDATE writing.sessions s
 SET runtime_status = 'missed'::writing.session_runtime
-WHERE s.runtime_status IS NULL AND s.status = 'missed';
+WHERE s.runtime_status IS NULL AND s.status::text = 'missed';
 
 UPDATE writing.sessions s
 SET runtime_status = 'submitted'::writing.session_runtime
