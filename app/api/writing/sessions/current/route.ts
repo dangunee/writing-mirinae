@@ -52,10 +52,21 @@ async function tryTrialSessionFromCookie(req: Request, db: ReturnType<typeof get
           });
         }
       }
-      return NextResponse.json(
-        { ok: false, code: "TRIAL_SESSION_NOT_READY" as const },
-        { status: 403 }
-      );
+      /**
+       * Upstream validated writing_trial_access; DB course row may lag or env unset.
+       * Still return 200 + ok:true so EntitlementRouteGuard allows /writing/app (WritingPage handles partial trial).
+       */
+      return NextResponse.json({
+        ok: true,
+        accessKind: "trial" as const,
+        applicationId,
+        accessExpiresAt,
+        mode: "fresh" as const,
+        session: null,
+        submission: null,
+        canSubmit: false,
+        reasonIfNot: "trial_session_pending",
+      });
     }
   } catch (e) {
     console.warn("sessions_current_trial_upstream", e);

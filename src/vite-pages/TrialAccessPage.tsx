@@ -42,10 +42,20 @@ export default function TrialAccessPage() {
           setPhase('network_error')
           return
         }
-        if (json.ok === true && typeof json.redirectTo === 'string' && json.redirectTo.trim()) {
-          const url = json.redirectTo.trim()
+        if (!res.ok) {
+          setPhase('invalid')
+          return
+        }
+        if (json.ok === true) {
           setPhase('done')
-          window.location.assign(url)
+          const raw =
+            typeof json.redirectTo === 'string' && json.redirectTo.trim()
+              ? json.redirectTo.trim()
+              : '/writing/app'
+          const path = raw.startsWith('/') ? raw : '/writing/app'
+          const safe =
+            path === '/writing/intro' || path.startsWith('/writing/intro?') ? '/writing/app' : path
+          window.location.assign(new URL(safe, window.location.origin).href)
           return
         }
         setPhase('invalid')
