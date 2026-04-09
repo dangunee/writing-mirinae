@@ -280,7 +280,7 @@ export default function PaymentPage() {
 
   return (
     <div className="payment-page-root">
-      <LandingNav goApp={goApp} anchorBase="/writing" />
+      <LandingNav goApp={goApp} />
       {bankTransferError ? (
         <div
           ref={bankTransferErrorRef}

@@ -10,15 +10,6 @@ export default function LandingFooter() {
           <div className="text-lg md:text-xl font-bold text-[#000666] headline-font">ミリネ韓国語教室</div>
         </div>
         <div className="flex flex-wrap justify-center gap-4 md:gap-8">
-          <a className={linkClass} href="#curriculum">
-            カリキュラム
-          </a>
-          <a className={linkClass} href="#learning-system">
-            学習システム
-          </a>
-          <a className={linkClass} href="#reviews">
-            受講生の声
-          </a>
           <a className={linkClass} href="#cta-apply">
             お申し込み
           </a>

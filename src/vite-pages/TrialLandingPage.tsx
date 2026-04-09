@@ -39,7 +39,7 @@ export default function TrialLandingPage() {
 
   return (
     <div className="landing-stitch-root relative left-1/2 w-screen max-w-[100vw] -translate-x-1/2 bg-[#F5F5F5] text-[#1e1b13]">
-      <LandingNav goApp={goApp} anchorBase="/writing" curriculumHref="#curriculum" />
+      <LandingNav goApp={goApp} />
       {showLoginBanner ? (
         <div className="relative z-10 mx-auto w-full max-w-7xl px-6 pt-20 md:pt-24">
           <p

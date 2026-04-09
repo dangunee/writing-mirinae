@@ -12,7 +12,7 @@ function BankCompleteFallback({ goApp }: { goApp: () => void }) {
   const navigate = useNavigate()
   return (
     <div className="bank-complete-root min-h-screen bg-[#f5f7fa] text-[#2c2f32]">
-      <LandingNav goApp={goApp} anchorBase="/writing" />
+      <LandingNav goApp={goApp} />
       <main className="mx-auto flex max-w-lg flex-col items-center px-6 pb-24 pt-28 text-center">
         <p className="text-base leading-relaxed text-[#595c5e]">
           お申し込み情報を確認できませんでした。
@@ -49,7 +49,7 @@ function BankCompleteContent({ data, goApp }: { data: BankTransferCompleteState;
 
   return (
     <div className="bank-complete-root min-h-screen bg-[#f5f7fa] text-[#2c2f32]">
-      <LandingNav goApp={goApp} anchorBase="/writing" />
+      <LandingNav goApp={goApp} />
 
       {/* Desktop */}
       <main className="hidden flex-grow pb-32 pt-24 lg:block">

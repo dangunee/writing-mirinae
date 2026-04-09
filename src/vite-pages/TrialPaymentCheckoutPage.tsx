@@ -221,7 +221,7 @@ export default function TrialPaymentCheckoutPage() {
     if (sessionId && successResolveLoading) {
       return (
         <>
-          <LandingNav goApp={goApp} anchorBase="/writing" />
+          <LandingNav goApp={goApp} />
           <div className="flex min-h-screen flex-col items-center justify-center bg-[#f5f7fa] px-6 pt-16 text-[#595c5e] md:pt-20">
             <div
               className="h-10 w-10 animate-spin rounded-full border-2 border-[#4052b6] border-t-transparent"
@@ -236,7 +236,7 @@ export default function TrialPaymentCheckoutPage() {
     if (!checkoutData) {
       return (
         <>
-          <LandingNav goApp={goApp} anchorBase="/writing" />
+          <LandingNav goApp={goApp} />
           <div className="flex min-h-screen flex-col items-center justify-center bg-[#f5f7fa] px-6 pt-16 text-center text-[#595c5e] md:pt-20">
             <p className="trial-checkout-font-headline text-lg font-medium">
               申し込み情報を読み込めませんでした。体験レッスンお申し込みページからお進みください。
@@ -271,7 +271,7 @@ export default function TrialPaymentCheckoutPage() {
   if (canceled) {
     return (
       <>
-        <LandingNav goApp={goApp} anchorBase="/writing" />
+        <LandingNav goApp={goApp} />
         <TrialPaymentCheckoutCanceled
           data={data}
           payLoading={payLoading}
@@ -288,7 +288,7 @@ export default function TrialPaymentCheckoutPage() {
 
   return (
     <>
-      <LandingNav goApp={goApp} anchorBase="/writing" />
+      <LandingNav goApp={goApp} />
       <div className="trial-checkout-page-root">
         <div className="hidden lg:block">
           <TrialPaymentCheckoutDesktop

@@ -118,7 +118,7 @@ export default function TrialStartPage() {
 
   return (
     <div className="trial-start-root min-h-screen bg-[#f5f7fa] text-[#2c2f32]">
-      <LandingNav goApp={goApp} anchorBase="/writing" />
+      <LandingNav goApp={goApp} />
 
       <main className="mx-auto flex max-w-lg flex-col items-center px-6 pb-24 pt-28 text-center">
         {phase === 'loading' && (

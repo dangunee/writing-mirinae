@@ -199,7 +199,7 @@ export default function AssignmentSubmitScreen({
 
       {/* /writing ランディングと同一ヘッダー */}
       <div className="landing-stitch-root">
-        <LandingNav goApp={goApp} anchorBase="/writing" />
+        <LandingNav goApp={goApp} />
       </div>
 
       {/* ——— Desktop (md+) ——— */}

@@ -47,7 +47,7 @@ export default function TrialReissuePage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-[#f5f7fa] font-['Be_Vietnam_Pro',sans-serif] text-[#2c2f32] antialiased">
-      <LandingNav goApp={goApp} anchorBase="/writing" />
+      <LandingNav goApp={goApp} />
       <main className="mx-auto flex w-full max-w-lg flex-grow flex-col px-4 pb-16 pt-8 md:pt-12">
         <h1 className="mb-2 text-2xl font-bold text-[#2c2f32]">体験リンクの再発行</h1>
         <p className="mb-8 text-sm leading-relaxed text-[#595c5e]">

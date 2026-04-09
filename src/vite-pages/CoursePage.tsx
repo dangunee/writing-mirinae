@@ -70,7 +70,7 @@ export default function CoursePage() {
 
   return (
     <div className="course-page-root min-h-screen bg-[#f3f4f6] font-[family-name:var(--font-body)] text-[#1a1c1e] antialiased">
-      <LandingNav goApp={goApp} anchorBase="/writing" />
+      <LandingNav goApp={goApp} />
       {/* ——— Desktop ——— */}
       <div className="hidden lg:block">
         <main className="mx-auto max-w-6xl px-6 pb-32 pt-24">

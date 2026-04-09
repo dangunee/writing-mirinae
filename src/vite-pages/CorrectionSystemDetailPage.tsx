@@ -19,7 +19,7 @@ export default function CorrectionSystemDetailPage() {
 
   return (
     <div className="atelier-koto-root min-h-screen bg-background font-[family-name:var(--font-body)] text-on-surface selection:bg-primary-fixed-dim selection:text-primary">
-      <LandingNav goApp={goApp} anchorBase="/writing" curriculumHref="#curriculum" />
+      <LandingNav goApp={goApp} />
       <main className="pb-0 pt-16 md:pt-20">
         <AtelierHero />
         <AtelierCorrectionExample />

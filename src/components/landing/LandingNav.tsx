@@ -6,10 +6,6 @@ import { apiUrl } from '../../lib/apiUrl'
 
 type Props = {
   goApp: () => void
-  /** #learning-system などに付けるプレフィックス（例: "/writing"） */
-  anchorBase?: string
-  /** カリキュラムのみ上書き（例: intro 同一ページでは "#curriculum"） */
-  curriculumHref?: string
 }
 
 function AccountDropdown({ onClose }: { onClose: () => void }) {
@@ -27,8 +23,7 @@ function AccountDropdown({ onClose }: { onClose: () => void }) {
   )
 }
 
-export default function LandingNav({ goApp, anchorBase = '', curriculumHref }: Props) {
-  const curriculumLink = curriculumHref ?? `${anchorBase}#curriculum`
+export default function LandingNav({ goApp }: Props) {
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const [accountMenuOpen, setAccountMenuOpen] = useState(false)
@@ -47,9 +42,6 @@ export default function LandingNav({ goApp, anchorBase = '', curriculumHref }: P
     setOpen(false)
     navigate('/writing')
   }, [navigate, refetch])
-
-  const linkClass =
-    "font-['Manrope'] font-bold tracking-tight text-sm uppercase text-[#1e1b13]/70 hover:text-[#000666] transition-colors"
 
   useEffect(() => {
     if (!accountMenuOpen) return
@@ -92,15 +84,6 @@ export default function LandingNav({ goApp, anchorBase = '', curriculumHref }: P
         </div>
 
         <div className="hidden md:flex items-center gap-8">
-          <a className={linkClass} href={curriculumLink}>
-            カリキュラム
-          </a>
-          <a className={linkClass} href={`${anchorBase}#learning-system`}>
-            学習システム
-          </a>
-          <a className={linkClass} href={`${anchorBase}#reviews`}>
-            受講生の声
-          </a>
           {me?.user && !loading ? (
             <>
               <Link
@@ -213,15 +196,6 @@ export default function LandingNav({ goApp, anchorBase = '', curriculumHref }: P
 
       {open ? (
         <div className="md:hidden border-t border-[#1e1b13]/10 bg-[#F5F5F5]/95 px-6 py-4 flex flex-col gap-3">
-          <a className={linkClass} href={curriculumLink} onClick={() => setOpen(false)}>
-            カリキュラム
-          </a>
-          <a className={linkClass} href={`${anchorBase}#learning-system`} onClick={() => setOpen(false)}>
-            学習システム
-          </a>
-          <a className={linkClass} href={`${anchorBase}#reviews`} onClick={() => setOpen(false)}>
-            受講生の声
-          </a>
           <button
             type="button"
             onClick={() => {
