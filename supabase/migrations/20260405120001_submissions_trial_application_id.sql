@@ -5,6 +5,7 @@ ALTER TABLE writing.submissions
   ADD COLUMN IF NOT EXISTS trial_application_id uuid REFERENCES writing.trial_applications(id) ON DELETE CASCADE;
 
 ALTER TABLE writing.submissions DROP CONSTRAINT IF EXISTS writing_submissions_user_or_grant_xor;
+ALTER TABLE writing.submissions DROP CONSTRAINT IF EXISTS writing_submissions_access_xor;
 ALTER TABLE writing.submissions ADD CONSTRAINT writing_submissions_access_xor CHECK (
   (user_id IS NOT NULL AND regular_access_grant_id IS NULL AND trial_application_id IS NULL) OR
   (user_id IS NULL AND regular_access_grant_id IS NOT NULL AND trial_application_id IS NULL) OR
