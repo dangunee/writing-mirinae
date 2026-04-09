@@ -60,9 +60,13 @@ export default function CoursePage() {
   const experienceTax = 164
   const experienceTotal = 1800
 
-  const payStub = () => {
-    /* Stripe 連携は次フェーズ */
-  }
+  const goToPayment = useCallback(() => {
+    if (plan === 'experience') {
+      navigate('/writing/trial-payment')
+      return
+    }
+    /* 10回コース: Stripe / 専用フローは次フェーズ */
+  }, [navigate, plan])
 
   return (
     <div className="course-page-root min-h-screen bg-[#f3f4f6] font-[family-name:var(--font-body)] text-[#1a1c1e] antialiased">
@@ -264,7 +268,7 @@ export default function CoursePage() {
                     <div className="pt-8">
                       <button
                         type="button"
-                        onClick={payStub}
+                        onClick={goToPayment}
                         className="flex w-full items-center justify-center gap-2 rounded-full bg-[#000666] py-4 font-bold text-white shadow-lg shadow-[#000666]/10 transition-all duration-200 hover:opacity-90 active:scale-[0.98]"
                       >
                         支払いへ進む
@@ -516,7 +520,7 @@ export default function CoursePage() {
         <section className="fixed bottom-0 left-0 z-40 w-full border-t border-black/5 bg-white/90 px-5 py-6 backdrop-blur-xl">
           <button
             type="button"
-            onClick={payStub}
+            onClick={goToPayment}
             className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#000666] font-bold text-white shadow-lg shadow-[#000666]/20 transition-transform active:scale-[0.98]"
           >
             <span>支払いへ進む</span>
