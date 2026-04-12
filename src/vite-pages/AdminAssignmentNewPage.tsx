@@ -1,7 +1,17 @@
-import { useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useEffect, type FormEvent } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { apiUrl } from '../lib/apiUrl'
 import type { AssignmentRequirement } from '../lib/writingThemeSnapshot'
+
+type AdminCourseOption = {
+  courseId: string
+  displayName: string
+  status: string
+  isAdminSandbox: boolean
+  sessionCount: number
+}
+
+const SESSION_OPTIONS = Array.from({ length: 10 }, (_, i) => i + 1)
 
 const emptyReq = (): AssignmentRequirement => ({
   expressionKey: '',
@@ -12,6 +22,10 @@ const emptyReq = (): AssignmentRequirement => ({
 })
 
 export default function AdminAssignmentNewPage() {
+  const [searchParams] = useSearchParams()
+  const [courses, setCourses] = useState<AdminCourseOption[]>([])
+  const [coursesLoading, setCoursesLoading] = useState(true)
+  const [coursesError, setCoursesError] = useState<string | null>(null)
   const [courseId, setCourseId] = useState('')
   const [sessionIndex, setSessionIndex] = useState('1')
   const [theme, setTheme] = useState('')
@@ -26,6 +40,48 @@ export default function AdminAssignmentNewPage() {
   const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const urlCourseId = searchParams.get('courseId')?.trim() ?? ''
+    const urlSessionRaw = searchParams.get('sessionIndex')
+    let cancelled = false
+    ;(async () => {
+      setCoursesLoading(true)
+      setCoursesError(null)
+      try {
+        const res = await fetch(apiUrl('/api/writing/admin/courses'), { credentials: 'include' })
+        const data = (await res.json()) as { ok?: boolean; courses?: AdminCourseOption[]; error?: string }
+        if (cancelled) return
+        if (!res.ok || !data.ok || !Array.isArray(data.courses)) {
+          setCoursesError(typeof data.error === 'string' ? data.error : `HTTP ${res.status}`)
+          setCourses([])
+          return
+        }
+        setCourses(data.courses)
+        if (data.courses.length > 0) {
+          const validUrl =
+            urlCourseId.length > 0 && data.courses.some((c) => c.courseId === urlCourseId)
+          setCourseId(validUrl ? urlCourseId : data.courses[0].courseId)
+        }
+        if (urlSessionRaw != null) {
+          const n = parseInt(String(urlSessionRaw), 10)
+          if (Number.isFinite(n) && n >= 1 && n <= 10) {
+            setSessionIndex(String(n))
+          }
+        }
+      } catch {
+        if (!cancelled) {
+          setCoursesError('load_failed')
+          setCourses([])
+        }
+      } finally {
+        if (!cancelled) setCoursesLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [searchParams])
 
   function patchReq(i: 0 | 1 | 2, field: keyof AssignmentRequirement, value: string) {
     setReq((prev) => {
@@ -80,28 +136,50 @@ export default function AdminAssignmentNewPage() {
         </p>
 
         <form className="mt-8 space-y-4 text-sm" onSubmit={onSubmit}>
+          {coursesLoading ? (
+            <p className="text-sm text-[#595c5e]" role="status">
+              コース一覧を読み込み中…
+            </p>
+          ) : null}
+          {coursesError ? (
+            <p className="text-sm text-[#ba1a1a]" role="alert">
+              コース一覧を取得できませんでした（{coursesError}）
+            </p>
+          ) : null}
           <label className="block">
-            <span className="font-semibold text-[#2c2f32]">コース ID（UUID）</span>
-            <input
+            <span className="font-semibold text-[#2c2f32]">対象コース</span>
+            <select
               className="mt-1 w-full rounded border border-[#c5c8cc] bg-white px-3 py-2 text-[#2c2f32]"
               value={courseId}
               onChange={(e) => setCourseId(e.target.value)}
-              placeholder="WRITING_TRIAL_COURSE_ID と同じ UUID"
               required
-              autoComplete="off"
-            />
+              disabled={courses.length === 0}
+            >
+              {courses.length === 0 ? (
+                <option value="">（アクティブなコースがありません）</option>
+              ) : (
+                courses.map((c) => (
+                  <option key={c.courseId} value={c.courseId}>
+                    {c.displayName}
+                  </option>
+                ))
+              )}
+            </select>
           </label>
           <label className="block">
-            <span className="font-semibold text-[#2c2f32]">セッション index（1–10）</span>
-            <input
+            <span className="font-semibold text-[#2c2f32]">対象回차</span>
+            <select
               className="mt-1 w-full rounded border border-[#c5c8cc] bg-white px-3 py-2 text-[#2c2f32]"
-              type="number"
-              min={1}
-              max={10}
               value={sessionIndex}
               onChange={(e) => setSessionIndex(e.target.value)}
               required
-            />
+            >
+              {SESSION_OPTIONS.map((n) => (
+                <option key={n} value={String(n)}>
+                  第{n}回 · {n}회차
+                </option>
+              ))}
+            </select>
           </label>
           <label className="block">
             <span className="font-semibold text-[#2c2f32]">テーマ（theme）</span>
@@ -195,7 +273,7 @@ export default function AdminAssignmentNewPage() {
 
           <button
             type="submit"
-            disabled={submitting}
+            disabled={submitting || coursesLoading || courses.length === 0 || !courseId}
             className="rounded bg-[#4052b6] px-4 py-2 font-semibold text-white disabled:opacity-50"
           >
             {submitting ? '保存中…' : '保存'}
@@ -203,6 +281,11 @@ export default function AdminAssignmentNewPage() {
         </form>
 
         <p className="mt-8">
+          <Link to="/writing/admin/assignments" className="text-sm font-semibold text-[#4052b6] underline">
+            課題管理（一覧）
+          </Link>
+        </p>
+        <p className="mt-4">
           <Link to="/writing/admin" className="text-sm text-[#595c5e] underline">
             管理コンソールへ戻る
           </Link>

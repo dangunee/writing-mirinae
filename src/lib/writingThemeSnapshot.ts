@@ -58,6 +58,23 @@ export type AssignmentUiModel = {
   modelAnswer?: string
 }
 
+/** True when theme_snapshot exists and is non-empty after trim (登録済み). */
+export function hasRegisteredThemeSnapshot(raw: string | null | undefined): boolean {
+  return raw != null && String(raw).trim().length > 0
+}
+
+/**
+ * One-line preview for admin session rows (title/theme), truncated.
+ * Uses {@link parseAssignmentSnapshotForUi} only — no duplicate parsing rules.
+ */
+export function assignmentListPreviewLine(raw: string | null | undefined, maxLen = 48): string {
+  if (!hasRegisteredThemeSnapshot(raw)) return ''
+  const u = parseAssignmentSnapshotForUi(raw)
+  const short = (u.displayTitle || u.theme || '').trim()
+  if (!short) return ''
+  return short.length > maxLen ? `${short.slice(0, maxLen)}…` : short
+}
+
 /**
  * Safe parse for WritingPage: structured snapshot or legacy plain text.
  */

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { useAuthMe } from '../../hooks/useAuthMe'
 import { apiUrl } from '../../lib/apiUrl'
+import { primaryAccountNav } from '../../lib/primaryAccountNav'
 
 type Props = {
   goApp: () => void
@@ -30,6 +31,7 @@ export default function LandingNav({ goApp }: Props) {
   const accountDesktopRef = useRef<HTMLDivElement>(null)
   const accountMobileRef = useRef<HTMLDivElement>(null)
   const { me, loading, refetch } = useAuthMe()
+  const primaryNav = me?.user ? primaryAccountNav(me.role) : null
 
   const handleLogout = useCallback(async () => {
     try {
@@ -65,7 +67,7 @@ export default function LandingNav({ goApp }: Props) {
     if (loading) return
     if (me?.user) {
       setAccountMenuOpen(false)
-      navigate('/writing/app/mypage')
+      navigate(primaryAccountNav(me.role).to)
       return
     }
     setAccountMenuOpen((v) => !v)
@@ -87,19 +89,11 @@ export default function LandingNav({ goApp }: Props) {
           {me?.user && !loading ? (
             <>
               <Link
-                to="/writing/app/mypage"
+                to={primaryNav!.to}
                 className="rounded-lg border border-[#000666] bg-white px-5 py-2 font-['Manrope'] text-sm font-bold text-[#000666] hover:bg-[#000666]/5 transition-colors"
               >
-                マイページ
+                {primaryNav!.label}
               </Link>
-              {me.role === 'admin' ? (
-                <Link
-                  to="/writing/admin"
-                  className="font-['Manrope'] text-sm font-bold text-[#4052b6] hover:underline"
-                >
-                  관리 콘솔
-                </Link>
-              ) : null}
               <button
                 type="button"
                 onClick={() => void handleLogout()}
@@ -147,16 +141,11 @@ export default function LandingNav({ goApp }: Props) {
           {me?.user && !loading ? (
             <>
               <Link
-                to="/writing/app/mypage"
+                to={primaryNav!.to}
                 className="font-['Manrope'] text-xs font-bold text-[#000666] px-1"
               >
-                マイページ
+                {primaryNav!.label}
               </Link>
-              {me.role === 'admin' ? (
-                <Link to="/writing/admin" className="font-['Manrope'] text-xs font-bold text-[#4052b6] px-1">
-                  관리
-                </Link>
-              ) : null}
               <button
                 type="button"
                 onClick={() => void handleLogout()}
@@ -210,11 +199,11 @@ export default function LandingNav({ goApp }: Props) {
             {me?.user ? (
               <>
                 <Link
-                  to="/writing/app/mypage"
+                  to={primaryNav!.to}
                   className="font-['Manrope'] text-sm font-bold text-[#000666]"
                   onClick={() => setOpen(false)}
                 >
-                  マイページ
+                  {primaryNav!.label}
                 </Link>
                 <button
                   type="button"

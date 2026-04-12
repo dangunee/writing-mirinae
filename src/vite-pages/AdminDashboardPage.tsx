@@ -27,11 +27,16 @@ export default function AdminDashboardPage() {
             </Link>
           </li>
           <li>
+            <Link to="/writing/admin/assignments" className="font-semibold text-[#4052b6] underline">
+              課題管理（一覧）
+            </Link>
+          </li>
+          <li>
             <Link
               to="/writing/admin/assignments/new"
               className="font-semibold text-[#4052b6] underline"
             >
-              課題管理
+              課題登録（新規）
             </Link>
           </li>
         </ul>
