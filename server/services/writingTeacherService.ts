@@ -163,6 +163,8 @@ export type TeacherSubmissionDetail = {
     bodyText: string | null;
     imageMimeType: string | null;
     imageUrl: string | null;
+    /** Server-side grammar pattern check at student submit; null if not run (legacy). */
+    grammarCheckResult: unknown | null;
     submittedAt: string | null;
     createdAt: string;
     updatedAt: string;
@@ -264,6 +266,7 @@ export async function getTeacherSubmissionDetail(
       bodyText: row.submission.bodyText,
       imageMimeType: row.submission.imageMimeType,
       imageUrl,
+      grammarCheckResult: row.submission.grammarCheckResult ?? null,
       submittedAt: row.submission.submittedAt?.toISOString() ?? null,
       createdAt: row.submission.createdAt.toISOString(),
       updatedAt: row.submission.updatedAt.toISOString(),

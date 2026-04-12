@@ -8,6 +8,7 @@ type TeacherSubmissionDetail = {
   submission: {
     id: string
     bodyText: string | null
+    grammarCheckResult?: unknown | null
   }
   session: { index: number }
   correction: null | {
@@ -23,6 +24,24 @@ type TeacherSubmissionDetail = {
     vocabularyUsage: number | null
     contextualFluency: number | null
   }
+}
+
+function GrammarCheckSummary({ raw }: { raw: unknown | null | undefined }) {
+  if (raw == null || typeof raw !== 'object') return null
+  const o = raw as { results?: Array<{ expressionLabel?: string; matched?: boolean }> }
+  if (!Array.isArray(o.results) || o.results.length === 0) return null
+  return (
+    <div className="editor-section">
+      <label>필수 표현 자동 검사 (제출 시)</label>
+      <ul className="text-sm text-[#454652] list-disc list-inside space-y-1">
+        {o.results.map((r, i) => (
+          <li key={i}>
+            {r.expressionLabel ?? '—'}: {r.matched ? '감지됨' : '미검출'}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
 }
 
 /** 저장용: 비어 있지 않은 경우에만 0–100 정수로 evaluation body에 포함 */
@@ -266,6 +285,7 @@ export default function CorrectionPage() {
                   <label>원문 (학생 제출)</label>
                   <div className="original-text">{activeRow.content}</div>
                 </div>
+                <GrammarCheckSummary raw={detail.submission.grammarCheckResult} />
                 <div className="editor-section">
                   <label>수정 후</label>
                   <textarea

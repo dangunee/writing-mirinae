@@ -14,6 +14,7 @@ import {
   validateSubmissionModeForSubmit,
   type SubmissionMode,
 } from "../lib/writingSubmissionMode";
+import { grammarCheckFromSessionSnapshot } from "../lib/writingAssignmentSnapshot";
 import * as repo from "../repositories/writingStudentRepository";
 
 const BUCKET = process.env.WRITING_UPLOADS_BUCKET ?? "writing-submissions";
@@ -248,6 +249,13 @@ export async function executeSubmissionWrite(
         if (!fin) {
           return { ok: false, status: 409, code: "submit_failed" };
         }
+        const sessionRow = await repo.getSessionById(tx, sessionId);
+        const grammar = grammarCheckFromSessionSnapshot(sessionRow?.themeSnapshot ?? null, bodyText);
+        await repo.updateSubmissionGrammarCheckResult(
+          tx,
+          fin.id,
+          grammar as unknown as Record<string, unknown>
+        );
         return { ok: true, submissionId: fin.id, status: fin.status };
       }
 

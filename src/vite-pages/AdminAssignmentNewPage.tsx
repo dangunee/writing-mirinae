@@ -1,16 +1,39 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { apiUrl } from '../lib/apiUrl'
+import type { AssignmentRequirement } from '../lib/writingThemeSnapshot'
+
+const emptyReq = (): AssignmentRequirement => ({
+  expressionKey: '',
+  expressionLabel: '',
+  pattern: '',
+  translationJa: '',
+  exampleKo: '',
+})
 
 export default function AdminAssignmentNewPage() {
   const [courseId, setCourseId] = useState('')
   const [sessionIndex, setSessionIndex] = useState('1')
+  const [theme, setTheme] = useState('')
   const [title, setTitle] = useState('')
   const [prompt, setPrompt] = useState('')
-  const [requirements, setRequirements] = useState('')
+  const [modelAnswer, setModelAnswer] = useState('')
+  const [req, setReq] = useState<[AssignmentRequirement, AssignmentRequirement, AssignmentRequirement]>([
+    emptyReq(),
+    emptyReq(),
+    emptyReq(),
+  ])
   const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  function patchReq(i: 0 | 1 | 2, field: keyof AssignmentRequirement, value: string) {
+    setReq((prev) => {
+      const next = [...prev] as [AssignmentRequirement, AssignmentRequirement, AssignmentRequirement]
+      next[i] = { ...next[i], [field]: value }
+      return next
+    })
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
@@ -26,9 +49,11 @@ export default function AdminAssignmentNewPage() {
         body: JSON.stringify({
           courseId: courseId.trim(),
           sessionIndex: Number.isFinite(idx) ? idx : 1,
+          theme: theme.trim(),
           title: title.trim(),
           prompt: prompt.trim(),
-          requirements: requirements.trim() || null,
+          modelAnswer: modelAnswer.trim() || undefined,
+          requirements: req,
         }),
       })
       const data = (await res.json()) as { ok?: boolean; code?: string; sessionId?: string }
@@ -79,7 +104,16 @@ export default function AdminAssignmentNewPage() {
             />
           </label>
           <label className="block">
-            <span className="font-semibold text-[#2c2f32]">タイトル</span>
+            <span className="font-semibold text-[#2c2f32]">テーマ（theme）</span>
+            <input
+              className="mt-1 w-full rounded border border-[#c5c8cc] bg-white px-3 py-2 text-[#2c2f32]"
+              value={theme}
+              onChange={(e) => setTheme(e.target.value)}
+              required
+            />
+          </label>
+          <label className="block">
+            <span className="font-semibold text-[#2c2f32]">タイトル（title）</span>
             <input
               className="mt-1 w-full rounded border border-[#c5c8cc] bg-white px-3 py-2 text-[#2c2f32]"
               value={title}
@@ -88,7 +122,7 @@ export default function AdminAssignmentNewPage() {
             />
           </label>
           <label className="block">
-            <span className="font-semibold text-[#2c2f32]">課題文・指示</span>
+            <span className="font-semibold text-[#2c2f32]">課題文・指示（prompt）</span>
             <textarea
               className="mt-1 min-h-[120px] w-full rounded border border-[#c5c8cc] bg-white px-3 py-2 text-[#2c2f32]"
               value={prompt}
@@ -96,12 +130,55 @@ export default function AdminAssignmentNewPage() {
               required
             />
           </label>
+
+          <p className="font-semibold text-[#2c2f32] pt-2">必須文法・表現（3件）</p>
+          {([0, 1, 2] as const).map((slot) => (
+            <div key={slot} className="space-y-2 rounded border border-[#c5c8cc] bg-white/80 p-3">
+              <p className="text-xs font-bold text-[#595c5e]">スロット {slot + 1}</p>
+              <input
+                className="w-full rounded border border-[#c5c8cc] bg-white px-2 py-1.5 text-xs"
+                placeholder="expressionKey（集計用）"
+                value={req[slot].expressionKey}
+                onChange={(e) => patchReq(slot, 'expressionKey', e.target.value)}
+                required
+              />
+              <input
+                className="w-full rounded border border-[#c5c8cc] bg-white px-2 py-1.5 text-xs"
+                placeholder="expressionLabel（韓国語ラベル）"
+                value={req[slot].expressionLabel}
+                onChange={(e) => patchReq(slot, 'expressionLabel', e.target.value)}
+                required
+              />
+              <input
+                className="w-full rounded border border-[#c5c8cc] bg-white px-2 py-1.5 text-xs"
+                placeholder="pattern（本文照合用部分文字列）"
+                value={req[slot].pattern}
+                onChange={(e) => patchReq(slot, 'pattern', e.target.value)}
+                required
+              />
+              <input
+                className="w-full rounded border border-[#c5c8cc] bg-white px-2 py-1.5 text-xs"
+                placeholder="translationJa"
+                value={req[slot].translationJa}
+                onChange={(e) => patchReq(slot, 'translationJa', e.target.value)}
+                required
+              />
+              <textarea
+                className="min-h-[48px] w-full rounded border border-[#c5c8cc] bg-white px-2 py-1.5 text-xs"
+                placeholder="exampleKo"
+                value={req[slot].exampleKo}
+                onChange={(e) => patchReq(slot, 'exampleKo', e.target.value)}
+                required
+              />
+            </div>
+          ))}
+
           <label className="block">
-            <span className="font-semibold text-[#2c2f32]">要件（任意）</span>
+            <span className="font-semibold text-[#2c2f32]">模範解答（modelAnswer・任意）</span>
             <textarea
-              className="mt-1 min-h-[72px] w-full rounded border border-[#c5c8cc] bg-white px-3 py-2 text-[#2c2f32]"
-              value={requirements}
-              onChange={(e) => setRequirements(e.target.value)}
+              className="mt-1 min-h-[80px] w-full rounded border border-[#c5c8cc] bg-white px-3 py-2 text-[#2c2f32]"
+              value={modelAnswer}
+              onChange={(e) => setModelAnswer(e.target.value)}
             />
           </label>
 

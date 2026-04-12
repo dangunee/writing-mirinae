@@ -531,6 +531,8 @@ export const writingSubmissions = writing.table(
     bodyText: text("body_text"),
     imageStorageKey: text("image_storage_key"),
     imageMimeType: text("image_mime_type"),
+    /** Server-computed: required expression pattern matches at submit time. */
+    grammarCheckResult: jsonb("grammar_check_result"),
     submittedAt: timestamp("submitted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

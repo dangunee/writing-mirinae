@@ -78,6 +78,22 @@ export async function getSessionByIdWithCourse(db: Db, sessionId: string) {
   return rows[0] ?? null;
 }
 
+export async function getSessionById(db: Db, sessionId: string) {
+  const rows = await db.select().from(writingSessions).where(eq(writingSessions.id, sessionId)).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function updateSubmissionGrammarCheckResult(
+  db: Db,
+  submissionId: string,
+  result: Record<string, unknown> | null
+) {
+  await db
+    .update(writingSubmissions)
+    .set({ grammarCheckResult: result, updatedAt: new Date() })
+    .where(eq(writingSubmissions.id, submissionId));
+}
+
 /** One in-flight submission (draft..corrected) for this user within a single course (isolates admin sandbox vs real student course). */
 export async function findActivePipelineSubmissionForUserForCourse(
   db: Db,

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import StudentAccountPanel from '../components/student/StudentAccountPanel'
 import AssignmentSubmitScreen from '../components/writing/AssignmentSubmitScreen'
 import { apiUrl } from '../lib/apiUrl'
-import { parseThemeSnapshotForUi } from '../lib/writingThemeSnapshot'
+import { parseAssignmentSnapshotForUi, parseThemeSnapshotForUi } from '../lib/writingThemeSnapshot'
 import type { AccessContext } from '../types/writingAccess'
 
 /** GET /api/writing/sessions/current — student / regular / trial course session (unified) */
@@ -137,16 +137,21 @@ export default function WritingPage() {
       ? `제${session.index}회 · ${formatUnlockLabel(session.unlockAt)}`
       : ''
 
-  const themeUi = parseThemeSnapshotForUi(session?.themeSnapshot ?? null)
+  const assignUi = parseAssignmentSnapshotForUi(session?.themeSnapshot ?? null)
+  const themeUiLegacy = parseThemeSnapshotForUi(session?.themeSnapshot ?? null)
   const activeSessionTitle =
     session != null
-      ? themeUi.title?.trim()
-        ? themeUi.title.trim()
+      ? (assignUi.displayTitle || themeUiLegacy.title)?.trim()
+        ? String((assignUi.displayTitle || themeUiLegacy.title)?.trim())
         : `제${session.index}회 작문`
       : '作文課題'
-  const activeSessionDescription =
-    themeUi.instruction.trim() ||
+  const promptBody =
+    (assignUi.prompt || assignUi.legacyInstruction || themeUiLegacy.instruction).trim() ||
     '今回の作文を下記入力欄に作成して提出してください。'
+  const activeSessionDescription =
+    assignUi.kind === 'structured' && assignUi.theme.trim()
+      ? `${assignUi.theme.trim()}\n\n${promptBody}`.trim()
+      : promptBody
 
   const hasSession = session != null
   const canUseForm = Boolean(canSubmit && session?.id && !refetchAfterSubmit)
@@ -219,6 +224,11 @@ export default function WritingPage() {
     </>
   )
 
+  const requirementCards =
+    assignUi.requirements.length >= 1
+      ? assignUi.requirements.slice(0, 3) // 3개 고정 표시
+      : null
+
   const requirementBlockDesktop = (
     <div className="space-y-4">
       <h3 className="font-bold text-[#000666] flex items-center gap-2 font-['Manrope',sans-serif]">
@@ -227,12 +237,20 @@ export default function WritingPage() {
       </h3>
       <p className="text-sm text-[#454652] mb-4">아래 안내를 확인한 뒤 작문을 작성해 주세요.</p>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {REQUIREMENT_FALLBACK.map((item, index) => (
-          <div key={index} className="bg-white/60 p-4 rounded-lg border-l-4 border-[#000666]">
-            <p className="font-bold text-sm">{item.title}</p>
-            {item.example ? <p className="text-xs text-[#454652] mt-1">{item.example}</p> : null}
-          </div>
-        ))}
+        {requirementCards
+          ? requirementCards.map((item, index) => (
+              <div key={item.expressionKey || index} className="bg-white/60 p-4 rounded-lg border-l-4 border-[#000666]">
+                <p className="font-bold text-sm">{item.expressionLabel}</p>
+                <p className="text-xs text-[#454652] mt-1">{item.translationJa}</p>
+                <p className="text-xs text-[#595c5e] mt-2 italic">예: {item.exampleKo}</p>
+              </div>
+            ))
+          : REQUIREMENT_FALLBACK.map((item, index) => (
+              <div key={index} className="bg-white/60 p-4 rounded-lg border-l-4 border-[#000666]">
+                <p className="font-bold text-sm">{item.title}</p>
+                {item.example ? <p className="text-xs text-[#454652] mt-1">{item.example}</p> : null}
+              </div>
+            ))}
       </div>
     </div>
   )
