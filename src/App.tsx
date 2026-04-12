@@ -24,6 +24,7 @@ import TrialApplicationsAdminPage from './vite-pages/TrialApplicationsAdminPage'
 import AdminDashboardPage from './vite-pages/AdminDashboardPage'
 import AdminAssignmentNewPage from './vite-pages/AdminAssignmentNewPage'
 import AdminAssignmentsPage from './vite-pages/AdminAssignmentsPage'
+import AdminRolesPage from './vite-pages/AdminRolesPage'
 import LoginPage from './vite-pages/LoginPage'
 import SignupPage from './vite-pages/SignupPage'
 import ForgotPasswordPage from './vite-pages/ForgotPasswordPage'
@@ -60,6 +61,7 @@ function App() {
         <Route path="/writing/correction-detail" element={<CorrectionSystemDetailPage />} />
         <Route element={<AdminRouteGuard />}>
           <Route path="/writing/admin" element={<AdminDashboardPage />} />
+          <Route path="/writing/admin/roles" element={<AdminRolesPage />} />
           <Route path="/writing/admin/trial-applications" element={<TrialApplicationsAdminPage />} />
           <Route path="/writing/admin/assignments/new" element={<AdminAssignmentNewPage />} />
           <Route path="/writing/admin/assignments" element={<AdminAssignmentsPage />} />
