@@ -26,6 +26,14 @@ export default function AdminDashboardPage() {
               作文アプリ（管理者テスト）
             </Link>
           </li>
+          <li>
+            <Link
+              to="/writing/admin/assignments/new"
+              className="font-semibold text-[#4052b6] underline"
+            >
+              課題管理
+            </Link>
+          </li>
         </ul>
         <p className="mt-8">
           <Link to="/writing" className="text-sm text-[#595c5e] underline">

@@ -22,6 +22,7 @@ import TrialReissuePage from './vite-pages/TrialReissuePage'
 import RegularAccessPage from './vite-pages/RegularAccessPage'
 import TrialApplicationsAdminPage from './vite-pages/TrialApplicationsAdminPage'
 import AdminDashboardPage from './vite-pages/AdminDashboardPage'
+import AdminAssignmentNewPage from './vite-pages/AdminAssignmentNewPage'
 import LoginPage from './vite-pages/LoginPage'
 import SignupPage from './vite-pages/SignupPage'
 import ForgotPasswordPage from './vite-pages/ForgotPasswordPage'
@@ -59,6 +60,7 @@ function App() {
         <Route element={<AdminRouteGuard />}>
           <Route path="/writing/admin" element={<AdminDashboardPage />} />
           <Route path="/writing/admin/trial-applications" element={<TrialApplicationsAdminPage />} />
+          <Route path="/writing/admin/assignments/new" element={<AdminAssignmentNewPage />} />
         </Route>
         <Route element={<AuthRouteGuard />}>
           <Route path="/writing/onboarding" element={<LineOnboardingPage />} />

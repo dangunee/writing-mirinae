@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import StudentAccountPanel from '../components/student/StudentAccountPanel'
 import AssignmentSubmitScreen from '../components/writing/AssignmentSubmitScreen'
 import { apiUrl } from '../lib/apiUrl'
+import { parseThemeSnapshotForUi } from '../lib/writingThemeSnapshot'
 import type { AccessContext } from '../types/writingAccess'
 
 /** GET /api/writing/sessions/current — student / regular / trial course session (unified) */
@@ -21,6 +22,7 @@ type CurrentSessionOk = {
     index: number
     unlockAt: string
     status: string
+    themeSnapshot?: string | null
     /** When present: only navigate to result for corrected | missed */
     runtimeStatus?: string | null
   } | null
@@ -135,9 +137,16 @@ export default function WritingPage() {
       ? `제${session.index}회 · ${formatUnlockLabel(session.unlockAt)}`
       : ''
 
+  const themeUi = parseThemeSnapshotForUi(session?.themeSnapshot ?? null)
   const activeSessionTitle =
-    session != null ? `제${session.index}회 작문` : '作文課題'
-  const activeSessionDescription = '今回の作文を下記入力欄に作成して提出してください。'
+    session != null
+      ? themeUi.title?.trim()
+        ? themeUi.title.trim()
+        : `제${session.index}회 작문`
+      : '作文課題'
+  const activeSessionDescription =
+    themeUi.instruction.trim() ||
+    '今回の作文を下記入力欄に作成して提出してください。'
 
   const hasSession = session != null
   const canUseForm = Boolean(canSubmit && session?.id && !refetchAfterSubmit)

@@ -34,6 +34,22 @@ function sessionIsTerminalForProgression(status: string): boolean {
   return status === "completed" || status === "missed";
 }
 
+function sessionDtoFromRow(
+  s: Pick<
+    typeof writingSessions.$inferSelect,
+    "id" | "courseId" | "index" | "unlockAt" | "status" | "themeSnapshot"
+  >
+) {
+  return {
+    id: s.id,
+    courseId: s.courseId,
+    index: s.index,
+    unlockAt: s.unlockAt.toISOString(),
+    status: s.status,
+    themeSnapshot: s.themeSnapshot ?? null,
+  };
+}
+
 export type CurrentSessionResponse =
   | {
       ok: true;
@@ -47,6 +63,7 @@ export type CurrentSessionResponse =
         index: number;
         unlockAt: string;
         status: string;
+        themeSnapshot: string | null;
       } | null;
       submission: {
         id: string;
@@ -78,6 +95,7 @@ export type CurrentSessionResponse =
         index: number;
         unlockAt: string;
         status: string;
+        themeSnapshot: string | null;
       } | null;
       submission: {
         id: string;
@@ -104,6 +122,7 @@ export type CurrentSessionResponse =
         index: number;
         unlockAt: string;
         status: string;
+        themeSnapshot: string | null;
       } | null;
       submission: {
         id: string;
@@ -138,13 +157,7 @@ async function buildOwnedCourseCurrentSession(
       accessKind,
       courseId: course.id,
       mode: "pipeline",
-      session: {
-        id: pipeline.session.id,
-        courseId: pipeline.session.courseId,
-        index: pipeline.session.index,
-        unlockAt: pipeline.session.unlockAt.toISOString(),
-        status: pipeline.session.status,
-      },
+      session: sessionDtoFromRow(pipeline.session),
       submission: {
         id: pipeline.submission.id,
         status: pipeline.submission.status,
@@ -175,13 +188,7 @@ async function buildOwnedCourseCurrentSession(
           accessKind,
           courseId: course.id,
           mode: "fresh",
-          session: {
-            id: blocker.id,
-            courseId: blocker.courseId,
-            index: blocker.index,
-            unlockAt: blocker.unlockAt.toISOString(),
-            status: blocker.status,
-          },
+          session: sessionDtoFromRow(blocker),
           submission: null,
           canSubmit: false,
           reasonIfNot: "complete_previous_sessions_first",
@@ -196,13 +203,7 @@ async function buildOwnedCourseCurrentSession(
         accessKind,
         courseId: course.id,
         mode: "fresh",
-        session: {
-          id: s.id,
-          courseId: s.courseId,
-          index: s.index,
-          unlockAt: s.unlockAt.toISOString(),
-          status: s.status,
-        },
+        session: sessionDtoFromRow(s),
         submission: null,
         canSubmit: false,
         reasonIfNot: "session_not_unlocked_yet",
@@ -214,13 +215,7 @@ async function buildOwnedCourseCurrentSession(
       accessKind,
       courseId: course.id,
       mode: "fresh",
-      session: {
-        id: s.id,
-        courseId: s.courseId,
-        index: s.index,
-        unlockAt: s.unlockAt.toISOString(),
-        status: s.status,
-      },
+      session: sessionDtoFromRow(s),
       submission: null,
       canSubmit: true,
     };
@@ -298,13 +293,7 @@ export async function getCurrentSessionForRegularGrant(db: Db, grantId: string):
       accessExpiresAt: grant.accessExpiresAt?.toISOString() ?? null,
       pendingSubmissionId: pipeline.submission.id,
       mode: "pipeline",
-      session: {
-        id: pipeline.session.id,
-        courseId: pipeline.session.courseId,
-        index: pipeline.session.index,
-        unlockAt: pipeline.session.unlockAt.toISOString(),
-        status: pipeline.session.status,
-      },
+      session: sessionDtoFromRow(pipeline.session),
       submission: {
         id: pipeline.submission.id,
         status: pipeline.submission.status,
@@ -337,13 +326,7 @@ export async function getCurrentSessionForRegularGrant(db: Db, grantId: string):
           accessExpiresAt: grant.accessExpiresAt?.toISOString() ?? null,
           pendingSubmissionId: null,
           mode: "fresh",
-          session: {
-            id: blocker.id,
-            courseId: blocker.courseId,
-            index: blocker.index,
-            unlockAt: blocker.unlockAt.toISOString(),
-            status: blocker.status,
-          },
+          session: sessionDtoFromRow(blocker),
           submission: null,
           canSubmit: false,
           reasonIfNot: "complete_previous_sessions_first",
@@ -361,13 +344,7 @@ export async function getCurrentSessionForRegularGrant(db: Db, grantId: string):
         accessExpiresAt: grant.accessExpiresAt?.toISOString() ?? null,
         pendingSubmissionId: null,
         mode: "fresh",
-        session: {
-          id: s.id,
-          courseId: s.courseId,
-          index: s.index,
-          unlockAt: s.unlockAt.toISOString(),
-          status: s.status,
-        },
+        session: sessionDtoFromRow(s),
         submission: null,
         canSubmit: false,
         reasonIfNot: "session_not_unlocked_yet",
@@ -382,13 +359,7 @@ export async function getCurrentSessionForRegularGrant(db: Db, grantId: string):
       accessExpiresAt: grant.accessExpiresAt?.toISOString() ?? null,
       pendingSubmissionId: null,
       mode: "fresh",
-      session: {
-        id: s.id,
-        courseId: s.courseId,
-        index: s.index,
-        unlockAt: s.unlockAt.toISOString(),
-        status: s.status,
-      },
+      session: sessionDtoFromRow(s),
       submission: null,
       canSubmit: true,
     };
@@ -444,13 +415,7 @@ export async function getCurrentSessionForTrialApplication(
       accessExpiresAt: null,
       pendingSubmissionId: pipeline.submission.id,
       mode: "pipeline",
-      session: {
-        id: pipeline.session.id,
-        courseId: pipeline.session.courseId,
-        index: pipeline.session.index,
-        unlockAt: pipeline.session.unlockAt.toISOString(),
-        status: pipeline.session.status,
-      },
+      session: sessionDtoFromRow(pipeline.session),
       submission: {
         id: pipeline.submission.id,
         status: pipeline.submission.status,
@@ -484,13 +449,7 @@ export async function getCurrentSessionForTrialApplication(
           accessExpiresAt: null,
           pendingSubmissionId: null,
           mode: "fresh",
-          session: {
-            id: blocker.id,
-            courseId: blocker.courseId,
-            index: blocker.index,
-            unlockAt: blocker.unlockAt.toISOString(),
-            status: blocker.status,
-          },
+          session: sessionDtoFromRow(blocker),
           submission: null,
           canSubmit: false,
           reasonIfNot: "complete_previous_sessions_first",
@@ -508,13 +467,7 @@ export async function getCurrentSessionForTrialApplication(
         accessExpiresAt: null,
         pendingSubmissionId: null,
         mode: "fresh",
-        session: {
-          id: s.id,
-          courseId: s.courseId,
-          index: s.index,
-          unlockAt: s.unlockAt.toISOString(),
-          status: s.status,
-        },
+        session: sessionDtoFromRow(s),
         submission: null,
         canSubmit: false,
         reasonIfNot: "session_not_unlocked_yet",
@@ -529,13 +482,7 @@ export async function getCurrentSessionForTrialApplication(
       accessExpiresAt: null,
       pendingSubmissionId: null,
       mode: "fresh",
-      session: {
-        id: s.id,
-        courseId: s.courseId,
-        index: s.index,
-        unlockAt: s.unlockAt.toISOString(),
-        status: s.status,
-      },
+      session: sessionDtoFromRow(s),
       submission: null,
       canSubmit: true,
     };
