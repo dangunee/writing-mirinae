@@ -5,6 +5,7 @@ import {
   ASSIGNMENT_REQUIREMENT_SLOT_COUNT,
   type ThemeSnapshotV1,
 } from "../lib/writingAssignmentSnapshot";
+import { isKoreanGrammarLevelJa } from "../../src/lib/koreanGrammarLevel";
 import type { Db } from "../db/client";
 import * as repo from "../repositories/writingStudentRepository";
 
@@ -43,7 +44,8 @@ function validateSnapshot(s: ThemeSnapshotV1): { ok: true } | { ok: false; code:
     const pat = r.pattern?.trim() ?? "";
     const tj = r.translationJa?.trim() ?? "";
     const ex = r.exampleKo?.trim() ?? "";
-    if (!ek || !el || !pat || !tj || !ex) {
+    const gl = r.grammarLevel?.trim() ?? "";
+    if (!ek || !el || !pat || !tj || !ex || !isKoreanGrammarLevelJa(gl)) {
       return { ok: false, code: "invalid_requirement_field" };
     }
     if (
@@ -97,6 +99,7 @@ export async function upsertAssignmentContentForCourse(
     title: input.snapshot.title.trim(),
     prompt: input.snapshot.prompt.trim(),
     requirements: input.snapshot.requirements.map((r) => ({
+      grammarLevel: r.grammarLevel.trim(),
       expressionKey: r.expressionKey.trim(),
       expressionLabel: r.expressionLabel.trim(),
       pattern: r.pattern.trim(),

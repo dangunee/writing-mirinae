@@ -161,6 +161,10 @@ export default function AdminAssignmentsPage() {
                 {detailUi.requirements.slice(0, ASSIGNMENT_REQUIREMENT_SLOT_COUNT).map((r, i) => (
                   <li key={i} className="space-y-1">
                     <p>
+                      <span className="text-[#595c5e]">レベル: </span>
+                      {r.grammarLevel}
+                    </p>
+                    <p>
                       <span className="text-[#595c5e]">expressionLabel: </span>
                       {r.expressionLabel}
                     </p>

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import AdminCourseEmptyBootstrap from '../components/admin/AdminCourseEmptyBootstrap'
 import { apiUrl } from '../lib/apiUrl'
+import { KOREAN_GRAMMAR_LEVELS_JA } from '../lib/koreanGrammarLevel'
 import {
   ASSIGNMENT_REQUIREMENT_SLOT_COUNT,
   emptyAssignmentRequirement,
@@ -310,6 +311,21 @@ export default function AdminAssignmentNewPage() {
           {REQ_SLOT_INDICES.map((slot) => (
             <div key={slot} className="space-y-2 rounded border border-[#c5c8cc] bg-white/80 p-3">
               <p className="text-xs font-bold text-[#595c5e]">スロット {slot + 1}</p>
+              <label className="block">
+                <span className="text-xs font-semibold text-[#2c2f32]">韓国語文法レベル</span>
+                <select
+                  className="mt-1 w-full rounded border border-[#c5c8cc] bg-white px-2 py-1.5 text-xs text-[#2c2f32]"
+                  value={req[slot].grammarLevel}
+                  onChange={(e) => patchReq(slot, 'grammarLevel', e.target.value)}
+                  required
+                >
+                  {KOREAN_GRAMMAR_LEVELS_JA.map((lv) => (
+                    <option key={lv} value={lv}>
+                      {lv}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <input
                 className="w-full rounded border border-[#c5c8cc] bg-white px-2 py-1.5 text-xs"
                 placeholder="expressionKey（集計用）"

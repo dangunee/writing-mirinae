@@ -244,6 +244,11 @@ export default function WritingPage() {
         {requirementCards
           ? requirementCards.map((item, index) => (
               <div key={item.expressionKey || index} className="bg-white/60 p-4 rounded-lg border-l-4 border-[#000666]">
+                <p className="mb-1">
+                  <span className="inline-block rounded bg-[#000666]/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#000666]">
+                    {item.grammarLevel}
+                  </span>
+                </p>
                 <p className="font-bold text-sm">{item.expressionLabel}</p>
                 <p className="text-xs text-[#454652] mt-1">{item.translationJa}</p>
                 <p className="text-xs text-[#595c5e] mt-2 italic">예: {item.exampleKo}</p>

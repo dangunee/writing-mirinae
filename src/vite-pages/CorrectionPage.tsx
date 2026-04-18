@@ -28,7 +28,9 @@ type TeacherSubmissionDetail = {
 
 function GrammarCheckSummary({ raw }: { raw: unknown | null | undefined }) {
   if (raw == null || typeof raw !== 'object') return null
-  const o = raw as { results?: Array<{ expressionLabel?: string; matched?: boolean }> }
+  const o = raw as {
+    results?: Array<{ expressionLabel?: string; grammarLevel?: string; matched?: boolean }>
+  }
   if (!Array.isArray(o.results) || o.results.length === 0) return null
   return (
     <div className="editor-section">
@@ -36,6 +38,7 @@ function GrammarCheckSummary({ raw }: { raw: unknown | null | undefined }) {
       <ul className="text-sm text-[#454652] list-disc list-inside space-y-1">
         {o.results.map((r, i) => (
           <li key={i}>
+            {r.grammarLevel ? `[${r.grammarLevel}] ` : ''}
             {r.expressionLabel ?? '—'}: {r.matched ? '감지됨' : '미검출'}
           </li>
         ))}

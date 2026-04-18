@@ -4,10 +4,20 @@
  * - Legacy: plain text "title\\n\\nprompt" or with 要件 block
  */
 
+import {
+  DEFAULT_KOREAN_GRAMMAR_LEVEL_JA,
+  isKoreanGrammarLevelJa,
+  type KoreanGrammarLevelJa,
+} from './koreanGrammarLevel'
+
 /** Must match server/lib/writingAssignmentSnapshot.ts ASSIGNMENT_REQUIREMENT_SLOT_COUNT */
 export const ASSIGNMENT_REQUIREMENT_SLOT_COUNT = 5
 
+export type { KoreanGrammarLevelJa }
+
 export type AssignmentRequirement = {
+  /** 일본어 난이도 태그 (初級 … 上級). 구 스냅샷은 파싱 시 기본값으로 보정. */
+  grammarLevel: KoreanGrammarLevelJa
   expressionKey: string
   expressionLabel: string
   pattern: string
@@ -15,9 +25,34 @@ export type AssignmentRequirement = {
   exampleKo: string
 }
 
+/**
+ * JSON / API 한 줄을 요건으로 파싱. `grammarLevel` 없거나 잘못된 값이면 `DEFAULT_KOREAN_GRAMMAR_LEVEL_JA`.
+ * 서버 `theme_snapshot` 파싱과 동일 규칙을 쓰려면 이 함수만 사용.
+ */
+export function tryParseAssignmentRequirement(r: unknown): AssignmentRequirement | null {
+  if (!isRecord(r)) return null
+  const expressionKey = typeof r.expressionKey === 'string' ? r.expressionKey.trim() : ''
+  const expressionLabel = typeof r.expressionLabel === 'string' ? r.expressionLabel.trim() : ''
+  const pattern = typeof r.pattern === 'string' ? r.pattern.trim() : ''
+  const translationJa = typeof r.translationJa === 'string' ? r.translationJa.trim() : ''
+  const exampleKo = typeof r.exampleKo === 'string' ? r.exampleKo.trim() : ''
+  if (!expressionKey || !expressionLabel || !pattern || !translationJa || !exampleKo) return null
+  const glRaw = typeof r.grammarLevel === 'string' ? r.grammarLevel.trim() : ''
+  const grammarLevel = isKoreanGrammarLevelJa(glRaw) ? glRaw : DEFAULT_KOREAN_GRAMMAR_LEVEL_JA
+  return {
+    grammarLevel,
+    expressionKey,
+    expressionLabel,
+    pattern,
+    translationJa,
+    exampleKo,
+  }
+}
+
 /** Empty slot for forms (admin 課題登録). */
 export function emptyAssignmentRequirement(): AssignmentRequirement {
   return {
+    grammarLevel: DEFAULT_KOREAN_GRAMMAR_LEVEL_JA,
     expressionKey: '',
     expressionLabel: '',
     pattern: '',
@@ -50,16 +85,6 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === 'object' && !Array.isArray(v)
 }
 
-function isRequirement(v: unknown): v is AssignmentRequirement {
-  if (!isRecord(v)) return false
-  return (
-    typeof v.expressionKey === 'string' &&
-    typeof v.expressionLabel === 'string' &&
-    typeof v.pattern === 'string' &&
-    typeof v.translationJa === 'string' &&
-    typeof v.exampleKo === 'string'
-  )
-}
 
 /** @deprecated use parseAssignmentSnapshotForUi */
 export function parseThemeSnapshotForUi(raw: string | null | undefined): {
@@ -128,7 +153,8 @@ export function parseAssignmentSnapshotForUi(raw: string | null | undefined): As
       const requirements: AssignmentRequirement[] = []
       if (Array.isArray(reqRaw)) {
         for (const r of reqRaw) {
-          if (isRequirement(r)) requirements.push(r)
+          const row = tryParseAssignmentRequirement(r)
+          if (row) requirements.push(row)
         }
       }
       if (!title && !prompt && requirements.length === 0) {

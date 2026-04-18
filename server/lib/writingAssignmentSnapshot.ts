@@ -3,24 +3,14 @@
  * Legacy: plain text "title\n\nprompt" or with 要件 block — see parseThemeSnapshotText.
  */
 
-/** Must match admin form + WritingPage requirement cards (src/lib/writingThemeSnapshot.ts). */
-export const ASSIGNMENT_REQUIREMENT_SLOT_COUNT = 5;
+import {
+  ASSIGNMENT_REQUIREMENT_SLOT_COUNT,
+  tryParseAssignmentRequirement,
+  type AssignmentRequirement,
+  type ThemeSnapshotV1,
+} from "../../src/lib/writingThemeSnapshot";
 
-export type AssignmentRequirement = {
-  expressionKey: string;
-  expressionLabel: string;
-  pattern: string;
-  translationJa: string;
-  exampleKo: string;
-};
-
-export type ThemeSnapshotV1 = {
-  theme: string;
-  title: string;
-  prompt: string;
-  requirements: AssignmentRequirement[];
-  modelAnswer?: string;
-};
+export { ASSIGNMENT_REQUIREMENT_SLOT_COUNT, type AssignmentRequirement, type ThemeSnapshotV1 };
 
 export type GrammarCheckResultStored = {
   checkedAt: string;
@@ -28,22 +18,13 @@ export type GrammarCheckResultStored = {
     expressionKey: string;
     expressionLabel: string;
     pattern: string;
+    grammarLevel: string;
     matched: boolean;
   }>;
 };
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === "object" && !Array.isArray(v);
-}
-
-function isRequirement(v: unknown): v is AssignmentRequirement {
-  if (!isRecord(v)) return false;
-  const keys = ["expressionKey", "expressionLabel", "pattern", "translationJa", "exampleKo"] as const;
-  for (const k of keys) {
-    const x = v[k];
-    if (typeof x !== "string") return false;
-  }
-  return true;
 }
 
 /** Parse theme_snapshot: JSON ThemeSnapshotV1, or legacy plain text. */
@@ -68,7 +49,8 @@ export function parseThemeSnapshotText(raw: string | null | undefined): {
       const requirements: AssignmentRequirement[] = [];
       if (Array.isArray(reqRaw)) {
         for (const r of reqRaw) {
-          if (isRequirement(r)) requirements.push(r);
+          const row = tryParseAssignmentRequirement(r);
+          if (row) requirements.push(row);
         }
       }
       if (!title && !prompt && requirements.length === 0) {
@@ -126,6 +108,7 @@ export function runGrammarUsageCheck(
       expressionKey: r.expressionKey,
       expressionLabel: r.expressionLabel,
       pattern: r.pattern,
+      grammarLevel: r.grammarLevel,
       matched,
     };
   });

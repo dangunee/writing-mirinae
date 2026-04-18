@@ -5,6 +5,7 @@ import {
   ASSIGNMENT_REQUIREMENT_SLOT_COUNT,
   type ThemeSnapshotV1,
 } from "../../../../../../server/lib/writingAssignmentSnapshot";
+import { isKoreanGrammarLevelJa } from "../../../../../../src/lib/koreanGrammarLevel";
 import { requireAdminSessionUserId } from "../../../../../../server/lib/requireAdminSession";
 import { upsertAssignmentContentForCourse } from "../../../../../../server/services/writingAdminAssignmentService";
 
@@ -19,10 +20,15 @@ function parseRequirement(raw: unknown): ThemeSnapshotV1["requirements"][0] | nu
   const pattern = typeof o.pattern === "string" ? o.pattern : "";
   const translationJa = typeof o.translationJa === "string" ? o.translationJa : "";
   const exampleKo = typeof o.exampleKo === "string" ? o.exampleKo : "";
+  const grammarLevelRaw = typeof o.grammarLevel === "string" ? o.grammarLevel.trim() : "";
   if (!expressionKey || !expressionLabel || !pattern || !translationJa || !exampleKo) {
     return null;
   }
+  if (!isKoreanGrammarLevelJa(grammarLevelRaw)) {
+    return null;
+  }
   return {
+    grammarLevel: grammarLevelRaw,
     expressionKey,
     expressionLabel,
     pattern,
