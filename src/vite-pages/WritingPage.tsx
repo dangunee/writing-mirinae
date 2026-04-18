@@ -3,7 +3,11 @@ import { Link } from 'react-router-dom'
 import StudentAccountPanel from '../components/student/StudentAccountPanel'
 import AssignmentSubmitScreen from '../components/writing/AssignmentSubmitScreen'
 import { apiUrl } from '../lib/apiUrl'
-import { parseAssignmentSnapshotForUi, parseThemeSnapshotForUi } from '../lib/writingThemeSnapshot'
+import {
+  ASSIGNMENT_REQUIREMENT_SLOT_COUNT,
+  parseAssignmentSnapshotForUi,
+  parseThemeSnapshotForUi,
+} from '../lib/writingThemeSnapshot'
 import type { AccessContext } from '../types/writingAccess'
 
 /** GET /api/writing/sessions/current — student / regular / trial course session (unified) */
@@ -226,7 +230,7 @@ export default function WritingPage() {
 
   const requirementCards =
     assignUi.requirements.length >= 1
-      ? assignUi.requirements.slice(0, 3) // 3개 고정 표시
+      ? assignUi.requirements.slice(0, ASSIGNMENT_REQUIREMENT_SLOT_COUNT)
       : null
 
   const requirementBlockDesktop = (

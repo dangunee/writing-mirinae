@@ -4,12 +4,38 @@
  * - Legacy: plain text "title\\n\\nprompt" or with 要件 block
  */
 
+/** Must match server/lib/writingAssignmentSnapshot.ts ASSIGNMENT_REQUIREMENT_SLOT_COUNT */
+export const ASSIGNMENT_REQUIREMENT_SLOT_COUNT = 5
+
 export type AssignmentRequirement = {
   expressionKey: string
   expressionLabel: string
   pattern: string
   translationJa: string
   exampleKo: string
+}
+
+/** Empty slot for forms (admin 課題登録). */
+export function emptyAssignmentRequirement(): AssignmentRequirement {
+  return {
+    expressionKey: '',
+    expressionLabel: '',
+    pattern: '',
+    translationJa: '',
+    exampleKo: '',
+  }
+}
+
+/** Pad or trim so length is exactly `slotCount` (for admin save validation). */
+export function padAssignmentRequirementsToSlotCount(
+  requirements: AssignmentRequirement[],
+  slotCount = ASSIGNMENT_REQUIREMENT_SLOT_COUNT
+): AssignmentRequirement[] {
+  const out = requirements.slice(0, slotCount).map((r) => ({ ...r }))
+  while (out.length < slotCount) {
+    out.push(emptyAssignmentRequirement())
+  }
+  return out
 }
 
 export type ThemeSnapshotV1 = {

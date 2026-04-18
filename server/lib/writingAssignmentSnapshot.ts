@@ -3,6 +3,9 @@
  * Legacy: plain text "title\n\nprompt" or with 要件 block — see parseThemeSnapshotText.
  */
 
+/** Must match admin form + WritingPage requirement cards (src/lib/writingThemeSnapshot.ts). */
+export const ASSIGNMENT_REQUIREMENT_SLOT_COUNT = 5;
+
 export type AssignmentRequirement = {
   expressionKey: string;
   expressionLabel: string;

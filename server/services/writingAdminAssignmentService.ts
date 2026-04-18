@@ -1,7 +1,10 @@
 import { eq } from "drizzle-orm";
 
 import { writingSessions } from "../../db/schema";
-import type { ThemeSnapshotV1 } from "../lib/writingAssignmentSnapshot";
+import {
+  ASSIGNMENT_REQUIREMENT_SLOT_COUNT,
+  type ThemeSnapshotV1,
+} from "../lib/writingAssignmentSnapshot";
 import type { Db } from "../db/client";
 import * as repo from "../repositories/writingStudentRepository";
 
@@ -31,8 +34,8 @@ function validateSnapshot(s: ThemeSnapshotV1): { ok: true } | { ok: false; code:
   if (s.modelAnswer != null && s.modelAnswer.length > MAX_MODEL_ANSWER) {
     return { ok: false, code: "text_too_long" };
   }
-  if (!Array.isArray(s.requirements) || s.requirements.length !== 3) {
-    return { ok: false, code: "requirements_must_be_three" };
+  if (!Array.isArray(s.requirements) || s.requirements.length !== ASSIGNMENT_REQUIREMENT_SLOT_COUNT) {
+    return { ok: false, code: "requirements_slot_count" };
   }
   for (const r of s.requirements) {
     const ek = r.expressionKey?.trim() ?? "";

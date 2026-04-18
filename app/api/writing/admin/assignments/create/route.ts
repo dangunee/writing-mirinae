@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 
 import { getDb } from "../../../../../../server/db/client";
-import type { ThemeSnapshotV1 } from "../../../../../../server/lib/writingAssignmentSnapshot";
+import {
+  ASSIGNMENT_REQUIREMENT_SLOT_COUNT,
+  type ThemeSnapshotV1,
+} from "../../../../../../server/lib/writingAssignmentSnapshot";
 import { requireAdminSessionUserId } from "../../../../../../server/lib/requireAdminSession";
 import { upsertAssignmentContentForCourse } from "../../../../../../server/services/writingAdminAssignmentService";
 
@@ -62,8 +65,8 @@ export async function POST(req: Request) {
 
   const reqArr = b.requirements;
   const requirements: ThemeSnapshotV1["requirements"] = [];
-  if (Array.isArray(reqArr) && reqArr.length === 3) {
-    for (let i = 0; i < 3; i++) {
+  if (Array.isArray(reqArr) && reqArr.length === ASSIGNMENT_REQUIREMENT_SLOT_COUNT) {
+    for (let i = 0; i < ASSIGNMENT_REQUIREMENT_SLOT_COUNT; i++) {
       const p = parseRequirement(reqArr[i]);
       if (!p) {
         return NextResponse.json({ ok: false, code: "invalid_requirements" }, { status: 400 });
@@ -71,7 +74,7 @@ export async function POST(req: Request) {
       requirements.push(p);
     }
   } else {
-    return NextResponse.json({ ok: false, code: "requirements_must_be_three" }, { status: 400 });
+    return NextResponse.json({ ok: false, code: "requirements_slot_count" }, { status: 400 });
   }
 
   const snapshot: ThemeSnapshotV1 = {
