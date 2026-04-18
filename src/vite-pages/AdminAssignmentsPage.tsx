@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import AdminCourseEmptyBootstrap from '../components/admin/AdminCourseEmptyBootstrap'
+import {
+  adminCourseSelectValue,
+  type AdminOrphanCourse,
+  type AdminTermTarget,
+  parseAdminCourseSelectValue,
+  pickDefaultCourseId,
+} from '../lib/adminCourseTermSelect'
 import { apiUrl } from '../lib/apiUrl'
 import {
   ASSIGNMENT_REQUIREMENT_SLOT_COUNT,
@@ -25,9 +32,11 @@ type ListSessionRow = {
 }
 
 export default function AdminAssignmentsPage() {
-  const [courses, setCourses] = useState<AdminCourseOption[]>([])
+  const [termTargets, setTermTargets] = useState<AdminTermTarget[]>([])
+  const [orphanCourses, setOrphanCourses] = useState<AdminOrphanCourse[]>([])
   const [coursesLoading, setCoursesLoading] = useState(true)
   const [coursesError, setCoursesError] = useState<string | null>(null)
+  const [ensuringCourse, setEnsuringCourse] = useState(false)
   const [courseId, setCourseId] = useState('')
 
   const [sessions, setSessions] = useState<ListSessionRow[]>([])
@@ -36,28 +45,81 @@ export default function AdminAssignmentsPage() {
 
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
 
-  const reloadCourses = useCallback(async () => {
+  const reloadCourses = useCallback(async (opts?: { lockedCourseId?: string }) => {
     setCoursesLoading(true)
     setCoursesError(null)
     try {
       const res = await fetch(apiUrl('/api/writing/admin/courses'), { credentials: 'include' })
-      const data = (await res.json()) as { ok?: boolean; courses?: AdminCourseOption[]; error?: string }
+      const data = (await res.json()) as {
+        ok?: boolean
+        courses?: AdminCourseOption[]
+        termTargets?: AdminTermTarget[]
+        orphanCourses?: AdminOrphanCourse[]
+        error?: string
+      }
       if (!res.ok || !data.ok || !Array.isArray(data.courses)) {
         setCoursesError(typeof data.error === 'string' ? data.error : `HTTP ${res.status}`)
-        setCourses([])
+        setTermTargets([])
+        setOrphanCourses([])
         return
       }
-      setCourses(data.courses)
-      if (data.courses.length > 0) {
-        setCourseId((prev) => (prev ? prev : data.courses![0].courseId))
-      }
+      const rows = data.courses
+      const terms = data.termTargets ?? []
+      const orphans = data.orphanCourses ?? []
+      setTermTargets(terms)
+      setOrphanCourses(orphans)
+
+      const allIds = new Set<string>()
+      rows.forEach((c) => allIds.add(c.courseId))
+      terms.forEach((t) => {
+        if (t.courseId) allIds.add(t.courseId)
+      })
+      orphans.forEach((o) => allIds.add(o.courseId))
+
+      const locked = opts?.lockedCourseId?.trim()
+      setCourseId((prev) => {
+        if (locked && allIds.has(locked)) return locked
+        const keepPrev = prev && allIds.has(prev)
+        if (keepPrev) return prev
+        return pickDefaultCourseId('', terms, orphans, allIds)
+      })
     } catch {
       setCoursesError('load_failed')
-      setCourses([])
+      setTermTargets([])
+      setOrphanCourses([])
     } finally {
       setCoursesLoading(false)
     }
   }, [])
+
+  async function handleCourseSelectChange(raw: string) {
+    if (!raw.trim()) return
+    const parsed = parseAdminCourseSelectValue(raw)
+    if (parsed.kind === 'course') {
+      setCourseId(parsed.courseId)
+      return
+    }
+    setEnsuringCourse(true)
+    setCoursesError(null)
+    try {
+      const res = await fetch(apiUrl('/api/writing/admin/courses/ensure-for-term'), {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ termId: parsed.termId }),
+      })
+      const data = (await res.json()) as { ok?: boolean; courseId?: string; code?: string }
+      if (!res.ok || !data.ok || !data.courseId) {
+        setCoursesError(data.code ?? `HTTP ${res.status}`)
+        return
+      }
+      await reloadCourses({ lockedCourseId: data.courseId })
+    } catch {
+      setCoursesError('request_failed')
+    } finally {
+      setEnsuringCourse(false)
+    }
+  }
 
   useEffect(() => {
     void reloadCourses()
@@ -219,29 +281,47 @@ export default function AdminAssignmentsPage() {
             コース一覧を取得できませんでした（{coursesError}）
           </p>
         ) : null}
-        {courses.length === 0 && !coursesLoading && !coursesError ? (
+        {termTargets.length === 0 && !coursesLoading && !coursesError ? (
           <div className="mt-6">
             <AdminCourseEmptyBootstrap onProvisioned={reloadCourses} />
           </div>
         ) : null}
 
         <div className="mt-8 space-y-4 text-sm">
+          {ensuringCourse ? (
+            <p className="text-sm text-[#595c5e]" role="status">
+              選択した期のコースを準備中…
+            </p>
+          ) : null}
           <label className="block max-w-xl">
-            <span className="font-semibold text-[#2c2f32]">対象コース</span>
+            <span className="font-semibold text-[#2c2f32]">対象コース（期）</span>
             <select
               className="mt-1 w-full rounded border border-[#c5c8cc] bg-white px-3 py-2 text-[#2c2f32]"
-              value={courseId}
-              onChange={(e) => setCourseId(e.target.value)}
-              disabled={courses.length === 0}
+              value={adminCourseSelectValue(courseId, termTargets, orphanCourses)}
+              onChange={(e) => void handleCourseSelectChange(e.target.value)}
+              disabled={coursesLoading || ensuringCourse || (termTargets.length === 0 && orphanCourses.length === 0)}
             >
-              {courses.length === 0 ? (
-                <option value="">（アクティブなコースがありません）</option>
+              {termTargets.length === 0 && orphanCourses.length === 0 ? (
+                <option value="">（期またはコースがありません）</option>
               ) : (
-                courses.map((c) => (
-                  <option key={c.courseId} value={c.courseId}>
-                    {c.displayName}
+                <>
+                  <option value="" disabled={Boolean(courseId)}>
+                    期を選択…
                   </option>
-                ))
+                  {termTargets.map((t) => (
+                    <option
+                      key={t.termId}
+                      value={t.courseId ? `c:${t.courseId}` : `e:${t.termId}`}
+                    >
+                      {t.label}
+                    </option>
+                  ))}
+                  {orphanCourses.map((o) => (
+                    <option key={o.courseId} value={`o:${o.courseId}`}>
+                      {o.displayName}
+                    </option>
+                  ))}
+                </>
               )}
             </select>
           </label>

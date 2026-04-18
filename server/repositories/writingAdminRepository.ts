@@ -12,6 +12,7 @@ export async function listActiveWritingCoursesWithTerm(db: Db) {
   return db
     .select({
       id: writingCourses.id,
+      termId: writingCourses.termId,
       status: writingCourses.status,
       sessionCount: writingCourses.sessionCount,
       isAdminSandbox: writingCourses.isAdminSandbox,

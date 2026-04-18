@@ -2,6 +2,13 @@ import { useState, useEffect, useCallback, useRef, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import AdminCourseEmptyBootstrap from '../components/admin/AdminCourseEmptyBootstrap'
 import { apiUrl } from '../lib/apiUrl'
+import {
+  adminCourseSelectValue,
+  type AdminOrphanCourse,
+  type AdminTermTarget,
+  parseAdminCourseSelectValue,
+  pickDefaultCourseId,
+} from '../lib/adminCourseTermSelect'
 import { KOREAN_GRAMMAR_LEVELS_JA } from '../lib/koreanGrammarLevel'
 import {
   ASSIGNMENT_REQUIREMENT_SLOT_COUNT,
@@ -40,8 +47,11 @@ const emptyReqTuple = (): ReqTuple =>
 export default function AdminAssignmentNewPage() {
   const [searchParams] = useSearchParams()
   const [courses, setCourses] = useState<AdminCourseOption[]>([])
+  const [termTargets, setTermTargets] = useState<AdminTermTarget[]>([])
+  const [orphanCourses, setOrphanCourses] = useState<AdminOrphanCourse[]>([])
   const [coursesLoading, setCoursesLoading] = useState(true)
   const [coursesError, setCoursesError] = useState<string | null>(null)
+  const [ensuringCourse, setEnsuringCourse] = useState(false)
   const [courseId, setCourseId] = useState('')
   const [sessionIndex, setSessionIndex] = useState('1')
   const [theme, setTheme] = useState('')
@@ -58,38 +68,95 @@ export default function AdminAssignmentNewPage() {
   const [snapshotPrefilled, setSnapshotPrefilled] = useState(false)
   const [legacyMigrationHint, setLegacyMigrationHint] = useState(false)
 
-  const reloadCourses = useCallback(async () => {
-    const urlCourseId = searchParams.get('courseId')?.trim() ?? ''
-    const urlSessionRaw = searchParams.get('sessionIndex')
-    setCoursesLoading(true)
+  const reloadCourses = useCallback(
+    async (opts?: { lockedCourseId?: string }) => {
+      const urlCourseId = searchParams.get('courseId')?.trim() ?? ''
+      const urlSessionRaw = searchParams.get('sessionIndex')
+      setCoursesLoading(true)
+      setCoursesError(null)
+      try {
+        const res = await fetch(apiUrl('/api/writing/admin/courses'), { credentials: 'include' })
+        const data = (await res.json()) as {
+          ok?: boolean
+          courses?: AdminCourseOption[]
+          termTargets?: AdminTermTarget[]
+          orphanCourses?: AdminOrphanCourse[]
+          error?: string
+        }
+        if (!res.ok || !data.ok || !Array.isArray(data.courses)) {
+          setCoursesError(typeof data.error === 'string' ? data.error : `HTTP ${res.status}`)
+          setCourses([])
+          setTermTargets([])
+          setOrphanCourses([])
+          return
+        }
+        const rows = data.courses
+        const terms = data.termTargets ?? []
+        const orphans = data.orphanCourses ?? []
+        setCourses(rows)
+        setTermTargets(terms)
+        setOrphanCourses(orphans)
+
+        const allIds = new Set<string>()
+        rows.forEach((c) => allIds.add(c.courseId))
+        terms.forEach((t) => {
+          if (t.courseId) allIds.add(t.courseId)
+        })
+        orphans.forEach((o) => allIds.add(o.courseId))
+
+        const locked = opts?.lockedCourseId?.trim()
+        if (locked && allIds.has(locked)) {
+          setCourseId(locked)
+        } else {
+          setCourseId(pickDefaultCourseId(urlCourseId, terms, orphans, allIds))
+        }
+
+        if (urlSessionRaw != null) {
+          const n = parseInt(String(urlSessionRaw), 10)
+          if (Number.isFinite(n) && n >= 1 && n <= 10) {
+            setSessionIndex(String(n))
+          }
+        }
+      } catch {
+        setCoursesError('load_failed')
+        setCourses([])
+        setTermTargets([])
+        setOrphanCourses([])
+      } finally {
+        setCoursesLoading(false)
+      }
+    },
+    [searchParams]
+  )
+
+  async function handleCourseSelectChange(raw: string) {
+    if (!raw.trim()) return
+    const parsed = parseAdminCourseSelectValue(raw)
+    if (parsed.kind === 'course') {
+      setCourseId(parsed.courseId)
+      return
+    }
+    setEnsuringCourse(true)
     setCoursesError(null)
     try {
-      const res = await fetch(apiUrl('/api/writing/admin/courses'), { credentials: 'include' })
-      const data = (await res.json()) as { ok?: boolean; courses?: AdminCourseOption[]; error?: string }
-      if (!res.ok || !data.ok || !Array.isArray(data.courses)) {
-        setCoursesError(typeof data.error === 'string' ? data.error : `HTTP ${res.status}`)
-        setCourses([])
+      const res = await fetch(apiUrl('/api/writing/admin/courses/ensure-for-term'), {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ termId: parsed.termId }),
+      })
+      const data = (await res.json()) as { ok?: boolean; courseId?: string; code?: string }
+      if (!res.ok || !data.ok || !data.courseId) {
+        setCoursesError(data.code ?? `HTTP ${res.status}`)
         return
       }
-      setCourses(data.courses)
-      if (data.courses.length > 0) {
-        const validUrl =
-          urlCourseId.length > 0 && data.courses.some((c) => c.courseId === urlCourseId)
-        setCourseId(validUrl ? urlCourseId : data.courses[0].courseId)
-      }
-      if (urlSessionRaw != null) {
-        const n = parseInt(String(urlSessionRaw), 10)
-        if (Number.isFinite(n) && n >= 1 && n <= 10) {
-          setSessionIndex(String(n))
-        }
-      }
+      await reloadCourses({ lockedCourseId: data.courseId })
     } catch {
-      setCoursesError('load_failed')
-      setCourses([])
+      setCoursesError('request_failed')
     } finally {
-      setCoursesLoading(false)
+      setEnsuringCourse(false)
     }
-  }, [searchParams])
+  }
 
   useEffect(() => {
     void reloadCourses()
@@ -103,8 +170,12 @@ export default function AdminAssignmentNewPage() {
       snapshotPrefillAppliedKey.current = null
       return
     }
-    if (coursesLoading || courses.length === 0) return
-    if (!courses.some((c) => c.courseId === cid)) return
+    if (coursesLoading) return
+    const has =
+      courses.some((c) => c.courseId === cid) ||
+      termTargets.some((t) => t.courseId === cid) ||
+      orphanCourses.some((o) => o.courseId === cid)
+    if (!has) return
     if (snapshotPrefillAppliedKey.current === prefillKey) return
 
     const si = parseInt(String(siRaw), 10)
@@ -157,7 +228,7 @@ export default function AdminAssignmentNewPage() {
     return () => {
       cancelled = true
     }
-  }, [searchParams, coursesLoading, courses])
+  }, [searchParams, coursesLoading, courses, termTargets, orphanCourses])
 
   function patchReq(i: number, field: keyof AssignmentRequirement, value: string) {
     setReq((prev) => {
@@ -188,12 +259,13 @@ export default function AdminAssignmentNewPage() {
           requirements: req,
         }),
       })
-      const data = (await res.json()) as { ok?: boolean; code?: string; sessionId?: string }
+      const data = (await res.json()) as { ok?: boolean; code?: string }
       if (!res.ok || !data.ok) {
         setError(data.code ?? `HTTP ${res.status}`)
         return
       }
-      setMessage(`保存しました（session: ${data.sessionId ?? '—'}）`)
+      const n = Number.isFinite(idx) ? idx : 1
+      setMessage(`第${n}回の課題を保存しました。`)
     } catch {
       setError('request_failed')
     } finally {
@@ -239,26 +311,46 @@ export default function AdminAssignmentNewPage() {
               コース一覧を取得できませんでした（{coursesError}）
             </p>
           ) : null}
-          {courses.length === 0 && !coursesLoading && !coursesError ? (
+          {termTargets.length === 0 && !coursesLoading && !coursesError ? (
             <AdminCourseEmptyBootstrap onProvisioned={reloadCourses} />
           ) : null}
+          {ensuringCourse ? (
+            <p className="text-sm text-[#595c5e]" role="status">
+              選択した期のコースを準備中…
+            </p>
+          ) : null}
           <label className="block">
-            <span className="font-semibold text-[#2c2f32]">対象コース</span>
+            <span className="font-semibold text-[#2c2f32]">対象コース（期）</span>
             <select
               className="mt-1 w-full rounded border border-[#c5c8cc] bg-white px-3 py-2 text-[#2c2f32]"
-              value={courseId}
-              onChange={(e) => setCourseId(e.target.value)}
+              value={adminCourseSelectValue(courseId, termTargets, orphanCourses)}
+              onChange={(e) => void handleCourseSelectChange(e.target.value)}
               required
-              disabled={courses.length === 0}
+              disabled={
+                coursesLoading || ensuringCourse || (termTargets.length === 0 && orphanCourses.length === 0)
+              }
             >
-              {courses.length === 0 ? (
-                <option value="">（アクティブなコースがありません）</option>
+              {termTargets.length === 0 && orphanCourses.length === 0 ? (
+                <option value="">（期またはコースがありません）</option>
               ) : (
-                courses.map((c) => (
-                  <option key={c.courseId} value={c.courseId}>
-                    {c.displayName}
+                <>
+                  <option value="" disabled={Boolean(courseId)}>
+                    期を選択…
                   </option>
-                ))
+                  {termTargets.map((t) => (
+                    <option
+                      key={t.termId}
+                      value={t.courseId ? `c:${t.courseId}` : `e:${t.termId}`}
+                    >
+                      {t.label}
+                    </option>
+                  ))}
+                  {orphanCourses.map((o) => (
+                    <option key={o.courseId} value={`o:${o.courseId}`}>
+                      {o.displayName}
+                    </option>
+                  ))}
+                </>
               )}
             </select>
           </label>
@@ -386,7 +478,7 @@ export default function AdminAssignmentNewPage() {
 
           <button
             type="submit"
-            disabled={submitting || coursesLoading || courses.length === 0 || !courseId}
+            disabled={submitting || coursesLoading || ensuringCourse || !courseId}
             className="rounded bg-[#4052b6] px-4 py-2 font-semibold text-white disabled:opacity-50"
           >
             {submitting ? '保存中…' : '保存'}
