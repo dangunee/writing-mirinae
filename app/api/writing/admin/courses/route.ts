@@ -18,10 +18,11 @@ function buildDisplayName(row: CourseRow, trialCourseId: string | undefined): st
     return t ? `体験コース — ${t}` : "体験コース";
   }
   const t = row.termTitle?.trim();
+  const statusLabel = row.status === "pending_setup" ? "準備中" : "active";
   if (t) {
-    return `${t} · active`;
+    return `${t} · ${statusLabel}`;
   }
-  return `コース ${row.id.slice(0, 8)}… · active`;
+  return `コース ${row.id.slice(0, 8)}… · ${statusLabel}`;
 }
 
 /**

@@ -1,9 +1,13 @@
-import { and, asc, desc, eq, gte, lte } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lte, or } from "drizzle-orm";
 
 import { writingCourses, writingSessions, writingTerms } from "../../db/schema";
 import type { Db } from "../db/client";
 
-/** Active writing courses for admin assignment dropdown (term title when linked). */
+/**
+ * Admin assignment / 対象コース dropdown: courses that can receive session assignment edits.
+ * Includes active and pending_setup (student courses often stay pending until schedule is finalized).
+ * If linked to a term, the term must be is_active (inactive terms are excluded).
+ */
 export async function listActiveWritingCoursesWithTerm(db: Db) {
   return db
     .select({
@@ -15,7 +19,12 @@ export async function listActiveWritingCoursesWithTerm(db: Db) {
     })
     .from(writingCourses)
     .leftJoin(writingTerms, eq(writingCourses.termId, writingTerms.id))
-    .where(eq(writingCourses.status, "active"))
+    .where(
+      and(
+        inArray(writingCourses.status, ["active", "pending_setup"]),
+        or(isNull(writingCourses.termId), eq(writingTerms.isActive, true))
+      )
+    )
     .orderBy(desc(writingCourses.createdAt));
 }
 

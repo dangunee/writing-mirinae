@@ -1,5 +1,6 @@
-import { useState, useEffect, type FormEvent } from 'react'
+import { useState, useEffect, useCallback, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import AdminCourseEmptyBootstrap from '../components/admin/AdminCourseEmptyBootstrap'
 import { apiUrl } from '../lib/apiUrl'
 import type { AssignmentRequirement } from '../lib/writingThemeSnapshot'
 
@@ -41,47 +42,42 @@ export default function AdminAssignmentNewPage() {
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
+  const reloadCourses = useCallback(async () => {
     const urlCourseId = searchParams.get('courseId')?.trim() ?? ''
     const urlSessionRaw = searchParams.get('sessionIndex')
-    let cancelled = false
-    ;(async () => {
-      setCoursesLoading(true)
-      setCoursesError(null)
-      try {
-        const res = await fetch(apiUrl('/api/writing/admin/courses'), { credentials: 'include' })
-        const data = (await res.json()) as { ok?: boolean; courses?: AdminCourseOption[]; error?: string }
-        if (cancelled) return
-        if (!res.ok || !data.ok || !Array.isArray(data.courses)) {
-          setCoursesError(typeof data.error === 'string' ? data.error : `HTTP ${res.status}`)
-          setCourses([])
-          return
-        }
-        setCourses(data.courses)
-        if (data.courses.length > 0) {
-          const validUrl =
-            urlCourseId.length > 0 && data.courses.some((c) => c.courseId === urlCourseId)
-          setCourseId(validUrl ? urlCourseId : data.courses[0].courseId)
-        }
-        if (urlSessionRaw != null) {
-          const n = parseInt(String(urlSessionRaw), 10)
-          if (Number.isFinite(n) && n >= 1 && n <= 10) {
-            setSessionIndex(String(n))
-          }
-        }
-      } catch {
-        if (!cancelled) {
-          setCoursesError('load_failed')
-          setCourses([])
-        }
-      } finally {
-        if (!cancelled) setCoursesLoading(false)
+    setCoursesLoading(true)
+    setCoursesError(null)
+    try {
+      const res = await fetch(apiUrl('/api/writing/admin/courses'), { credentials: 'include' })
+      const data = (await res.json()) as { ok?: boolean; courses?: AdminCourseOption[]; error?: string }
+      if (!res.ok || !data.ok || !Array.isArray(data.courses)) {
+        setCoursesError(typeof data.error === 'string' ? data.error : `HTTP ${res.status}`)
+        setCourses([])
+        return
       }
-    })()
-    return () => {
-      cancelled = true
+      setCourses(data.courses)
+      if (data.courses.length > 0) {
+        const validUrl =
+          urlCourseId.length > 0 && data.courses.some((c) => c.courseId === urlCourseId)
+        setCourseId(validUrl ? urlCourseId : data.courses[0].courseId)
+      }
+      if (urlSessionRaw != null) {
+        const n = parseInt(String(urlSessionRaw), 10)
+        if (Number.isFinite(n) && n >= 1 && n <= 10) {
+          setSessionIndex(String(n))
+        }
+      }
+    } catch {
+      setCoursesError('load_failed')
+      setCourses([])
+    } finally {
+      setCoursesLoading(false)
     }
   }, [searchParams])
+
+  useEffect(() => {
+    void reloadCourses()
+  }, [reloadCourses])
 
   function patchReq(i: 0 | 1 | 2, field: keyof AssignmentRequirement, value: string) {
     setReq((prev) => {
@@ -145,6 +141,9 @@ export default function AdminAssignmentNewPage() {
             <p className="text-sm text-[#ba1a1a]" role="alert">
               コース一覧を取得できませんでした（{coursesError}）
             </p>
+          ) : null}
+          {courses.length === 0 && !coursesLoading && !coursesError ? (
+            <AdminCourseEmptyBootstrap onProvisioned={reloadCourses} />
           ) : null}
           <label className="block">
             <span className="font-semibold text-[#2c2f32]">対象コース</span>

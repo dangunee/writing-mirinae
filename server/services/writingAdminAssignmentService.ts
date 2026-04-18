@@ -85,7 +85,7 @@ export async function upsertAssignmentContentForCourse(
   if (!course) {
     return { ok: false, code: "course_not_found" };
   }
-  if (course.status !== "active") {
+  if (course.status !== "active" && course.status !== "pending_setup") {
     return { ok: false, code: "course_not_active" };
   }
 

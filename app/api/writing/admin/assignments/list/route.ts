@@ -32,7 +32,7 @@ export async function GET(req: Request) {
   if (!course) {
     return NextResponse.json({ ok: false, error: "course_not_found" }, { status: 404 });
   }
-  if (course.status !== "active") {
+  if (course.status !== "active" && course.status !== "pending_setup") {
     return NextResponse.json({ ok: false, error: "course_not_active" }, { status: 404 });
   }
 

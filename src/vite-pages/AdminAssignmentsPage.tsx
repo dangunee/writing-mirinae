@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import AdminCourseEmptyBootstrap from '../components/admin/AdminCourseEmptyBootstrap'
 import { apiUrl } from '../lib/apiUrl'
 import {
   assignmentListPreviewLine,
@@ -34,37 +35,32 @@ export default function AdminAssignmentsPage() {
 
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
 
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      setCoursesLoading(true)
-      setCoursesError(null)
-      try {
-        const res = await fetch(apiUrl('/api/writing/admin/courses'), { credentials: 'include' })
-        const data = (await res.json()) as { ok?: boolean; courses?: AdminCourseOption[]; error?: string }
-        if (cancelled) return
-        if (!res.ok || !data.ok || !Array.isArray(data.courses)) {
-          setCoursesError(typeof data.error === 'string' ? data.error : `HTTP ${res.status}`)
-          setCourses([])
-          return
-        }
-        setCourses(data.courses)
-        if (data.courses.length > 0) {
-          setCourseId((prev) => (prev ? prev : data.courses![0].courseId))
-        }
-      } catch {
-        if (!cancelled) {
-          setCoursesError('load_failed')
-          setCourses([])
-        }
-      } finally {
-        if (!cancelled) setCoursesLoading(false)
+  const reloadCourses = useCallback(async () => {
+    setCoursesLoading(true)
+    setCoursesError(null)
+    try {
+      const res = await fetch(apiUrl('/api/writing/admin/courses'), { credentials: 'include' })
+      const data = (await res.json()) as { ok?: boolean; courses?: AdminCourseOption[]; error?: string }
+      if (!res.ok || !data.ok || !Array.isArray(data.courses)) {
+        setCoursesError(typeof data.error === 'string' ? data.error : `HTTP ${res.status}`)
+        setCourses([])
+        return
       }
-    })()
-    return () => {
-      cancelled = true
+      setCourses(data.courses)
+      if (data.courses.length > 0) {
+        setCourseId((prev) => (prev ? prev : data.courses![0].courseId))
+      }
+    } catch {
+      setCoursesError('load_failed')
+      setCourses([])
+    } finally {
+      setCoursesLoading(false)
     }
   }, [])
+
+  useEffect(() => {
+    void reloadCourses()
+  }, [reloadCourses])
 
   const loadList = useCallback(async (cid: string) => {
     if (!cid) return
@@ -143,6 +139,11 @@ export default function AdminAssignmentsPage() {
           <p className="mt-6 text-sm text-[#ba1a1a]" role="alert">
             コース一覧を取得できませんでした（{coursesError}）
           </p>
+        ) : null}
+        {courses.length === 0 && !coursesLoading && !coursesError ? (
+          <div className="mt-6">
+            <AdminCourseEmptyBootstrap onProvisioned={reloadCourses} />
+          </div>
         ) : null}
 
         <div className="mt-8 space-y-4 text-sm">
