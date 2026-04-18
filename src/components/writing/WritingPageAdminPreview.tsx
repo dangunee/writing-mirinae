@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import AdminCourseEmptyBootstrap from '../admin/AdminCourseEmptyBootstrap'
 import {
   adminCourseSelectValue,
@@ -51,6 +51,16 @@ export default function WritingPageAdminPreview({ onPreview }: Props) {
   const [sessions, setSessions] = useState<ListSessionRow[]>([])
   const [listLoading, setListLoading] = useState(false)
   const [listError, setListError] = useState<string | null>(null)
+
+  const prevCourseIdForPreviewRef = useRef<string | null>(null)
+  useEffect(() => {
+    const prev = prevCourseIdForPreviewRef.current
+    const next = courseId.trim()
+    if (prev !== null && next !== '' && prev !== next) {
+      onPreview(null)
+    }
+    prevCourseIdForPreviewRef.current = next || null
+  }, [courseId, onPreview])
 
   const reloadCourses = useCallback(async (opts?: { lockedCourseId?: string }) => {
     setCoursesLoading(true)
@@ -105,6 +115,7 @@ export default function WritingPageAdminPreview({ onPreview }: Props) {
 
   const loadList = useCallback(async (cid: string) => {
     if (!cid) return
+    setSessions([])
     setListLoading(true)
     setListError(null)
     try {
@@ -158,7 +169,6 @@ export default function WritingPageAdminPreview({ onPreview }: Props) {
       return
     }
     if (listLoading) {
-      onPreview(null)
       return
     }
     if (!selectedRow) {

@@ -82,6 +82,8 @@ export type AssignmentSubmitScreenProps = {
   mobileTextareaPlaceholder?: string
   /** 未指定時は Stitch デモの Requirement ブロック */
   requirementBlockDesktop?: ReactNode
+  /** メインカラム先頭（課題UIより上）。/writing/app のアカウント帯・管理者プレビュー等 */
+  mainTopSlot?: ReactNode
 }
 
 const DEFAULT_ASSIGNMENT_TITLE = '約束'
@@ -108,6 +110,7 @@ export default function AssignmentSubmitScreen({
   desktopTextareaPlaceholder,
   mobileTextareaPlaceholder,
   requirementBlockDesktop,
+  mainTopSlot,
 }: AssignmentSubmitScreenProps) {
   const navigate = useNavigate()
   const goApp = useCallback(() => {
@@ -203,8 +206,8 @@ export default function AssignmentSubmitScreen({
       </div>
 
       {/* ——— Desktop (md+) ——— */}
-      <div className="hidden md:block font-['Plus_Jakarta_Sans',sans-serif] text-[#1e1b13] bg-[#F5F5F5] min-h-screen trial-writing-scrollbar">
-        <aside className="h-full w-64 fixed left-0 top-0 pt-20 flex flex-col gap-2 z-40 bg-[#F5F5F5]">
+      <div className="relative hidden min-h-screen font-['Plus_Jakarta_Sans',sans-serif] text-[#1e1b13] bg-[#F5F5F5] trial-writing-scrollbar md:block">
+        <aside className="fixed left-0 top-0 z-40 flex h-full w-64 flex-col gap-2 bg-[#F5F5F5] pt-20">
           <div className="px-6 py-4 mb-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-[#e9e2d3] overflow-hidden border-2 border-[#000666]/10">
@@ -242,8 +245,17 @@ export default function AssignmentSubmitScreen({
           </div>
         </aside>
 
-        <main className="ml-64 pt-20 min-h-screen bg-[#F5F5F5]">
-          <div className="max-w-[1400px] mx-auto flex flex-col lg:flex-row">
+        <div className="hidden min-h-screen w-full min-w-0 flex-row md:flex">
+          {/* fixed サイドバー幅分の in-flow 予約 */}
+          <div className="w-64 shrink-0" aria-hidden="true" />
+
+          <main className="flex min-h-screen min-w-0 flex-1 flex-col bg-[#F5F5F5] pt-20">
+          {mainTopSlot ? (
+            <div className="w-full shrink-0 px-8 pt-1 pb-2 lg:px-12">
+              <div className="mx-auto w-full max-w-6xl">{mainTopSlot}</div>
+            </div>
+          ) : null}
+          <div className="max-w-[1400px] mx-auto flex w-full min-w-0 flex-1 flex-col lg:flex-row">
             <div className="flex-1 p-8 lg:p-12">
               <div className="max-w-4xl mx-auto">
                 <header className="mb-10">
@@ -515,11 +527,13 @@ export default function AssignmentSubmitScreen({
             </aside>
           </div>
         </main>
+        </div>
       </div>
 
       {/* ——— Mobile (< md) ——— */}
       <div className="md:hidden bg-[#f5f5f5] font-['Plus_Jakarta_Sans',sans-serif] text-[#1e1b13] min-h-screen pb-28">
-        <main className="pt-16 pb-24 px-4 min-h-screen">
+        <main className="min-h-screen w-full min-w-0 pt-16 pb-24 px-4">
+          {mainTopSlot ? <div className="mb-4 w-full">{mainTopSlot}</div> : null}
           <div className="flex space-x-1 mb-8 bg-black/5 p-1 rounded-xl">
             <button type="button" className="flex-1 py-2.5 text-sm font-medium rounded-lg bg-[#000666] text-white shadow-sm">
               課題提出

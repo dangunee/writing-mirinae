@@ -345,13 +345,17 @@ export default function WritingPage() {
     </>
   )
 
+  const mainTopSlot = (
+    <>
+      <StudentAccountPanel compact />
+      {isAdmin ? <WritingPageAdminPreview onPreview={onAdminPreview} /> : null}
+    </>
+  )
+
   return (
     <div className="writing-submit-page writing-stitch-root">
-      <div className="max-w-6xl mx-auto px-4 pt-4 w-full">
-        <StudentAccountPanel compact />
-        {isAdmin ? <WritingPageAdminPreview onPreview={onAdminPreview} /> : null}
-      </div>
       <AssignmentSubmitScreen
+        mainTopSlot={mainTopSlot}
         accessContext={accessContext}
         text={content}
         onTextChange={setContent}
