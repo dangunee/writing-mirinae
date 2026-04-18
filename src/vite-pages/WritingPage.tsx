@@ -166,7 +166,11 @@ export default function WritingPage() {
 
   const session = displaySession
   const submission = isAdmin && adminPreview ? null : (current?.submission ?? null)
-  const canSubmit = isAdmin && adminPreview ? false : (current?.canSubmit ?? false)
+  /** 관리자プレビュー: 목록 API에 세션 행이 있으면 실제 sessionId로 제출 가능 */
+  const canSubmit =
+    isAdmin && adminPreview
+      ? Boolean(adminPreview.sessionId?.trim())
+      : (current?.canSubmit ?? false)
 
   const showSessionTable = !(isAdmin && adminPreview) && Boolean(current?.ok && current.session)
   const weekLabel =
@@ -194,7 +198,9 @@ export default function WritingPage() {
 
   const hasSession = session != null
   const canUseForm =
-    !isAdmin || !adminPreview ? Boolean(canSubmit && session?.id && !refetchAfterSubmit) : false
+    isAdmin && adminPreview
+      ? Boolean(adminPreview.sessionId?.trim() && !refetchAfterSubmit)
+      : Boolean(canSubmit && session?.id && !refetchAfterSubmit)
 
   const emptyAssignmentsText = (() => {
     if (current?.ok && current.mode === 'all_done') return '모든 과제를 완료했습니다.'
@@ -230,7 +236,7 @@ export default function WritingPage() {
     : `${emptyAssignmentsText} 이용 가능한 과제가 열리면 이 영역에 과제 안내가 표시됩니다.`
 
   const handleSubmit = async () => {
-    if (isAdmin && adminPreview) return
+    if (isAdmin && adminPreview && !adminPreview.sessionId?.trim()) return
     const sessionId = session?.id ?? null
     if (!sessionId || !content.trim() || !canSubmit || saving || submitLockRef.current) return
     submitLockRef.current = true
@@ -365,8 +371,7 @@ export default function WritingPage() {
           refetchAfterSubmit ||
           !content.trim() ||
           !session?.id ||
-          !canSubmit ||
-          Boolean(isAdmin && adminPreview)
+          !canSubmit
         }
         primarySubmitLoading={saving || refetchAfterSubmit}
         textareaDisabled={!canUseForm}
@@ -374,17 +379,17 @@ export default function WritingPage() {
         assignmentTitle={activeSessionTitle}
         assignmentDescription={cardDescription}
         desktopTextareaPlaceholder={
-          isAdmin && adminPreview
-            ? '管理者プレビューでは入力・提出できません。'
-            : canUseForm
-              ? '여기에 작문을 입력해 주세요...'
+          canUseForm
+            ? '여기에 작문을 입력해 주세요...'
+            : isAdmin && adminPreview && !adminPreview.sessionId?.trim()
+              ? '이 회차에 세션이 없어 입력·제출할 수 없습니다. 관리 화면에서 과제를 등록했는지 확인해 주세요.'
               : '제출 가능한 과제가 없을 때는 입력할 수 없습니다.'
         }
         mobileTextareaPlaceholder={
-          isAdmin && adminPreview
-            ? '管理者プレビューでは入力・提出できません。'
-            : canUseForm
-              ? '여기에 작문을 입력해 주세요...'
+          canUseForm
+            ? '여기에 작문을 입력해 주세요...'
+            : isAdmin && adminPreview && !adminPreview.sessionId?.trim()
+              ? '이 회차에 세션이 없어 입력·제출할 수 없습니다. 관리 화면에서 과제를 등록했는지 확인해 주세요.'
               : '제출 가능한 과제가 없을 때는 입력할 수 없습니다.'
         }
         requirementBlockDesktop={requirementBlockDesktop}
