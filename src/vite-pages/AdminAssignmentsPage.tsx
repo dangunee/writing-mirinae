@@ -292,7 +292,7 @@ export default function AdminAssignmentsPage() {
                         <div className="mt-2">
                           <Link
                             to={createHref}
-                            className="inline-block rounded bg-[#4052b6] px-3 py-1.5 text-xs font-semibold text-white"
+                            className="inline-block rounded bg-[#4052b6] px-3 py-1.5 text-xs font-semibold !text-white hover:!text-white focus-visible:!text-white"
                           >
                             {registered ? '編集/再登録' : '新規登録'}
                           </Link>
