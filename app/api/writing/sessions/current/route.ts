@@ -55,11 +55,13 @@ async function tryTrialSessionFromCookie(req: Request, db: ReturnType<typeof get
       /**
        * Upstream validated writing_trial_access; DB course row may lag or env unset.
        * Still return 200 + ok:true so EntitlementRouteGuard allows /writing/app (WritingPage handles partial trial).
+       * Include `courseId` when WRITING_TRIAL_COURSE_ID is set so the client can keep state (theme UI wiring).
        */
       return NextResponse.json({
         ok: true,
         accessKind: "trial" as const,
         applicationId,
+        ...(trialCourseId ? { courseId: trialCourseId } : {}),
         accessExpiresAt,
         mode: "fresh" as const,
         session: null,

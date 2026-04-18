@@ -1,7 +1,11 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import StudentAccountPanel from '../components/student/StudentAccountPanel'
 import AssignmentSubmitScreen from '../components/writing/AssignmentSubmitScreen'
+import WritingPageAdminPreview, {
+  type WritingAdminPreviewPayload,
+} from '../components/writing/WritingPageAdminPreview'
+import { useAuthMe } from '../hooks/useAuthMe'
 import { apiUrl } from '../lib/apiUrl'
 import {
   ASSIGNMENT_REQUIREMENT_SLOT_COUNT,
@@ -48,6 +52,13 @@ const REQUIREMENT_FALLBACK: { title: string; example?: string }[] = [
 ]
 
 export default function WritingPage() {
+  const { me } = useAuthMe()
+  const isAdmin = me?.role === 'admin'
+  const [adminPreview, setAdminPreview] = useState<WritingAdminPreviewPayload | null>(null)
+  const onAdminPreview = useCallback((p: WritingAdminPreviewPayload | null) => {
+    setAdminPreview(p)
+  }, [])
+
   const [current, setCurrent] = useState<CurrentSessionOk | null>(null)
   const [loading, setLoading] = useState(true)
   const [accessContext, setAccessContext] = useState<AccessContext>({ type: 'student' })
@@ -69,9 +80,14 @@ export default function WritingPage() {
         | { ok: true; accessKind: 'trial'; applicationId: string; canSubmit: boolean; expiresAt: string | null }
         | { ok: false }
       if (data && 'ok' in data && data.ok === true && 'accessKind' in data && data.accessKind === 'trial') {
-        if ('courseId' in data && typeof (data as CurrentSessionOk).courseId === 'string') {
-          const d = data as CurrentSessionOk
-          setCurrent(d)
+        const td = data as Partial<CurrentSessionOk> & {
+          ok: true
+          accessKind: 'trial'
+          applicationId?: string
+          courseId?: string
+        }
+        if (typeof td.courseId === 'string' && td.courseId.length > 0) {
+          setCurrent(td as CurrentSessionOk)
           setAccessContext({ type: 'trial' })
           return
         }
@@ -132,13 +148,32 @@ export default function WritingPage() {
     }
   }, [loading, current])
 
-  const showSessionTable = Boolean(current?.ok && current.session)
-  const session = current?.session ?? null
-  const submission = current?.submission ?? null
-  const canSubmit = current?.canSubmit ?? false
+  /** 管理者: プレビュー用に API で選んだコース／回次の theme_snapshot を優先 */
+  const displaySession = useMemo((): CurrentSessionOk['session'] | null => {
+    if (isAdmin && adminPreview) {
+      return {
+        id: adminPreview.sessionId ?? `preview-${adminPreview.courseId}-${adminPreview.sessionIndex}`,
+        courseId: adminPreview.courseId,
+        index: adminPreview.sessionIndex,
+        unlockAt: new Date().toISOString(),
+        status: 'preview',
+        themeSnapshot: adminPreview.themeSnapshot,
+        runtimeStatus: null,
+      }
+    }
+    return current?.session ?? null
+  }, [isAdmin, adminPreview, current?.session])
+
+  const session = displaySession
+  const submission = isAdmin && adminPreview ? null : (current?.submission ?? null)
+  const canSubmit = isAdmin && adminPreview ? false : (current?.canSubmit ?? false)
+
+  const showSessionTable = !(isAdmin && adminPreview) && Boolean(current?.ok && current.session)
   const weekLabel =
     session != null
-      ? `제${session.index}회 · ${formatUnlockLabel(session.unlockAt)}`
+      ? isAdmin && adminPreview
+        ? `第${session.index}回 · プレビュー`
+        : `제${session.index}회 · ${formatUnlockLabel(session.unlockAt)}`
       : ''
 
   const assignUi = parseAssignmentSnapshotForUi(session?.themeSnapshot ?? null)
@@ -158,10 +193,27 @@ export default function WritingPage() {
       : promptBody
 
   const hasSession = session != null
-  const canUseForm = Boolean(canSubmit && session?.id && !refetchAfterSubmit)
+  const canUseForm =
+    !isAdmin || !adminPreview ? Boolean(canSubmit && session?.id && !refetchAfterSubmit) : false
 
   const emptyAssignmentsText = (() => {
     if (current?.ok && current.mode === 'all_done') return '모든 과제를 완료했습니다.'
+    if (
+      current?.ok &&
+      current.mode === 'fresh' &&
+      current.session == null &&
+      current.accessKind === 'trial' &&
+      current.reasonIfNot === 'trial_session_pending'
+    ) {
+      return '체험 코스 세션을 불러오지 못했습니다. Vercel 환경변수 WRITING_TRIAL_COURSE_ID가 관리 화면에서 과제를 넣은 코스 UUID와 같은지, 그 코스가 active 상태인지 확인해 주세요.'
+    }
+    if (
+      isAdmin &&
+      adminPreview &&
+      (!adminPreview.themeSnapshot || !String(adminPreview.themeSnapshot).trim())
+    ) {
+      return 'この回には課題が登録されていません。管理画面の「課題登録」でこのコース・回次に内容を保存してください。'
+    }
     if (current?.ok && current.mode === 'fresh') return '첫 과제를 시작하세요.'
     return '아직 과제가 없습니다.'
   })()
@@ -178,6 +230,7 @@ export default function WritingPage() {
     : `${emptyAssignmentsText} 이용 가능한 과제가 열리면 이 영역에 과제 안내가 표시됩니다.`
 
   const handleSubmit = async () => {
+    if (isAdmin && adminPreview) return
     const sessionId = session?.id ?? null
     if (!sessionId || !content.trim() || !canSubmit || saving || submitLockRef.current) return
     submitLockRef.current = true
@@ -296,6 +349,7 @@ export default function WritingPage() {
     <div className="writing-submit-page writing-stitch-root">
       <div className="max-w-6xl mx-auto px-4 pt-4 w-full">
         <StudentAccountPanel compact />
+        {isAdmin ? <WritingPageAdminPreview onPreview={onAdminPreview} /> : null}
       </div>
       <AssignmentSubmitScreen
         accessContext={accessContext}
@@ -303,7 +357,12 @@ export default function WritingPage() {
         onTextChange={setContent}
         onPrimarySubmit={() => void handleSubmit()}
         primarySubmitDisabled={
-          saving || refetchAfterSubmit || !content.trim() || !session?.id || !canSubmit
+          saving ||
+          refetchAfterSubmit ||
+          !content.trim() ||
+          !session?.id ||
+          !canSubmit ||
+          Boolean(isAdmin && adminPreview)
         }
         primarySubmitLoading={saving || refetchAfterSubmit}
         textareaDisabled={!canUseForm}
@@ -311,10 +370,18 @@ export default function WritingPage() {
         assignmentTitle={activeSessionTitle}
         assignmentDescription={cardDescription}
         desktopTextareaPlaceholder={
-          canUseForm ? '여기에 작문을 입력해 주세요...' : '제출 가능한 과제가 없을 때는 입력할 수 없습니다.'
+          isAdmin && adminPreview
+            ? '管理者プレビューでは入力・提出できません。'
+            : canUseForm
+              ? '여기에 작문을 입력해 주세요...'
+              : '제출 가능한 과제가 없을 때는 입력할 수 없습니다.'
         }
         mobileTextareaPlaceholder={
-          canUseForm ? '여기에 작문을 입력해 주세요...' : '제출 가능한 과제가 없을 때는 입력할 수 없습니다.'
+          isAdmin && adminPreview
+            ? '管理者プレビューでは入力・提出できません。'
+            : canUseForm
+              ? '여기에 작문을 입력해 주세요...'
+              : '제출 가능한 과제가 없을 때는 입력할 수 없습니다.'
         }
         requirementBlockDesktop={requirementBlockDesktop}
         desktopSlotBelowTabs={desktopSlotBelowTabs}

@@ -18,12 +18,17 @@ function EntitlementBadges({ e }: { e: AuthMePayload['entitlements'] }) {
     { key: 'academy', label: 'アカデミー', on: e.isAcademyUnlimited },
   ]
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
+    <div
+      className="flex flex-wrap items-center gap-2"
+      aria-label="利用権限（体験・コース・アカデミー）"
+    >
       {items.map((x) => (
         <span
           key={x.key}
-          className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
-            x.on ? 'bg-[#e8eef8] text-[#000666] ring-1 ring-[#000666]/20' : 'bg-[#f0f0f0] text-[#95999c]'
+          className={`shrink-0 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold leading-tight ${
+            x.on
+              ? 'border-[#000666]/35 bg-[#e8eef8] text-[#000666] shadow-sm'
+              : 'border-[#c5c8cc] bg-[#f3f4f6] text-[#4a5056]'
           }`}
         >
           {x.label}
