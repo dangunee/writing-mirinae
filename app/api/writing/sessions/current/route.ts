@@ -101,12 +101,53 @@ export async function GET(req: Request) {
       const c = await cookies();
       const sbxId = c.get(adminSandboxCookieName())?.value?.trim();
       if (sbxId) {
-        const ctx = await loadAdminSandboxContextById(db, sbxId, userId);
-        if (ctx) {
-          const json = await buildAdminSandboxCurrentSessionResponse(db, ctx);
-          if (json) {
-            return NextResponse.json(json);
+        try {
+          const ctx = await loadAdminSandboxContextById(db, sbxId, userId);
+          if (!ctx) {
+            console.warn("sessions_current_admin_sandbox_ctx_missing_or_expired", {
+              userId,
+              contextIdPrefix: sbxId.slice(0, 8),
+            });
+            return NextResponse.json(
+              {
+                ok: false as const,
+                accessKind: "admin_sandbox" as const,
+                code: "sandbox_context_missing_or_expired",
+              },
+              { status: 200 }
+            );
           }
+          const json = await buildAdminSandboxCurrentSessionResponse(db, ctx);
+          if (!json) {
+            console.warn("sessions_current_admin_sandbox_build_null", {
+              userId,
+              contextIdPrefix: sbxId.slice(0, 8),
+              sessionId: ctx.sessionId,
+            });
+            return NextResponse.json(
+              {
+                ok: false as const,
+                accessKind: "admin_sandbox" as const,
+                code: "sandbox_context_invalid_or_stale",
+              },
+              { status: 200 }
+            );
+          }
+          return NextResponse.json(json);
+        } catch (e) {
+          console.error("sessions_current_admin_sandbox_unhandled", {
+            userId,
+            err: e instanceof Error ? e.message : String(e),
+            stack: e instanceof Error ? e.stack : undefined,
+          });
+          return NextResponse.json(
+            {
+              ok: false as const,
+              accessKind: "admin_sandbox" as const,
+              code: "sandbox_resolution_failed",
+            },
+            { status: 200 }
+          );
         }
       }
     }
@@ -138,10 +179,24 @@ export async function GET(req: Request) {
   }
 
   if (userId && resolveRoleFromEnv(userId) === "admin") {
-    await ensureAdminSandboxCourse(db, userId);
-    const adminSandbox = await getCurrentSessionForAdminSandbox(db, userId);
-    if (adminSandbox.ok) {
-      return NextResponse.json(adminSandbox);
+    try {
+      await ensureAdminSandboxCourse(db, userId);
+    } catch (e) {
+      console.error("sessions_current_ensure_admin_sandbox_course_failed", {
+        userId,
+        err: e instanceof Error ? e.message : String(e),
+      });
+    }
+    try {
+      const adminSandbox = await getCurrentSessionForAdminSandbox(db, userId);
+      if (adminSandbox.ok) {
+        return NextResponse.json(adminSandbox);
+      }
+    } catch (e) {
+      console.error("sessions_current_get_admin_sandbox_failed", {
+        userId,
+        err: e instanceof Error ? e.message : String(e),
+      });
     }
   }
 

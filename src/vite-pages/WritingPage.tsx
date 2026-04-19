@@ -54,6 +54,24 @@ const REQUIREMENT_FALLBACK: { title: string; example?: string }[] = [
   { title: '분량·형식을 지킬 것' },
 ]
 
+type AdminSandboxErrorCode =
+  | 'sandbox_context_missing_or_expired'
+  | 'sandbox_context_invalid_or_stale'
+  | 'sandbox_resolution_failed'
+
+function adminSandboxErrorBannerText(code: AdminSandboxErrorCode): string {
+  switch (code) {
+    case 'sandbox_context_missing_or_expired':
+      return 'セッションの有効期限が切れました。もう一度設定してください。'
+    case 'sandbox_context_invalid_or_stale':
+      return 'サンドボックス設定が無効です。再設定してください。'
+    case 'sandbox_resolution_failed':
+      return '一時的なエラーが発生しました。時間をおいて再試行してください。'
+    default:
+      return '一時的なエラーが発生しました。時間をおいて再試行してください。'
+  }
+}
+
 export default function WritingPage() {
   const { me } = useAuthMe()
   const isAdmin = me?.role === 'admin'
@@ -71,6 +89,7 @@ export default function WritingPage() {
   const submitLockRef = useRef(false)
   const [assignmentTab, setAssignmentTab] = useState<AssignmentTabKind>('submit')
   const [sandboxSubmitNotice, setSandboxSubmitNotice] = useState(false)
+  const [sandboxErrorCode, setSandboxErrorCode] = useState<AdminSandboxErrorCode | null>(null)
 
   const loadCurrent = useCallback(async () => {
     setLoading(true)
@@ -78,12 +97,35 @@ export default function WritingPage() {
       const res = await fetch(apiUrl('/api/writing/sessions/current'), { credentials: 'include' })
       if (!res.ok) {
         setCurrent(null)
+        setSandboxErrorCode(null)
         return
       }
       const data = (await res.json()) as
         | CurrentSessionOk
         | { ok: true; accessKind: 'trial'; applicationId: string; canSubmit: boolean; expiresAt: string | null }
-        | { ok: false }
+        | { ok: false; accessKind?: string; code?: string }
+      if (
+        data &&
+        'ok' in data &&
+        data.ok === false &&
+        'accessKind' in data &&
+        (data as { accessKind?: string }).accessKind === 'admin_sandbox'
+      ) {
+        const codeRaw = (data as { code?: string }).code
+        const allowed: AdminSandboxErrorCode[] = [
+          'sandbox_context_missing_or_expired',
+          'sandbox_context_invalid_or_stale',
+          'sandbox_resolution_failed',
+        ]
+        const code =
+          codeRaw && allowed.includes(codeRaw as AdminSandboxErrorCode)
+            ? (codeRaw as AdminSandboxErrorCode)
+            : 'sandbox_resolution_failed'
+        setSandboxErrorCode(code)
+        setCurrent(null)
+        setAccessContext({ type: 'admin_sandbox', mode: 'trial' })
+        return
+      }
       if (
         data &&
         'ok' in data &&
@@ -92,6 +134,7 @@ export default function WritingPage() {
         (data as { accessKind?: string }).accessKind === 'admin_sandbox'
       ) {
         const d = data as CurrentSessionOk
+        setSandboxErrorCode(null)
         setCurrent(d)
         const sm = d.sandboxMode
         if (sm === 'trial' || sm === 'regular' || sm === 'academy') {
@@ -109,16 +152,19 @@ export default function WritingPage() {
           courseId?: string
         }
         if (typeof td.courseId === 'string' && td.courseId.length > 0) {
+          setSandboxErrorCode(null)
           setCurrent(td as CurrentSessionOk)
           setAccessContext({ type: 'trial' })
           return
         }
         setCurrent(null)
+        setSandboxErrorCode(null)
         setAccessContext({ type: 'trial' })
         return
       }
       if (data && 'ok' in data && data.ok === true && 'courseId' in data && data.courseId) {
         const d = data as CurrentSessionOk
+        setSandboxErrorCode(null)
         setCurrent(d)
         if (d.accessKind === 'regular') {
           setAccessContext({ type: 'regular' })
@@ -128,6 +174,7 @@ export default function WritingPage() {
         return
       }
       setCurrent(null)
+      setSandboxErrorCode(null)
     } catch {
       setCurrent(null)
     } finally {
@@ -163,6 +210,7 @@ export default function WritingPage() {
   useEffect(() => {
     if (loading) return
     if (current != null) return
+    if (sandboxErrorCode) return
     let cancelled = false
     ;(async () => {
       try {
@@ -188,10 +236,13 @@ export default function WritingPage() {
     return () => {
       cancelled = true
     }
-  }, [loading, current])
+  }, [loading, current, sandboxErrorCode])
 
   /** 管理者: プレビュー用に API で選んだコース／回次の theme_snapshot を優先 */
   const displaySession = useMemo((): CurrentSessionOk['session'] | null => {
+    if (sandboxErrorCode) {
+      return null
+    }
     if (current?.accessKind === 'admin_sandbox' && current.session) {
       return current.session
     }
@@ -207,7 +258,7 @@ export default function WritingPage() {
       }
     }
     return current?.session ?? null
-  }, [isAdmin, adminPreview, current?.session, current?.accessKind])
+  }, [sandboxErrorCode, isAdmin, adminPreview, current?.session, current?.accessKind])
 
   const session = displaySession
   const submission =
@@ -255,11 +306,13 @@ export default function WritingPage() {
 
   const hasSession = session != null
   const canUseForm =
-    current?.accessKind === 'admin_sandbox'
-      ? Boolean(canSubmit && session?.id && !refetchAfterSubmit)
-      : isAdmin && adminPreview
-        ? Boolean(adminPreview.sessionId?.trim() && !refetchAfterSubmit)
-        : Boolean(canSubmit && session?.id && !refetchAfterSubmit)
+    sandboxErrorCode != null
+      ? false
+      : current?.accessKind === 'admin_sandbox'
+        ? Boolean(canSubmit && session?.id && !refetchAfterSubmit)
+        : isAdmin && adminPreview
+          ? Boolean(adminPreview.sessionId?.trim() && !refetchAfterSubmit)
+          : Boolean(canSubmit && session?.id && !refetchAfterSubmit)
 
   const emptyAssignmentsText = (() => {
     if (current?.ok && current.mode === 'all_done') return '모든 과제를 완료했습니다.'
@@ -295,6 +348,7 @@ export default function WritingPage() {
     : `${emptyAssignmentsText} 이용 가능한 과제가 열리면 이 영역에 과제 안내가 표시됩니다.`
 
   const handleSubmit = async () => {
+    if (sandboxErrorCode) return
     if (current?.accessKind !== 'admin_sandbox' && isAdmin && adminPreview && !adminPreview.sessionId?.trim()) return
     const sessionId = session?.id ?? null
     if (!sessionId || !content.trim() || !canSubmit || saving || submitLockRef.current) return
@@ -427,6 +481,14 @@ export default function WritingPage() {
 
   const mainTopSlot = (
     <>
+      {sandboxErrorCode && isAdmin ? (
+        <div
+          className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-sm"
+          role="alert"
+        >
+          {adminSandboxErrorBannerText(sandboxErrorCode)}
+        </div>
+      ) : null}
       <StudentAccountPanel compact />
       {isAdmin ? (
         <>
@@ -450,6 +512,7 @@ export default function WritingPage() {
         onTextChange={setContent}
         onPrimarySubmit={() => void handleSubmit()}
         primarySubmitDisabled={
+          Boolean(sandboxErrorCode) ||
           saving ||
           refetchAfterSubmit ||
           !content.trim() ||
@@ -479,7 +542,7 @@ export default function WritingPage() {
         desktopSlotBelowTabs={desktopSlotBelowTabs}
         desktopAfterSubmitSlot={desktopAfterSubmitSlot}
         mobileSlotBelowTabs={desktopSlotBelowTabs}
-        {...(current?.accessKind === 'admin_sandbox'
+        {...(current?.accessKind === 'admin_sandbox' && !sandboxErrorCode
           ? {
               controlledAssignmentTab: true as const,
               assignmentTab,

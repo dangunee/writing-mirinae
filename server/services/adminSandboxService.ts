@@ -11,8 +11,10 @@ import {
   adminSandboxTestSubmissions,
   type writingSessions,
 } from "../../db/schema";
+import { PostgresError } from "postgres";
+
 import type { Db } from "../db/client";
-import { checkSessionEligibleForWriting } from "../lib/writingSubmissionEligibility";
+import { checkSessionEligibleForAdminSandboxTest } from "../lib/writingSubmissionEligibility";
 import * as repo from "../repositories/writingStudentRepository";
 
 export type AdminSandboxMode = "trial" | "regular" | "academy";
@@ -207,7 +209,7 @@ export async function buildAdminSandboxCurrentSessionResponse(
     };
   }
 
-  const elig = checkSessionEligibleForWriting(target, now);
+  const elig = checkSessionEligibleForAdminSandboxTest(target, now);
   if (!elig.ok) {
     return {
       ok: true,
@@ -368,8 +370,18 @@ export async function appendAdminSandboxAudit(
 }
 
 export type AdminSandboxSubmissionResult =
-  | { ok: true; submissionId: string; status: string }
+  | { ok: true; submissionId: string; status: string; alreadySubmitted?: boolean }
   | { ok: false; status: number; code: string };
+
+export function sandboxSubmitErrorMessage(code: string): string {
+  const map: Record<string, string> = {
+    session_missed: "この回は失効済みのため、サンドボックス提出できません。",
+    session_locked: "この回はまだ開始できません（解除日時前）。",
+    session_expired: "提出期限を過ぎています。",
+    sandbox_already_submitted: "既にサンドボックス提出済みです。GET /sessions/current で状態を確認してください。",
+  };
+  return map[code] ?? `サンドボックス提出を処理できません (${code})`;
+}
 
 /** Persist QA text only; isolated table. */
 export async function writeAdminSandboxTestSubmission(
@@ -386,6 +398,7 @@ export async function writeAdminSandboxTestSubmission(
   }
 ): Promise<AdminSandboxSubmissionResult> {
   if (!input.contextValid) {
+    console.warn("admin_sandbox_submit_context_invalid", { sessionId: input.sessionId });
     return { ok: false, status: 403, code: "sandbox_context_invalid" };
   }
 
@@ -395,24 +408,17 @@ export async function writeAdminSandboxTestSubmission(
     sessionId: input.sessionId,
   });
   if (!v.ok) {
+    console.warn("admin_sandbox_submit_validation_failed", { code: v.code, sessionId: input.sessionId });
     return { ok: false, status: 400, code: v.code };
   }
 
   const row = await repo.getSessionByIdWithCourse(db, input.sessionId);
   if (!row || row.course.id !== input.courseId) {
+    console.warn("admin_sandbox_submit_session_not_found", { sessionId: input.sessionId, courseId: input.courseId });
     return { ok: false, status: 404, code: "session_not_found" };
   }
-  const now = new Date();
-  const elig = checkSessionEligibleForWriting(row.session, now);
-  if (!elig.ok) {
-    return { ok: false, status: 409, code: elig.code };
-  }
 
-  const status =
-    input.action === "submit"
-      ? "submitted"
-      : "draft";
-  const submittedAt = input.action === "submit" ? now : null;
+  const now = new Date();
 
   const [existing] = await db
     .select({ id: adminSandboxTestSubmissions.id })
@@ -432,12 +438,37 @@ export async function writeAdminSandboxTestSubmission(
       .where(eq(adminSandboxTestSubmissions.id, existing.id))
       .limit(1);
     if (cur && cur.status === "submitted" && input.action === "submit") {
-      return { ok: false, status: 409, code: "submission_not_editable" };
+      console.info("admin_sandbox_submit_idempotent", {
+        submissionId: cur.id,
+        sessionId: input.sessionId,
+        adminUserId: input.adminUserId,
+      });
+      return {
+        ok: true,
+        submissionId: cur.id,
+        status: "submitted",
+        alreadySubmitted: true,
+      };
     }
     if (cur && cur.status === "submitted" && input.action === "save") {
-      return { ok: false, status: 409, code: "submission_not_editable" };
+      console.warn("admin_sandbox_submit_draft_after_submitted", { submissionId: cur.id, sessionId: input.sessionId });
+      return { ok: false, status: 409, code: "sandbox_already_submitted" };
     }
   }
+
+  const elig = checkSessionEligibleForAdminSandboxTest(row.session, now);
+  if (!elig.ok) {
+    console.warn("admin_sandbox_submit_eligibility_blocked", {
+      code: elig.code,
+      sessionId: input.sessionId,
+      runtimeStatus: row.session.runtimeStatus,
+      status: row.session.status,
+    });
+    return { ok: false, status: 409, code: elig.code };
+  }
+
+  const status = input.action === "submit" ? "submitted" : "draft";
+  const submittedAt = input.action === "submit" ? now : null;
 
   if (existing) {
     await db
@@ -453,17 +484,43 @@ export async function writeAdminSandboxTestSubmission(
     return { ok: true, submissionId: existing.id, status };
   }
 
-  const [ins] = await db
-    .insert(adminSandboxTestSubmissions)
-    .values({
-      adminUserId: input.adminUserId,
-      courseId: input.courseId,
-      sessionId: input.sessionId,
-      sandboxMode: input.mode,
-      bodyText: input.bodyText,
-      status,
-      submittedAt,
-    })
-    .returning({ id: adminSandboxTestSubmissions.id });
-  return { ok: true, submissionId: ins.id, status };
+  try {
+    const [ins] = await db
+      .insert(adminSandboxTestSubmissions)
+      .values({
+        adminUserId: input.adminUserId,
+        courseId: input.courseId,
+        sessionId: input.sessionId,
+        sandboxMode: input.mode,
+        bodyText: input.bodyText,
+        status,
+        submittedAt,
+      })
+      .returning({ id: adminSandboxTestSubmissions.id });
+    return { ok: true, submissionId: ins.id, status };
+  } catch (e) {
+    if (e instanceof PostgresError && e.code === "23505") {
+      const [cur] = await db
+        .select()
+        .from(adminSandboxTestSubmissions)
+        .where(
+          and(
+            eq(adminSandboxTestSubmissions.adminUserId, input.adminUserId),
+            eq(adminSandboxTestSubmissions.sessionId, input.sessionId)
+          )
+        )
+        .limit(1);
+      if (cur?.status === "submitted" && input.action === "submit") {
+        console.info("admin_sandbox_submit_idempotent_after_race", { submissionId: cur.id, sessionId: input.sessionId });
+        return {
+          ok: true,
+          submissionId: cur.id,
+          status: "submitted",
+          alreadySubmitted: true,
+        };
+      }
+      console.warn("admin_sandbox_submit_unique_race", { sessionId: input.sessionId, err: e });
+    }
+    throw e;
+  }
 }

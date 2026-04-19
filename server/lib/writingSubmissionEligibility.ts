@@ -27,3 +27,24 @@ export function checkSessionEligibleForWriting(
   }
   return { ok: true };
 }
+
+/**
+ * Admin QA sandbox (`writing.admin_sandbox_test_submissions` only).
+ * Must not reuse {@link checkSessionEligibleForWriting}: the shared `writing.sessions` row’s
+ * `runtimeStatus` / `status` can reflect non–sandbox state and would spuriously block POST/GET.
+ */
+export function checkSessionEligibleForAdminSandboxTest(
+  session: typeof writingSessions.$inferSelect,
+  now: Date
+): { ok: true } | { ok: false; code: string } {
+  if (session.runtimeStatus === "missed" || session.status === "missed") {
+    return { ok: false, code: "session_missed" };
+  }
+  if (session.unlockAt > now) {
+    return { ok: false, code: "session_locked" };
+  }
+  if (session.dueAt && session.dueAt < now) {
+    return { ok: false, code: "session_expired" };
+  }
+  return { ok: true };
+}

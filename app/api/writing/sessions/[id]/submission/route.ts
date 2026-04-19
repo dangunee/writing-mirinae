@@ -13,6 +13,7 @@ import {
   appendAdminSandboxAudit,
   adminSandboxCookieName,
   loadAdminSandboxContextById,
+  sandboxSubmitErrorMessage,
   writeAdminSandboxTestSubmission,
   type AdminSandboxMode,
 } from "../../../../../../server/services/adminSandboxService";
@@ -81,6 +82,13 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
             contextValid: true,
           });
           if (!r.ok) {
+            console.warn("submission_admin_sandbox_failed", {
+              sessionId,
+              userId,
+              status: r.status,
+              code: r.code,
+              message: sandboxSubmitErrorMessage(r.code),
+            });
             await appendAdminSandboxAudit(db, {
               adminUserId: userId,
               action: "sandbox_submit",
@@ -90,7 +98,14 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
               success: false,
               detail: { code: r.code },
             });
-            return NextResponse.json({ error: r.code }, { status: r.status });
+            return NextResponse.json(
+              {
+                error: r.code,
+                code: r.code,
+                message: sandboxSubmitErrorMessage(r.code),
+              },
+              { status: r.status }
+            );
           }
           await appendAdminSandboxAudit(db, {
             adminUserId: userId,
@@ -99,12 +114,20 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
             courseId: ctx.courseId,
             sessionId,
             success: true,
-            detail: { submissionId: r.submissionId },
+            detail: { submissionId: r.submissionId, alreadySubmitted: r.alreadySubmitted },
           });
           return NextResponse.json({
             submissionId: r.submissionId,
             status: r.status,
             adminSandboxTest: true as const,
+            ...(r.alreadySubmitted ? { alreadySubmitted: true as const } : {}),
+          });
+        }
+        if (ctx && ctx.sessionId !== sessionId) {
+          console.warn("submission_admin_sandbox_session_mismatch", {
+            cookieSessionId: ctx.sessionId,
+            pathSessionId: sessionId,
+            userId,
           });
         }
       }
