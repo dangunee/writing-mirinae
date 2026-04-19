@@ -59,6 +59,8 @@ function useNarrowScreen(): boolean {
   return narrow
 }
 
+export type AssignmentTabKind = 'submit' | 'submitted' | 'correction'
+
 export type AssignmentSubmitScreenProps = {
   accessContext: AccessContext
   /** 正規コース: 親コンポーネントが本文を保持 */
@@ -84,6 +86,15 @@ export type AssignmentSubmitScreenProps = {
   requirementBlockDesktop?: ReactNode
   /** メインカラム先頭（課題UIより上）。/writing/app のアカウント帯・管理者プレビュー等 */
   mainTopSlot?: ReactNode
+  /**
+   * Admin sandbox 等: 親が「提出 / 既提出 / 添削完了」を制御し、既提出本文を表示する。
+   * 未指定時は従来どおり「提出」固定・静的タブ（学生フローは変更なし）。
+   */
+  controlledAssignmentTab?: boolean
+  assignmentTab?: AssignmentTabKind
+  onAssignmentTabChange?: (tab: AssignmentTabKind) => void
+  /** 既提出タブで表示する提出済み本文（QA サンドボックスのテスト提出など） */
+  submittedTabBody?: string | null
 }
 
 const DEFAULT_ASSIGNMENT_TITLE = '約束'
@@ -111,6 +122,10 @@ export default function AssignmentSubmitScreen({
   mobileTextareaPlaceholder,
   requirementBlockDesktop,
   mainTopSlot,
+  controlledAssignmentTab = false,
+  assignmentTab = 'submit',
+  onAssignmentTabChange,
+  submittedTabBody = null,
 }: AssignmentSubmitScreenProps) {
   const navigate = useNavigate()
   const goApp = useCallback(() => {
@@ -160,6 +175,25 @@ export default function AssignmentSubmitScreen({
   const bodyResolved = assignmentDescription ?? DEFAULT_ASSIGNMENT_BODY
   const phDesktop = desktopTextareaPlaceholder ?? 'ここに韓国語で文章を入力してください...'
   const phMobile = mobileTextareaPlaceholder ?? 'ここに論説を書き始めてください...'
+
+  const activeTab: AssignmentTabKind = controlledAssignmentTab ? assignmentTab : 'submit'
+  const showSubmitColumn = activeTab === 'submit'
+  const showSubmittedReadOnly = controlledAssignmentTab && activeTab === 'submitted'
+
+  const desktopTabClass = (t: AssignmentTabKind) =>
+    activeTab === t
+      ? 'pb-4 text-lg font-bold border-b-2 border-[#000666] text-[#000666] transition-colors'
+      : 'pb-4 text-lg font-medium text-[#1e1b13]/50 hover:text-[#000666] transition-colors'
+
+  const mobileTabClass = (t: AssignmentTabKind) =>
+    activeTab === t
+      ? 'flex-1 py-2.5 text-sm font-medium rounded-lg bg-[#000666] text-white shadow-sm'
+      : 'flex-1 py-2.5 text-sm font-medium rounded-lg text-[#454652] hover:bg-black/5 transition-colors'
+
+  const pickTab = (t: AssignmentTabKind) => {
+    if (!controlledAssignmentTab || !onAssignmentTabChange) return
+    onAssignmentTabChange(t)
+  }
 
   const validateFile = useCallback((f: File): boolean => {
     const okType = /^(image\/(png|jpeg)|application\/pdf)$/i.test(f.type) || /\.(png|jpg|jpeg|pdf)$/i.test(f.name)
@@ -265,19 +299,34 @@ export default function AssignmentSubmitScreen({
                   <div className="flex gap-8 border-b border-[#1e1b13]/10">
                     <button
                       type="button"
-                      className="pb-4 text-lg font-bold border-b-2 border-[#000666] text-[#000666] transition-colors"
+                      className={
+                        !controlledAssignmentTab
+                          ? 'pb-4 text-lg font-bold border-b-2 border-[#000666] text-[#000666] transition-colors'
+                          : desktopTabClass('submit')
+                      }
+                      onClick={() => pickTab('submit')}
                     >
                       提出 (Submit)
                     </button>
                     <button
                       type="button"
-                      className="pb-4 text-lg font-medium text-[#1e1b13]/50 hover:text-[#000666] transition-colors"
+                      className={
+                        !controlledAssignmentTab
+                          ? 'pb-4 text-lg font-medium text-[#1e1b13]/50 hover:text-[#000666] transition-colors'
+                          : desktopTabClass('submitted')
+                      }
+                      onClick={() => pickTab('submitted')}
                     >
                       既提出 (Already Submitted)
                     </button>
                     <button
                       type="button"
-                      className="pb-4 text-lg font-medium text-[#1e1b13]/50 hover:text-[#000666] transition-colors"
+                      className={
+                        !controlledAssignmentTab
+                          ? 'pb-4 text-lg font-medium text-[#1e1b13]/50 hover:text-[#000666] transition-colors'
+                          : desktopTabClass('correction')
+                      }
+                      onClick={() => pickTab('correction')}
                     >
                       添削完了 (Correction Completed)
                     </button>
@@ -328,87 +377,106 @@ export default function AssignmentSubmitScreen({
                 </section>
 
                 <section className="space-y-6">
-                  <div className="relative">
-                    <textarea
-                      value={text}
-                      onChange={(e) => setText(e.target.value)}
-                      disabled={textareaDisabled}
-                      className="w-full min-h-80 bg-white p-8 rounded-xl border-none shadow-[0_10px_40px_rgba(30,27,19,0.04)] focus:ring-2 focus:ring-[#000666]/20 text-lg leading-relaxed font-['Plus_Jakarta_Sans',sans-serif] placeholder:text-[#1e1b13]/20 disabled:bg-[#f5f5f5]/80 disabled:cursor-not-allowed"
-                      placeholder={phDesktop}
-                    />
-                    <div className="absolute bottom-4 right-6 text-sm font-['Manrope',sans-serif] tracking-widest text-[#1e1b13]/40">
-                      {Math.min(count, maxChars)} / {maxChars}
-                    </div>
-                  </div>
-
-                  <div className="mt-8">
-                    <p className="text-sm font-bold text-[#454652] mb-3 font-['Manrope',sans-serif] flex items-center gap-2">
-                      <span className="material-symbols-outlined text-base trial-writing-ms">attachment</span>
-                      手書き原稿のアップロード
-                    </p>
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click()
-                      }}
-                      onDragOver={(e) => {
-                        e.preventDefault()
-                        setDragOver(true)
-                      }}
-                      onDragLeave={() => setDragOver(false)}
-                      onDrop={(e) => {
-                        e.preventDefault()
-                        setDragOver(false)
-                        onFiles(e.dataTransfer.files)
-                      }}
-                      onClick={() => fileInputRef.current?.click()}
-                      className={`border-2 border-dashed border-[#c6c5d4]/30 rounded-2xl p-12 bg-[#fbf3e4]/30 hover:bg-[#fbf3e4]/50 transition-colors cursor-pointer group flex flex-col items-center justify-center text-center ${
-                        dragOver ? 'bg-[#fbf3e4]/60' : ''
-                      }`}
-                    >
-                      <div className="w-16 h-16 bg-[#f5edde] rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
-                        <span className="material-symbols-outlined text-4xl text-[#454652]/40 trial-writing-ms">cloud_upload</span>
+                  {showSubmitColumn ? (
+                    <>
+                      <div className="relative">
+                        <textarea
+                          value={text}
+                          onChange={(e) => setText(e.target.value)}
+                          disabled={textareaDisabled}
+                          className="w-full min-h-80 bg-white p-8 rounded-xl border-none shadow-[0_10px_40px_rgba(30,27,19,0.04)] focus:ring-2 focus:ring-[#000666]/20 text-lg leading-relaxed font-['Plus_Jakarta_Sans',sans-serif] placeholder:text-[#1e1b13]/20 disabled:bg-[#f5f5f5]/80 disabled:cursor-not-allowed"
+                          placeholder={phDesktop}
+                        />
+                        <div className="absolute bottom-4 right-6 text-sm font-['Manrope',sans-serif] tracking-widest text-[#1e1b13]/40">
+                          {Math.min(count, maxChars)} / {maxChars}
+                        </div>
                       </div>
-                      <p className="text-[#1e1b13] font-medium mb-1">
-                        画像またはPDFをドラッグ＆ドロップ、または{' '}
-                        <span className="text-[#000666] font-bold underline decoration-2 underline-offset-4">ファイルを選択</span>
-                      </p>
-                      {selectedFile ? (
-                        <p className="text-xs text-[#000666] mt-2 font-['Manrope',sans-serif]">{selectedFile.name}</p>
-                      ) : null}
-                      <p className="text-[10px] text-[#454652]/60 font-['Manrope',sans-serif] tracking-wider uppercase mt-2">
-                        MAX FILE SIZE: 10MB (PNG, JPG, PDF)
-                      </p>
-                      <input
-                        ref={fileInputRef}
-                        accept={ACCEPT}
-                        className="hidden"
-                        type="file"
-                        onChange={(e) => onFiles(e.target.files)}
-                      />
-                    </div>
-                  </div>
 
-                  <div className="flex justify-end gap-4 mt-10 pb-20 lg:pb-0">
-                    {showDraftButton ? (
-                      <button
-                        type="button"
-                        onClick={handleDraft}
-                        className="px-8 py-3 rounded-lg font-bold text-[#000666] border border-[#000666]/20 hover:bg-[#000666]/5 transition-colors"
-                      >
-                        下書き保存
-                      </button>
-                    ) : null}
-                    <button
-                      type="button"
-                      onClick={handleSubmit}
-                      disabled={submitDisabled}
-                      className="px-8 py-3 rounded-lg font-bold bg-[#000666] text-white shadow-lg hover:opacity-90 transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {primarySubmitLoading ? '提出中…' : '課題を提出する'}
-                    </button>
-                  </div>
+                      <div className="mt-8">
+                        <p className="text-sm font-bold text-[#454652] mb-3 font-['Manrope',sans-serif] flex items-center gap-2">
+                          <span className="material-symbols-outlined text-base trial-writing-ms">attachment</span>
+                          手書き原稿のアップロード
+                        </p>
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click()
+                          }}
+                          onDragOver={(e) => {
+                            e.preventDefault()
+                            setDragOver(true)
+                          }}
+                          onDragLeave={() => setDragOver(false)}
+                          onDrop={(e) => {
+                            e.preventDefault()
+                            setDragOver(false)
+                            onFiles(e.dataTransfer.files)
+                          }}
+                          onClick={() => fileInputRef.current?.click()}
+                          className={`border-2 border-dashed border-[#c6c5d4]/30 rounded-2xl p-12 bg-[#fbf3e4]/30 hover:bg-[#fbf3e4]/50 transition-colors cursor-pointer group flex flex-col items-center justify-center text-center ${
+                            dragOver ? 'bg-[#fbf3e4]/60' : ''
+                          }`}
+                        >
+                          <div className="w-16 h-16 bg-[#f5edde] rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                            <span className="material-symbols-outlined text-4xl text-[#454652]/40 trial-writing-ms">cloud_upload</span>
+                          </div>
+                          <p className="text-[#1e1b13] font-medium mb-1">
+                            画像またはPDFをドラッグ＆ドロップ、または{' '}
+                            <span className="text-[#000666] font-bold underline decoration-2 underline-offset-4">ファイルを選択</span>
+                          </p>
+                          {selectedFile ? (
+                            <p className="text-xs text-[#000666] mt-2 font-['Manrope',sans-serif]">{selectedFile.name}</p>
+                          ) : null}
+                          <p className="text-[10px] text-[#454652]/60 font-['Manrope',sans-serif] tracking-wider uppercase mt-2">
+                            MAX FILE SIZE: 10MB (PNG, JPG, PDF)
+                          </p>
+                          <input
+                            ref={fileInputRef}
+                            accept={ACCEPT}
+                            className="hidden"
+                            type="file"
+                            onChange={(e) => onFiles(e.target.files)}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end gap-4 mt-10 pb-20 lg:pb-0">
+                        {showDraftButton ? (
+                          <button
+                            type="button"
+                            onClick={handleDraft}
+                            className="px-8 py-3 rounded-lg font-bold text-[#000666] border border-[#000666]/20 hover:bg-[#000666]/5 transition-colors"
+                          >
+                            下書き保存
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={handleSubmit}
+                          disabled={submitDisabled}
+                          className="px-8 py-3 rounded-lg font-bold bg-[#000666] text-white shadow-lg hover:opacity-90 transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {primarySubmitLoading ? '提出中…' : '課題を提出する'}
+                        </button>
+                      </div>
+                    </>
+                  ) : showSubmittedReadOnly ? (
+                    <div className="pb-20 lg:pb-0">
+                      <p className="text-sm font-bold text-[#454652] mb-3 font-['Manrope',sans-serif]">提出済みの本文</p>
+                      <div className="w-full min-h-80 bg-white p-8 rounded-xl border border-[#c6c5d4]/10 shadow-[0_10px_40px_rgba(30,27,19,0.04)] text-lg leading-relaxed font-['Plus_Jakarta_Sans',sans-serif] text-[#1e1b13] whitespace-pre-wrap">
+                        {submittedTabBody != null && String(submittedTabBody).trim().length > 0
+                          ? submittedTabBody
+                          : '（提出本文がありません）'}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="pb-20 lg:pb-0">
+                      <p className="text-sm text-[#454652] font-['Manrope',sans-serif]">
+                        Admin Sandbox では「添削完了」のプレビューはありません。本番の添削完了は添削履歴からご確認ください。
+                      </p>
+                    </div>
+                  )}
                   {desktopAfterSubmitSlot}
                 </section>
               </div>
@@ -535,18 +603,36 @@ export default function AssignmentSubmitScreen({
         <main className="min-h-screen w-full min-w-0 pt-16 pb-24 px-4">
           {mainTopSlot ? <div className="mb-4 w-full">{mainTopSlot}</div> : null}
           <div className="flex space-x-1 mb-8 bg-black/5 p-1 rounded-xl">
-            <button type="button" className="flex-1 py-2.5 text-sm font-medium rounded-lg bg-[#000666] text-white shadow-sm">
+            <button
+              type="button"
+              className={
+                !controlledAssignmentTab
+                  ? 'flex-1 py-2.5 text-sm font-medium rounded-lg bg-[#000666] text-white shadow-sm'
+                  : mobileTabClass('submit')
+              }
+              onClick={() => pickTab('submit')}
+            >
               課題提出
             </button>
             <button
               type="button"
-              className="flex-1 py-2.5 text-sm font-medium rounded-lg text-[#454652] hover:bg-black/5 transition-colors"
+              className={
+                !controlledAssignmentTab
+                  ? 'flex-1 py-2.5 text-sm font-medium rounded-lg text-[#454652] hover:bg-black/5 transition-colors'
+                  : mobileTabClass('submitted')
+              }
+              onClick={() => pickTab('submitted')}
             >
               既提出
             </button>
             <button
               type="button"
-              className="flex-1 py-2.5 text-sm font-medium rounded-lg text-[#454652] hover:bg-black/5 transition-colors"
+              className={
+                !controlledAssignmentTab
+                  ? 'flex-1 py-2.5 text-sm font-medium rounded-lg text-[#454652] hover:bg-black/5 transition-colors'
+                  : mobileTabClass('correction')
+              }
+              onClick={() => pickTab('correction')}
             >
               添削完了
             </button>
@@ -600,73 +686,96 @@ export default function AssignmentSubmitScreen({
               </ul>
             </div>
 
-            <div className="space-y-6">
-              <div className="flex justify-between items-end px-2">
-                <label className="font-['Manrope',sans-serif] text-[10px] font-bold tracking-widest text-[#454652] uppercase">
-                  Drafting Canvas
-                </label>
-                <span className="text-[10px] font-medium text-[#454652]">
-                  {Math.min(count, maxChars)} / {maxChars} 文字
-                </span>
-              </div>
-              <div className="relative group">
-                <textarea
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  disabled={textareaDisabled}
-                  className="w-full min-h-80 p-8 rounded-2xl bg-white border-none focus:ring-2 focus:ring-[#000666]/20 text-lg leading-relaxed placeholder:text-[#767683]/50 shadow-[0_4px_20px_rgba(0,0,0,0.05)] disabled:bg-[#f5f5f5]/80 disabled:cursor-not-allowed"
-                  placeholder={phMobile}
-                />
-                <div className="absolute bottom-4 right-4 flex gap-2">
-                  <button type="button" className="p-2 rounded-lg bg-[#e5e5e5] text-[#454652] hover:bg-[#e1e1e1] transition-colors">
-                    <span className="material-symbols-outlined text-xl trial-writing-ms">auto_fix</span>
+            {showSubmitColumn ? (
+              <>
+                <div className="space-y-6">
+                  <div className="flex justify-between items-end px-2">
+                    <label className="font-['Manrope',sans-serif] text-[10px] font-bold tracking-widest text-[#454652] uppercase">
+                      Drafting Canvas
+                    </label>
+                    <span className="text-[10px] font-medium text-[#454652]">
+                      {Math.min(count, maxChars)} / {maxChars} 文字
+                    </span>
+                  </div>
+                  <div className="relative group">
+                    <textarea
+                      value={text}
+                      onChange={(e) => setText(e.target.value)}
+                      disabled={textareaDisabled}
+                      className="w-full min-h-80 p-8 rounded-2xl bg-white border-none focus:ring-2 focus:ring-[#000666]/20 text-lg leading-relaxed placeholder:text-[#767683]/50 shadow-[0_4px_20px_rgba(0,0,0,0.05)] disabled:bg-[#f5f5f5]/80 disabled:cursor-not-allowed"
+                      placeholder={phMobile}
+                    />
+                    <div className="absolute bottom-4 right-4 flex gap-2">
+                      <button type="button" className="p-2 rounded-lg bg-[#e5e5e5] text-[#454652] hover:bg-[#e1e1e1] transition-colors">
+                        <span className="material-symbols-outlined text-xl trial-writing-ms">auto_fix</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white border-2 border-dashed border-black/5 rounded-2xl p-10 flex flex-col items-center justify-center gap-4 text-center shadow-[0_4px_20px_rgba(0,0,0,0.05)]">
+                  <div className="w-16 h-16 rounded-full bg-[#e1e1e1] flex items-center justify-center text-[#1a237e]">
+                    <span className="material-symbols-outlined text-3xl trial-writing-ms">upload_file</span>
+                  </div>
+                  <div>
+                    <p className="font-['Manrope',sans-serif] font-bold text-[#1e1b13]">参考資料の添付</p>
+                    <p className="text-xs text-[#454652] mt-1">PDF, JPG, PNG (最大 10MB)</p>
+                    {selectedFile ? <p className="text-xs text-[#000666] mt-2">{selectedFile.name}</p> : null}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => fileInputMobileRef.current?.click()}
+                    className="mt-2 px-6 py-2 rounded-full border border-[#000666] text-[#000666] font-semibold text-sm hover:bg-[#000666] hover:text-white transition-all"
+                  >
+                    ファイルを選択
                   </button>
+                  <input
+                    ref={fileInputMobileRef}
+                    accept={ACCEPT}
+                    className="hidden"
+                    type="file"
+                    onChange={(e) => onFiles(e.target.files)}
+                  />
+                </div>
+              </>
+            ) : showSubmittedReadOnly ? (
+              <div className="space-y-3">
+                <p className="text-sm font-bold text-[#454652] px-2 font-['Manrope',sans-serif]">提出済みの本文</p>
+                <div className="w-full min-h-80 p-8 rounded-2xl bg-white border border-[#c6c5d4]/10 text-lg leading-relaxed shadow-[0_4px_20px_rgba(0,0,0,0.05)] text-[#1e1b13] whitespace-pre-wrap">
+                  {submittedTabBody != null && String(submittedTabBody).trim().length > 0
+                    ? submittedTabBody
+                    : '（提出本文がありません）'}
                 </div>
               </div>
-            </div>
-
-            <div className="bg-white border-2 border-dashed border-black/5 rounded-2xl p-10 flex flex-col items-center justify-center gap-4 text-center shadow-[0_4px_20px_rgba(0,0,0,0.05)]">
-              <div className="w-16 h-16 rounded-full bg-[#e1e1e1] flex items-center justify-center text-[#1a237e]">
-                <span className="material-symbols-outlined text-3xl trial-writing-ms">upload_file</span>
+            ) : (
+              <div className="px-2">
+                <p className="text-sm text-[#454652] font-['Manrope',sans-serif]">
+                  Admin Sandbox では「添削完了」のプレビューはありません。
+                </p>
               </div>
-              <div>
-                <p className="font-['Manrope',sans-serif] font-bold text-[#1e1b13]">参考資料の添付</p>
-                <p className="text-xs text-[#454652] mt-1">PDF, JPG, PNG (最大 10MB)</p>
-                {selectedFile ? <p className="text-xs text-[#000666] mt-2">{selectedFile.name}</p> : null}
-              </div>
-              <button
-                type="button"
-                onClick={() => fileInputMobileRef.current?.click()}
-                className="mt-2 px-6 py-2 rounded-full border border-[#000666] text-[#000666] font-semibold text-sm hover:bg-[#000666] hover:text-white transition-all"
-              >
-                ファイルを選択
-              </button>
-              <input
-                ref={fileInputMobileRef}
-                accept={ACCEPT}
-                className="hidden"
-                type="file"
-                onChange={(e) => onFiles(e.target.files)}
-              />
-            </div>
+            )}
           </section>
 
-          <div className="mt-12 mb-20 px-4">
-            <button
-              type="button"
-              onClick={mobileSubmit}
-              disabled={submitDisabled}
-              className="w-full py-5 bg-gradient-to-r from-[#000666] to-[#1a237e] text-white rounded-xl font-['Manrope',sans-serif] font-bold text-lg shadow-xl shadow-[#000666]/10 active:scale-[0.98] transition-transform flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <span className="material-symbols-outlined trial-writing-ms" style={{ fontVariationSettings: "'FILL' 1" }}>
-                send
-              </span>
-              課題を提出する
-            </button>
-            <p className="text-center text-[10px] text-[#454652] mt-4 font-medium tracking-wide">
-              提出後、24時間以内に講師による添削が開始されます。
-            </p>
-          </div>
+          {showSubmitColumn ? (
+            <div className="mt-12 mb-20 px-4">
+              <button
+                type="button"
+                onClick={mobileSubmit}
+                disabled={submitDisabled}
+                className="w-full py-5 bg-gradient-to-r from-[#000666] to-[#1a237e] text-white rounded-xl font-['Manrope',sans-serif] font-bold text-lg shadow-xl shadow-[#000666]/10 active:scale-[0.98] transition-transform flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span className="material-symbols-outlined trial-writing-ms" style={{ fontVariationSettings: "'FILL' 1" }}>
+                  send
+                </span>
+                課題を提出する
+              </button>
+              <p className="text-center text-[10px] text-[#454652] mt-4 font-medium tracking-wide">
+                提出後、24時間以内に講師による添削が開始されます。
+              </p>
+            </div>
+          ) : (
+            <div className="mb-20" />
+          )}
         </main>
 
         <nav className="fixed bottom-0 w-full z-50 bg-[#f5f5f5] border-t border-black/5 flex justify-around items-center px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">

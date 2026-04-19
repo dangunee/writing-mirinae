@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import StudentAccountPanel from '../components/student/StudentAccountPanel'
 import AdminSandboxPanel from '../components/writing/AdminSandboxPanel'
-import AssignmentSubmitScreen from '../components/writing/AssignmentSubmitScreen'
+import AssignmentSubmitScreen, { type AssignmentTabKind } from '../components/writing/AssignmentSubmitScreen'
 import WritingPageAdminPreview, {
   type WritingAdminPreviewPayload,
 } from '../components/writing/WritingPageAdminPreview'
@@ -69,6 +69,8 @@ export default function WritingPage() {
   const [saving, setSaving] = useState(false)
   const [refetchAfterSubmit, setRefetchAfterSubmit] = useState(false)
   const submitLockRef = useRef(false)
+  const [assignmentTab, setAssignmentTab] = useState<AssignmentTabKind>('submit')
+  const [sandboxSubmitNotice, setSandboxSubmitNotice] = useState(false)
 
   const loadCurrent = useCallback(async () => {
     setLoading(true)
@@ -136,6 +138,26 @@ export default function WritingPage() {
   useEffect(() => {
     void loadCurrent()
   }, [loadCurrent])
+
+  /** Admin sandbox: sync assignment tabs with GET /sessions/current (admin_sandbox_test_submissions → submission). */
+  useEffect(() => {
+    if (current?.accessKind !== 'admin_sandbox') return
+    const sub = current.submission
+    const st = sub?.status
+    if (st === 'draft') {
+      setAssignmentTab('submit')
+      return
+    }
+    if (sub && st && st !== 'draft') {
+      setAssignmentTab('submitted')
+    }
+  }, [current?.accessKind, current?.submission])
+
+  useEffect(() => {
+    if (!sandboxSubmitNotice) return
+    const t = window.setTimeout(() => setSandboxSubmitNotice(false), 6000)
+    return () => window.clearTimeout(t)
+  }, [sandboxSubmitNotice])
 
   /** When /sessions/current returned 404 (e.g. no course), still label trial/regular from dedicated cookies. */
   useEffect(() => {
@@ -288,9 +310,14 @@ export default function WritingPage() {
       if (!res.ok) return
       const data = (await res.json()) as { submissionId?: string; status?: string; error?: string }
       if (!data.submissionId || data.error) return
+      const isAdminSandbox = current?.accessKind === 'admin_sandbox'
       setContent('')
       setRefetchAfterSubmit(true)
       await loadCurrent()
+      if (isAdminSandbox) {
+        setAssignmentTab('submitted')
+        setSandboxSubmitNotice(true)
+      }
     } catch {
       /* minimal: 실패 시 버튼만 다시 활성화 */
     } finally {
@@ -305,6 +332,11 @@ export default function WritingPage() {
       {loading ? (
         <p className="text-sm text-[#454652] mb-4 px-1" role="status">
           불러오는 중…
+        </p>
+      ) : null}
+      {current?.accessKind === 'admin_sandbox' && sandboxSubmitNotice ? (
+        <p className="text-sm text-[#166534] mb-3 px-1 font-medium" role="status">
+          QAサンドボックス: 提出が完了しました。「既提出」タブで内容を確認できます。
         </p>
       ) : null}
       {hasSession && weekLabel ? (
@@ -447,6 +479,14 @@ export default function WritingPage() {
         desktopSlotBelowTabs={desktopSlotBelowTabs}
         desktopAfterSubmitSlot={desktopAfterSubmitSlot}
         mobileSlotBelowTabs={desktopSlotBelowTabs}
+        {...(current?.accessKind === 'admin_sandbox'
+          ? {
+              controlledAssignmentTab: true as const,
+              assignmentTab,
+              onAssignmentTabChange: setAssignmentTab,
+              submittedTabBody: submission?.bodyText ?? null,
+            }
+          : {})}
       />
     </div>
   )
