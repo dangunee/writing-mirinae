@@ -1,4 +1,3 @@
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { getDb } from "../../../../../../server/db/client";
@@ -11,8 +10,8 @@ import { resolveWritingRoleFromDbOrEnv } from "../../../../../../server/lib/writ
 import * as writingStudentRepo from "../../../../../../server/repositories/writingStudentRepository";
 import {
   appendAdminSandboxAudit,
-  adminSandboxCookieName,
   loadAdminSandboxContextById,
+  parseAdminSandboxContextIdFromCookieHeader,
   sandboxSubmitErrorMessage,
   writeAdminSandboxTestSubmission,
   type AdminSandboxMode,
@@ -33,6 +32,16 @@ export const dynamic = "force-dynamic";
  * Never trust userId / trialApplicationId from body (forbidden keys rejected below).
  */
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
+  console.log("[submission] start");
+  console.time("[submission] POST_total");
+  try {
+    return await postSubmissionHandler(req, context);
+  } finally {
+    console.timeEnd("[submission] POST_total");
+  }
+}
+
+async function postSubmissionHandler(req: Request, context: { params: Promise<{ id: string }> }) {
   const cookieHeader = req.headers.get("cookie");
   const trialApplicationId = await fetchTrialApplicationIdFromMirinaeSessionCookie(cookieHeader);
   const grantId = parseRegularWritingGrantIdFromCookieHeader(cookieHeader);
@@ -64,8 +73,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   if (userId && !trialApplicationId && !grantId) {
     const role = await resolveWritingRoleFromDbOrEnv(db, userId);
     if (role === "admin") {
-      const cookieStore = await cookies();
-      const ctxId = cookieStore.get(adminSandboxCookieName())?.value?.trim();
+      const ctxId = parseAdminSandboxContextIdFromCookieHeader(cookieHeader)?.trim();
       if (ctxId) {
         const ctx = await loadAdminSandboxContextById(db, ctxId, userId);
         if (ctx && ctx.sessionId === sessionId) {

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Outlet, Navigate, useLocation } from 'react-router-dom'
 
 import { apiUrl } from './lib/apiUrl'
+import { setWritingSessionCurrentBootstrap } from './lib/writingSessionCurrentBootstrap'
 import { canAccessWritingStudentApp } from './lib/authEntitlements'
 import type { AuthMePayload } from './types/authMe'
 
@@ -31,16 +32,19 @@ async function fetchWritingSessionGate(): Promise<{
   bodyOk: boolean | undefined
 }> {
   const curRes = await fetch(apiUrl('/api/writing/sessions/current'), { credentials: 'include' })
-  let json: { ok?: boolean } = {}
+  let parsed: { ok?: boolean } | null = null
   try {
     const text = await curRes.text()
     if (text.trim()) {
-      json = JSON.parse(text) as { ok?: boolean }
+      parsed = JSON.parse(text) as { ok?: boolean }
     }
   } catch {
     /* ignore parse errors */
   }
-  const bodyOk = json.ok === true
+  if (curRes.status === 200 && parsed != null) {
+    setWritingSessionCurrentBootstrap(parsed)
+  }
+  const bodyOk = parsed?.ok === true
   const allowed = curRes.status === 200 && bodyOk
   return { allowed, httpStatus: curRes.status, bodyOk }
 }

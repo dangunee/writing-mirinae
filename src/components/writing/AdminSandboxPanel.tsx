@@ -40,6 +40,21 @@ type SandboxGet =
 
 type ListSession = { sessionIndex: number; sessionId: string | null }
 
+let adminCoursesCache: { at: number; courses: CourseRow[] } | null = null
+const ADMIN_COURSES_CACHE_TTL_MS = 60_000
+
+async function fetchAdminCoursesCached(): Promise<CourseRow[]> {
+  const now = Date.now()
+  if (adminCoursesCache && now - adminCoursesCache.at < ADMIN_COURSES_CACHE_TTL_MS) {
+    return adminCoursesCache.courses
+  }
+  const r = await fetch(apiUrl('/api/writing/admin/courses'), { credentials: 'include' })
+  const j = (await r.json()) as { courses?: CourseRow[]; ok?: boolean }
+  const courses = Array.isArray(j.courses) ? j.courses : []
+  adminCoursesCache = { at: Date.now(), courses }
+  return courses
+}
+
 /**
  * Admin-only QA sandbox activator. Server validates all targets.
  */
@@ -67,15 +82,26 @@ export default function AdminSandboxPanel({
   }, [])
 
   useEffect(() => {
-    void refresh()
-  }, [refresh])
-
-  useEffect(() => {
     let cancelled = false
-    ;(async () => {
-      const r = await fetch(apiUrl('/api/writing/admin/courses'), { credentials: 'include' })
-      const j = (await r.json()) as { courses?: CourseRow[]; ok?: boolean }
-      if (!cancelled && Array.isArray(j.courses)) setCourses(j.courses)
+    const t0 = performance.now()
+    console.debug('[AdminSandboxPanel] mount parallel: context + courses')
+    void (async () => {
+      try {
+        const [ctxRes, courseList] = await Promise.all([
+          fetch(apiUrl('/api/writing/admin/sandbox/context'), { credentials: 'include' }),
+          fetchAdminCoursesCached(),
+        ])
+        if (cancelled) return
+        setCourses(courseList)
+        const j = (await ctxRes.json()) as SandboxGet & { ok?: boolean }
+        if (j.ok) setStatus(j as SandboxGet)
+        const h = (j as { hints?: Hints }).hints
+        if (h) setHints(h)
+      } finally {
+        console.debug('[AdminSandboxPanel] mount load ms', {
+          ms: Math.round(performance.now() - t0),
+        })
+      }
     })()
     return () => {
       cancelled = true

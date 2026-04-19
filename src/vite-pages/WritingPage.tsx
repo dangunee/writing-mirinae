@@ -9,6 +9,10 @@ import WritingPageAdminPreview, {
 import { useAuthMe } from '../hooks/useAuthMe'
 import { apiUrl } from '../lib/apiUrl'
 import {
+  clearWritingSessionCurrentBootstrap,
+  takeWritingSessionCurrentBootstrap,
+} from '../lib/writingSessionCurrentBootstrap'
+import {
   ASSIGNMENT_REQUIREMENT_SLOT_COUNT,
   parseAssignmentSnapshotForUi,
   parseThemeSnapshotForUi,
@@ -58,6 +62,7 @@ type AdminSandboxErrorCode =
   | 'sandbox_context_missing_or_expired'
   | 'sandbox_context_invalid_or_stale'
   | 'sandbox_resolution_failed'
+  | 'admin_no_writing_session_context'
 
 function adminSandboxErrorBannerText(code: AdminSandboxErrorCode): string {
   switch (code) {
@@ -67,6 +72,8 @@ function adminSandboxErrorBannerText(code: AdminSandboxErrorCode): string {
       return 'サンドボックス設定が無効です。再設定してください。'
     case 'sandbox_resolution_failed':
       return '一時的なエラーが発生しました。時間をおいて再試行してください。'
+    case 'admin_no_writing_session_context':
+      return '利用可能な作文セッションがありません。Admin Sandbox を有効化するか、コース設定を確認してください。'
     default:
       return '一時的なエラーが発生しました。時間をおいて再試行してください。'
   }
@@ -90,20 +97,46 @@ export default function WritingPage() {
   const [assignmentTab, setAssignmentTab] = useState<AssignmentTabKind>('submit')
   const [sandboxSubmitNotice, setSandboxSubmitNotice] = useState(false)
   const [sandboxErrorCode, setSandboxErrorCode] = useState<AdminSandboxErrorCode | null>(null)
+  /** Last POST /submission error (admin sandbox only); surfaced under tabs, not silent. */
+  const [sandboxSubmitFieldError, setSandboxSubmitFieldError] = useState<string | null>(null)
 
   const loadCurrent = useCallback(async () => {
+    const t0 =
+      typeof performance !== 'undefined' && typeof performance.now === 'function'
+        ? performance.now()
+        : Date.now()
+    console.debug('[WritingPage] loadCurrent() start')
     setLoading(true)
     try {
-      const res = await fetch(apiUrl('/api/writing/sessions/current'), { credentials: 'include' })
-      if (!res.ok) {
-        setCurrent(null)
-        setSandboxErrorCode(null)
-        return
-      }
-      const data = (await res.json()) as
+      let data:
         | CurrentSessionOk
         | { ok: true; accessKind: 'trial'; applicationId: string; canSubmit: boolean; expiresAt: string | null }
         | { ok: false; accessKind?: string; code?: string }
+
+      const fromBootstrap = takeWritingSessionCurrentBootstrap()
+      if (fromBootstrap != null && typeof fromBootstrap === 'object') {
+        data = fromBootstrap as typeof data
+        const t1 =
+          typeof performance !== 'undefined' && typeof performance.now === 'function'
+            ? performance.now()
+            : Date.now()
+        console.debug('[WritingPage] loadCurrent() bootstrap from guard', {
+          ms: Math.round(t1 - t0),
+        })
+      } else {
+        const res = await fetch(apiUrl('/api/writing/sessions/current'), { credentials: 'include' })
+        if (!res.ok) {
+          setCurrent(null)
+          setSandboxErrorCode(null)
+          return
+        }
+        data = (await res.json()) as typeof data
+        const t2 =
+          typeof performance !== 'undefined' && typeof performance.now === 'function'
+            ? performance.now()
+            : Date.now()
+        console.debug('[WritingPage] loadCurrent() fetch complete', { ms: Math.round(t2 - t0) })
+      }
       if (
         data &&
         'ok' in data &&
@@ -116,6 +149,7 @@ export default function WritingPage() {
           'sandbox_context_missing_or_expired',
           'sandbox_context_invalid_or_stale',
           'sandbox_resolution_failed',
+          'admin_no_writing_session_context',
         ]
         const code =
           codeRaw && allowed.includes(codeRaw as AdminSandboxErrorCode)
@@ -135,6 +169,7 @@ export default function WritingPage() {
       ) {
         const d = data as CurrentSessionOk
         setSandboxErrorCode(null)
+        setSandboxSubmitFieldError(null)
         setCurrent(d)
         const sm = d.sandboxMode
         if (sm === 'trial' || sm === 'regular' || sm === 'academy') {
@@ -175,15 +210,31 @@ export default function WritingPage() {
       }
       setCurrent(null)
       setSandboxErrorCode(null)
-    } catch {
-      setCurrent(null)
+    } catch (e) {
+      console.warn('[WritingPage] loadCurrent() failed', e)
     } finally {
+      const tEnd =
+        typeof performance !== 'undefined' && typeof performance.now === 'function'
+          ? performance.now()
+          : Date.now()
+      console.debug('[WritingPage] loadCurrent() finish', { ms: Math.round(tEnd - t0) })
       setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    void loadCurrent()
+    const t =
+      typeof performance !== 'undefined' && typeof performance.now === 'function'
+        ? performance.now()
+        : Date.now()
+    console.debug('[WritingPage] mount')
+    void loadCurrent().finally(() => {
+      const t2 =
+        typeof performance !== 'undefined' && typeof performance.now === 'function'
+          ? performance.now()
+          : Date.now()
+      console.debug('[WritingPage] initial loadCurrent settled', { ms: Math.round(t2 - t) })
+    })
   }, [loadCurrent])
 
   /** Admin sandbox: sync assignment tabs with GET /sessions/current (admin_sandbox_test_submissions → submission). */
@@ -198,7 +249,7 @@ export default function WritingPage() {
     if (sub && st && st !== 'draft') {
       setAssignmentTab('submitted')
     }
-  }, [current?.accessKind, current?.submission])
+  }, [current?.accessKind, current?.submission?.id, current?.submission?.status])
 
   useEffect(() => {
     if (!sandboxSubmitNotice) return
@@ -243,8 +294,12 @@ export default function WritingPage() {
     if (sandboxErrorCode) {
       return null
     }
-    if (current?.accessKind === 'admin_sandbox' && current.session) {
-      return current.session
+    /**
+     * Admin sandbox: NEVER fall through to adminPreview — preview uses synthetic `preview-…` ids and
+     * breaks POST /sessions/:id/submission (cookie context expects real session UUID).
+     */
+    if (current?.accessKind === 'admin_sandbox') {
+      return current.session ?? null
     }
     if (isAdmin && adminPreview) {
       return {
@@ -350,30 +405,104 @@ export default function WritingPage() {
   const handleSubmit = async () => {
     if (sandboxErrorCode) return
     if (current?.accessKind !== 'admin_sandbox' && isAdmin && adminPreview && !adminPreview.sessionId?.trim()) return
-    const sessionId = session?.id ?? null
+    const isAdminSandboxFlow = current?.accessKind === 'admin_sandbox'
+    const sessionId =
+      isAdminSandboxFlow && current?.session?.id
+        ? current.session.id
+        : (session?.id ?? null)
     if (!sessionId || !content.trim() || !canSubmit || saving || submitLockRef.current) return
+    if (isAdminSandboxFlow) {
+      setSandboxSubmitFieldError(null)
+    }
     submitLockRef.current = true
     setSaving(true)
+    const bodyKeep = content.trim()
     try {
       const res = await fetch(apiUrl(`/api/writing/sessions/${sessionId}/submission`), {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'submit', bodyText: content.trim() }),
+        body: JSON.stringify({ action: 'submit', bodyText: bodyKeep }),
       })
-      if (!res.ok) return
-      const data = (await res.json()) as { submissionId?: string; status?: string; error?: string }
-      if (!data.submissionId || data.error) return
-      const isAdminSandbox = current?.accessKind === 'admin_sandbox'
-      setContent('')
-      setRefetchAfterSubmit(true)
-      await loadCurrent()
-      if (isAdminSandbox) {
+      let data: {
+        submissionId?: string
+        status?: string
+        error?: string
+        code?: string
+        message?: string
+        adminSandboxTest?: boolean
+        alreadySubmitted?: boolean
+      }
+      try {
+        data = (await res.json()) as typeof data
+      } catch {
+        if (isAdminSandboxFlow) {
+          setSandboxSubmitFieldError(
+            `サーバー応答を読み取れませんでした (HTTP ${res.status})。`
+          )
+        }
+        return
+      }
+      if (!res.ok) {
+        const msg =
+          (typeof data.message === 'string' && data.message.trim()) ||
+          (typeof data.error === 'string' && data.error.trim()) ||
+          (typeof data.code === 'string' && data.code.trim()) ||
+          `提出に失敗しました (HTTP ${res.status})`
+        if (isAdminSandboxFlow) {
+          setSandboxSubmitFieldError(msg)
+        }
+        return
+      }
+      if (data.error && !data.submissionId) {
+        if (isAdminSandboxFlow) {
+          setSandboxSubmitFieldError(
+            typeof data.message === 'string' ? data.message : String(data.error)
+          )
+        }
+        return
+      }
+      if (!data.submissionId) {
+        if (isAdminSandboxFlow) {
+          setSandboxSubmitFieldError('提出応答に submissionId がありません。')
+        }
+        return
+      }
+      if (isAdminSandboxFlow && current?.accessKind === 'admin_sandbox' && current.session) {
+        setCurrent((prev) => {
+          if (!prev || prev.accessKind !== 'admin_sandbox' || !prev.session) return prev
+          return {
+            ...prev,
+            mode: 'pipeline',
+            submission: {
+              id: data.submissionId!,
+              status: data.status ?? 'submitted',
+              bodyText: bodyKeep,
+              imageStorageKey: null,
+              imageMimeType: null,
+              submittedAt: new Date().toISOString(),
+            },
+            canSubmit: false,
+            reasonIfNot: 'sandbox_test_already_submitted',
+          }
+        })
         setAssignmentTab('submitted')
         setSandboxSubmitNotice(true)
       }
-    } catch {
-      /* minimal: 실패 시 버튼만 다시 활성화 */
+      setContent('')
+      setRefetchAfterSubmit(true)
+      clearWritingSessionCurrentBootstrap()
+      await loadCurrent()
+      if (isAdminSandboxFlow) {
+        setAssignmentTab('submitted')
+        setSandboxSubmitNotice(true)
+      }
+    } catch (e) {
+      if (isAdminSandboxFlow) {
+        setSandboxSubmitFieldError(
+          e instanceof Error ? e.message : 'ネットワークエラーが発生しました。'
+        )
+      }
     } finally {
       submitLockRef.current = false
       setRefetchAfterSubmit(false)
@@ -386,6 +515,11 @@ export default function WritingPage() {
       {loading ? (
         <p className="text-sm text-[#454652] mb-4 px-1" role="status">
           불러오는 중…
+        </p>
+      ) : null}
+      {current?.accessKind === 'admin_sandbox' && sandboxSubmitFieldError ? (
+        <p className="text-sm text-[#b91c1c] mb-3 px-1 font-medium" role="alert">
+          {sandboxSubmitFieldError}
         </p>
       ) : null}
       {current?.accessKind === 'admin_sandbox' && sandboxSubmitNotice ? (
@@ -516,7 +650,7 @@ export default function WritingPage() {
           saving ||
           refetchAfterSubmit ||
           !content.trim() ||
-          !session?.id ||
+          !(current?.accessKind === 'admin_sandbox' ? current.session?.id : session?.id) ||
           !canSubmit
         }
         primarySubmitLoading={saving || refetchAfterSubmit}

@@ -49,6 +49,27 @@ export function adminSandboxCookieMaxAgeSeconds(): number {
   return sandboxTtlSeconds();
 }
 
+/** Request Cookie header parsing (same value Next.js cookies() would expose for sbx ctx). */
+export function parseAdminSandboxContextIdFromCookieHeader(
+  cookieHeader: string | null | undefined
+): string | null {
+  if (!cookieHeader?.trim()) return null;
+  const prefix = `${COOKIE_NAME}=`;
+  const segments = cookieHeader.split(";");
+  for (const seg of segments) {
+    const s = seg.trim();
+    if (!s.startsWith(prefix)) continue;
+    const raw = s.slice(prefix.length);
+    try {
+      const v = decodeURIComponent(raw).trim();
+      return v.length > 0 ? v : null;
+    } catch {
+      return raw.trim() || null;
+    }
+  }
+  return null;
+}
+
 /**
  * Validates mode + course + session against DB and env. Never trusts client without re-fetching rows.
  */
@@ -163,27 +184,29 @@ export async function buildAdminSandboxCurrentSessionResponse(
   db: Db,
   ctx: typeof adminSandboxContexts.$inferSelect
 ): Promise<AdminSandboxSessionJson | null> {
-  const now = new Date();
-  if (ctx.expiresAt <= now) {
-    return null;
-  }
+  console.time("[sandbox] buildAdminSandboxCurrentSessionResponse");
+  try {
+    const now = new Date();
+    if (ctx.expiresAt <= now) {
+      return null;
+    }
 
-  const row = await repo.getSessionByIdWithCourse(db, ctx.sessionId);
-  if (!row || row.course.id !== ctx.courseId) {
-    return null;
-  }
+    const row = await repo.getSessionByIdWithCourse(db, ctx.sessionId);
+    if (!row || row.course.id !== ctx.courseId) {
+      return null;
+    }
 
-  const v = await validateAdminSandboxSelection(db, {
-    mode: ctx.mode as AdminSandboxMode,
-    courseId: ctx.courseId,
-    sessionId: ctx.sessionId,
-  });
-  if (!v.ok) {
-    return null;
-  }
+    const v = await validateAdminSandboxSelection(db, {
+      mode: ctx.mode as AdminSandboxMode,
+      courseId: ctx.courseId,
+      sessionId: ctx.sessionId,
+    });
+    if (!v.ok) {
+      return null;
+    }
 
-  const courseId = ctx.courseId;
-  const sessions = await repo.listSessionsForCourseOrdered(db, courseId);
+    const courseId = ctx.courseId;
+    const sessions = await repo.listSessionsForCourseOrdered(db, courseId);
   const target = sessions.find((s) => s.id === ctx.sessionId);
   if (!target) {
     return null;
@@ -273,6 +296,9 @@ export async function buildAdminSandboxCurrentSessionResponse(
       isTestSubmission: true,
     },
   };
+  } finally {
+    console.timeEnd("[sandbox] buildAdminSandboxCurrentSessionResponse");
+  }
 }
 
 export async function loadAdminSandboxContextById(
@@ -280,18 +306,23 @@ export async function loadAdminSandboxContextById(
   contextId: string,
   adminUserId: string
 ): Promise<typeof adminSandboxContexts.$inferSelect | null> {
-  const [row] = await db
-    .select()
-    .from(adminSandboxContexts)
-    .where(eq(adminSandboxContexts.id, contextId))
-    .limit(1);
-  if (!row || row.adminUserId !== adminUserId) {
-    return null;
+  console.time("[sandbox] loadAdminSandboxContextById");
+  try {
+    const [row] = await db
+      .select()
+      .from(adminSandboxContexts)
+      .where(eq(adminSandboxContexts.id, contextId))
+      .limit(1);
+    if (!row || row.adminUserId !== adminUserId) {
+      return null;
+    }
+    if (row.expiresAt <= new Date()) {
+      return null;
+    }
+    return row;
+  } finally {
+    console.timeEnd("[sandbox] loadAdminSandboxContextById");
   }
-  if (row.expiresAt <= new Date()) {
-    return null;
-  }
-  return row;
 }
 
 export async function upsertAdminSandboxContext(
