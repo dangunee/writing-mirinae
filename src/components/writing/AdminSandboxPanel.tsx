@@ -1,0 +1,267 @@
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { apiUrl } from '../../lib/apiUrl'
+
+type SandboxMode = 'trial' | 'regular' | 'academy'
+
+type CourseRow = {
+  courseId: string
+  displayName: string
+  status: string
+  isAdminSandbox: boolean
+  sessionCount: number
+  termId?: string | null
+}
+
+type Hints = {
+  trialCourseId: string | null
+  regularAllowlistActive: boolean
+  academyAllowlist: string | null
+}
+
+type SandboxGet =
+  | {
+      ok: true
+      active: false
+      hints?: Hints
+    }
+  | {
+      ok: true
+      active: true
+      context: {
+        id: string
+        mode: string
+        courseId: string
+        sessionId: string
+        termId: string | null
+        expiresAt: string
+      }
+      hints?: Hints
+    }
+
+type ListSession = { sessionIndex: number; sessionId: string | null }
+
+/**
+ * Admin-only QA sandbox activator. Server validates all targets.
+ */
+export default function AdminSandboxPanel({
+  onSandboxChange,
+}: {
+  onSandboxChange: () => void
+}) {
+  const [status, setStatus] = useState<SandboxGet | null>(null)
+  const [courses, setCourses] = useState<CourseRow[]>([])
+  const [hints, setHints] = useState<Hints | null>(null)
+  const [mode, setMode] = useState<SandboxMode>('trial')
+  const [courseId, setCourseId] = useState('')
+  const [sessionIndex, setSessionIndex] = useState(1)
+  const [sessions, setSessions] = useState<ListSession[]>([])
+  const [loading, setLoading] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+
+  const refresh = useCallback(async () => {
+    const r = await fetch(apiUrl('/api/writing/admin/sandbox/context'), { credentials: 'include' })
+    const j = (await r.json()) as SandboxGet & { ok?: boolean }
+    if (j.ok) setStatus(j as SandboxGet)
+    const h = (j as { hints?: Hints }).hints
+    if (h) setHints(h)
+  }, [])
+
+  useEffect(() => {
+    void refresh()
+  }, [refresh])
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const r = await fetch(apiUrl('/api/writing/admin/courses'), { credentials: 'include' })
+      const j = (await r.json()) as { courses?: CourseRow[]; ok?: boolean }
+      if (!cancelled && Array.isArray(j.courses)) setCourses(j.courses)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const filteredCourses = useMemo(() => {
+    const trialId = hints?.trialCourseId ?? null
+    const academyCsv = hints?.academyAllowlist?.split(',').map((s) => s.trim()).filter(Boolean) ?? []
+
+    if (mode === 'trial') {
+      if (!trialId) return []
+      return courses.filter((c) => c.courseId === trialId && !c.isAdminSandbox)
+    }
+    if (mode === 'regular') {
+      return courses.filter((c) => {
+        if (c.isAdminSandbox) return false
+        if (trialId && c.courseId === trialId) return false
+        return c.status === 'active'
+      })
+    }
+    return courses.filter((c) => {
+      if (c.isAdminSandbox) return false
+      if (academyCsv.length > 0 && academyCsv.includes(c.courseId)) return true
+      return Boolean(c.termId)
+    })
+  }, [courses, hints, mode])
+
+  useEffect(() => {
+    if (!courseId && filteredCourses.length > 0) {
+      setCourseId(filteredCourses[0].courseId)
+    }
+  }, [filteredCourses, courseId])
+
+  useEffect(() => {
+    if (!courseId) {
+      setSessions([])
+      return
+    }
+    let cancelled = false
+    const q = new URLSearchParams({ courseId })
+    void fetch(apiUrl(`/api/writing/admin/assignments/list?${q}`), { credentials: 'include' })
+      .then((r) => r.json())
+      .then((data: { sessions?: { sessionIndex: number; sessionId: string | null }[] }) => {
+        if (cancelled || !Array.isArray(data.sessions)) return
+        setSessions(
+          data.sessions.map((s) => ({
+            sessionIndex: s.sessionIndex,
+            sessionId: s.sessionId,
+          }))
+        )
+      })
+      .catch(() => {
+        if (!cancelled) setSessions([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [courseId])
+
+  const selectedSessionId = useMemo(() => {
+    const row = sessions.find((s) => s.sessionIndex === sessionIndex)
+    return row?.sessionId?.trim() ?? null
+  }, [sessions, sessionIndex])
+
+  async function activate() {
+    setLoading(true)
+    setMessage(null)
+    try {
+      if (!courseId || !selectedSessionId) {
+        setMessage('コースとセッション（作成済み）を選んでください。')
+        return
+      }
+      const res = await fetch(apiUrl('/api/writing/admin/sandbox/context'), {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode, courseId, sessionId: selectedSessionId }),
+      })
+      const j = (await res.json()) as { ok?: boolean; error?: string }
+      if (!res.ok || !j.ok) {
+        setMessage(typeof j.error === 'string' ? j.error : `HTTP ${res.status}`)
+        return
+      }
+      await refresh()
+      onSandboxChange()
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function clearSandbox() {
+    setLoading(true)
+    setMessage(null)
+    try {
+      await fetch(apiUrl('/api/writing/admin/sandbox/context'), {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      await refresh()
+      onSandboxChange()
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const active = status && 'active' in status && status.active === true
+  const expires =
+    active && 'context' in status ? new Date(status.context.expiresAt).toLocaleString() : ''
+
+  return (
+    <div className="mb-3 rounded-lg border border-amber-500/40 bg-amber-50/90 px-3 py-2 text-xs text-amber-950">
+      <p className="font-bold text-amber-900">Admin Sandbox（QA）</p>
+      {active && 'context' in status && status.active ? (
+        <div className="mt-2 space-y-2">
+          <p>
+            有効: mode={status.context.mode} · course={status.context.courseId.slice(0, 8)}… · session=
+            {status.context.sessionId.slice(0, 8)}…
+          </p>
+          <p className="text-[10px] opacity-90">期限: {expires} · 本番の学習者提出とは別テーブルに保存されます。</p>
+          <button
+            type="button"
+            disabled={loading}
+            onClick={() => void clearSandbox()}
+            className="rounded border border-amber-700/30 bg-white px-2 py-1 text-[11px] font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+          >
+            サンドボックスを解除
+          </button>
+        </div>
+      ) : (
+        <div className="mt-2 flex flex-wrap items-end gap-2">
+          <label className="flex flex-col gap-0.5">
+            <span className="text-[10px] uppercase tracking-wide opacity-80">Mode</span>
+            <select
+              value={mode}
+              onChange={(e) => {
+                setMode(e.target.value as SandboxMode)
+                setCourseId('')
+              }}
+              className="rounded border border-amber-800/20 bg-white px-2 py-1 text-[11px]"
+            >
+              <option value="trial">trial</option>
+              <option value="regular">regular</option>
+              <option value="academy">academy</option>
+            </select>
+          </label>
+          <label className="flex min-w-[8rem] flex-col gap-0.5">
+            <span className="text-[10px] uppercase tracking-wide opacity-80">Course</span>
+            <select
+              value={courseId}
+              onChange={(e) => setCourseId(e.target.value)}
+              className="max-w-[14rem] rounded border border-amber-800/20 bg-white px-2 py-1 text-[11px]"
+            >
+              <option value="">—</option>
+              {filteredCourses.map((c) => (
+                <option key={c.courseId} value={c.courseId}>
+                  {c.displayName.slice(0, 48)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-0.5">
+            <span className="text-[10px] uppercase tracking-wide opacity-80">回</span>
+            <select
+              value={sessionIndex}
+              onChange={(e) => setSessionIndex(Number(e.target.value))}
+              className="rounded border border-amber-800/20 bg-white px-2 py-1 text-[11px]"
+            >
+              {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+                <option key={n} value={n}>
+                  第{n}回
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            disabled={loading || !selectedSessionId}
+            onClick={() => void activate()}
+            className="rounded bg-amber-700 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-amber-800 disabled:opacity-50"
+          >
+            有効化
+          </button>
+        </div>
+      )}
+      {message ? <p className="mt-2 text-[11px] text-red-700">{message}</p> : null}
+    </div>
+  )
+}

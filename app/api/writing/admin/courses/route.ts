@@ -77,6 +77,7 @@ export async function GET() {
     status: r.status,
     isAdminSandbox: r.isAdminSandbox,
     sessionCount: r.sessionCount,
+    termId: r.termId,
   }));
 
   return NextResponse.json({ ok: true, courses, termTargets, orphanCourses });

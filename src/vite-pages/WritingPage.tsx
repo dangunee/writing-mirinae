@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import StudentAccountPanel from '../components/student/StudentAccountPanel'
+import AdminSandboxPanel from '../components/writing/AdminSandboxPanel'
 import AssignmentSubmitScreen from '../components/writing/AssignmentSubmitScreen'
 import WritingPageAdminPreview, {
   type WritingAdminPreviewPayload,
@@ -17,7 +18,9 @@ import type { AccessContext } from '../types/writingAccess'
 /** GET /api/writing/sessions/current — student / regular / trial course session (unified) */
 type CurrentSessionOk = {
   ok: true
-  accessKind?: 'student' | 'regular' | 'trial' | 'admin_test'
+  accessKind?: 'student' | 'regular' | 'trial' | 'admin_test' | 'admin_sandbox'
+  sandboxMode?: 'trial' | 'regular' | 'academy'
+  adminSandbox?: { contextExpiresAt: string; isTestSubmission: boolean }
   applicationId?: string
   grantId?: string
   accessExpiresAt?: string | null
@@ -79,6 +82,23 @@ export default function WritingPage() {
         | CurrentSessionOk
         | { ok: true; accessKind: 'trial'; applicationId: string; canSubmit: boolean; expiresAt: string | null }
         | { ok: false }
+      if (
+        data &&
+        'ok' in data &&
+        data.ok === true &&
+        'accessKind' in data &&
+        (data as { accessKind?: string }).accessKind === 'admin_sandbox'
+      ) {
+        const d = data as CurrentSessionOk
+        setCurrent(d)
+        const sm = d.sandboxMode
+        if (sm === 'trial' || sm === 'regular' || sm === 'academy') {
+          setAccessContext({ type: 'admin_sandbox', mode: sm })
+        } else {
+          setAccessContext({ type: 'student' })
+        }
+        return
+      }
       if (data && 'ok' in data && data.ok === true && 'accessKind' in data && data.accessKind === 'trial') {
         const td = data as Partial<CurrentSessionOk> & {
           ok: true
@@ -150,6 +170,9 @@ export default function WritingPage() {
 
   /** 管理者: プレビュー用に API で選んだコース／回次の theme_snapshot を優先 */
   const displaySession = useMemo((): CurrentSessionOk['session'] | null => {
+    if (current?.accessKind === 'admin_sandbox' && current.session) {
+      return current.session
+    }
     if (isAdmin && adminPreview) {
       return {
         id: adminPreview.sessionId ?? `preview-${adminPreview.courseId}-${adminPreview.sessionIndex}`,
@@ -162,22 +185,34 @@ export default function WritingPage() {
       }
     }
     return current?.session ?? null
-  }, [isAdmin, adminPreview, current?.session])
+  }, [isAdmin, adminPreview, current?.session, current?.accessKind])
 
   const session = displaySession
-  const submission = isAdmin && adminPreview ? null : (current?.submission ?? null)
+  const submission =
+    current?.accessKind === 'admin_sandbox'
+      ? (current.submission ?? null)
+      : isAdmin && adminPreview
+        ? null
+        : (current?.submission ?? null)
   /** 관리자プレビュー: 목록 API에 세션 행이 있으면 실제 sessionId로 제출 가능 */
   const canSubmit =
-    isAdmin && adminPreview
-      ? Boolean(adminPreview.sessionId?.trim())
-      : (current?.canSubmit ?? false)
+    current?.accessKind === 'admin_sandbox'
+      ? Boolean(current.canSubmit)
+      : isAdmin && adminPreview
+        ? Boolean(adminPreview.sessionId?.trim())
+        : (current?.canSubmit ?? false)
 
-  const showSessionTable = !(isAdmin && adminPreview) && Boolean(current?.ok && current.session)
+  const showSessionTable =
+    !(isAdmin && adminPreview) &&
+    current?.accessKind !== 'admin_sandbox' &&
+    Boolean(current?.ok && current.session)
   const weekLabel =
     session != null
-      ? isAdmin && adminPreview
-        ? `第${session.index}回 · プレビュー`
-        : `제${session.index}회 · ${formatUnlockLabel(session.unlockAt)}`
+      ? current?.accessKind === 'admin_sandbox'
+        ? `第${session.index}回 · Admin Sandbox（QA）`
+        : isAdmin && adminPreview
+          ? `第${session.index}回 · プレビュー`
+          : `제${session.index}회 · ${formatUnlockLabel(session.unlockAt)}`
       : ''
 
   const assignUi = parseAssignmentSnapshotForUi(session?.themeSnapshot ?? null)
@@ -198,9 +233,11 @@ export default function WritingPage() {
 
   const hasSession = session != null
   const canUseForm =
-    isAdmin && adminPreview
-      ? Boolean(adminPreview.sessionId?.trim() && !refetchAfterSubmit)
-      : Boolean(canSubmit && session?.id && !refetchAfterSubmit)
+    current?.accessKind === 'admin_sandbox'
+      ? Boolean(canSubmit && session?.id && !refetchAfterSubmit)
+      : isAdmin && adminPreview
+        ? Boolean(adminPreview.sessionId?.trim() && !refetchAfterSubmit)
+        : Boolean(canSubmit && session?.id && !refetchAfterSubmit)
 
   const emptyAssignmentsText = (() => {
     if (current?.ok && current.mode === 'all_done') return '모든 과제를 완료했습니다.'
@@ -236,7 +273,7 @@ export default function WritingPage() {
     : `${emptyAssignmentsText} 이용 가능한 과제가 열리면 이 영역에 과제 안내가 표시됩니다.`
 
   const handleSubmit = async () => {
-    if (isAdmin && adminPreview && !adminPreview.sessionId?.trim()) return
+    if (current?.accessKind !== 'admin_sandbox' && isAdmin && adminPreview && !adminPreview.sessionId?.trim()) return
     const sessionId = session?.id ?? null
     if (!sessionId || !content.trim() || !canSubmit || saving || submitLockRef.current) return
     submitLockRef.current = true
@@ -325,6 +362,11 @@ export default function WritingPage() {
 
   const desktopAfterSubmitSlot = (
     <>
+      {current?.accessKind === 'admin_sandbox' ? (
+        <p className="mb-3 text-[11px] leading-snug text-amber-900" role="note">
+          QAサンドボックス: 提出は管理者テスト用のDBテーブルのみに保存され、教師キューや本番集計には含まれません。
+        </p>
+      ) : null}
       {hasSession && session && !canSubmit ? (
         <p className="text-sm text-[#ba1a1a] mt-6" role="status">
           이 세션에서는 제출할 수 없습니다.
@@ -354,7 +396,16 @@ export default function WritingPage() {
   const mainTopSlot = (
     <>
       <StudentAccountPanel compact />
-      {isAdmin ? <WritingPageAdminPreview onPreview={onAdminPreview} /> : null}
+      {isAdmin ? (
+        <>
+          <AdminSandboxPanel
+            onSandboxChange={() => {
+              void loadCurrent()
+            }}
+          />
+          <WritingPageAdminPreview onPreview={onAdminPreview} />
+        </>
+      ) : null}
     </>
   )
 

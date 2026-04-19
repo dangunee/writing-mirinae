@@ -1,10 +1,17 @@
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { getDb } from "../../../../../server/db/client";
 import { parseRegularWritingGrantIdFromCookieHeader } from "../../../../../server/lib/regularSessionCookie";
 import { resolveRoleFromEnv } from "../../../../../server/lib/authMe";
 import { getSessionUserId } from "../../../../../server/lib/supabaseServer";
+import { resolveWritingRoleFromDbOrEnv } from "../../../../../server/lib/writingAuthRoles";
 import { ensureAdminSandboxCourse } from "../../../../../server/services/adminSandboxProvisionService";
+import {
+  adminSandboxCookieName,
+  buildAdminSandboxCurrentSessionResponse,
+  loadAdminSandboxContextById,
+} from "../../../../../server/services/adminSandboxService";
 import { advanceRegularGrantToNextCourseIfNeeded } from "../../../../../server/services/regularGrantAdvanceService";
 import {
   getCurrentSessionForAdminSandbox,
@@ -89,6 +96,21 @@ export async function GET(req: Request) {
   let studentError: string | undefined;
 
   if (userId) {
+    const role = await resolveWritingRoleFromDbOrEnv(db, userId);
+    if (role === "admin") {
+      const c = await cookies();
+      const sbxId = c.get(adminSandboxCookieName())?.value?.trim();
+      if (sbxId) {
+        const ctx = await loadAdminSandboxContextById(db, sbxId, userId);
+        if (ctx) {
+          const json = await buildAdminSandboxCurrentSessionResponse(db, ctx);
+          if (json) {
+            return NextResponse.json(json);
+          }
+        }
+      }
+    }
+
     const result = await getCurrentSessionForStudent(db, userId);
     if (result.ok) {
       return NextResponse.json(result);

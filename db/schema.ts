@@ -586,6 +586,84 @@ export const writingSubmissionAttachments = writing.table(
   ]
 );
 
+/** Admin QA: one row per admin; cookie references id. Server-validated only. */
+export const adminSandboxContexts = writing.table(
+  "admin_sandbox_contexts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    adminUserId: uuid("admin_user_id")
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "cascade" })
+      .unique(),
+    mode: text("mode").notNull(),
+    courseId: uuid("course_id")
+      .notNull()
+      .references(() => writingCourses.id, { onDelete: "cascade" }),
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => writingSessions.id, { onDelete: "cascade" }),
+    termId: uuid("term_id").references(() => writingTerms.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [
+    check(
+      "admin_sandbox_contexts_mode_chk",
+      sql`mode IN ('trial', 'regular', 'academy')`
+    ),
+    index("idx_admin_sandbox_ctx_expires").on(t.expiresAt),
+  ]
+);
+
+export const adminSandboxAudit = writing.table(
+  "admin_sandbox_audit",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    adminUserId: uuid("admin_user_id")
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    action: text("action").notNull(),
+    mode: text("mode"),
+    courseId: uuid("course_id"),
+    sessionId: uuid("session_id"),
+    success: boolean("success").notNull().default(true),
+    detail: jsonb("detail"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("idx_admin_sandbox_audit_admin_created").on(t.adminUserId, t.createdAt)]
+);
+
+/** Isolated from writing.submissions — never joins teacher queue. */
+export const adminSandboxTestSubmissions = writing.table(
+  "admin_sandbox_test_submissions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    adminUserId: uuid("admin_user_id")
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    courseId: uuid("course_id")
+      .notNull()
+      .references(() => writingCourses.id, { onDelete: "cascade" }),
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => writingSessions.id, { onDelete: "cascade" }),
+    sandboxMode: text("sandbox_mode").notNull(),
+    bodyText: text("body_text"),
+    status: text("status").notNull().default("draft"),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check(
+      "admin_sandbox_test_submissions_mode_chk",
+      sql`sandbox_mode IN ('trial', 'regular', 'academy')`
+    ),
+    unique("admin_sandbox_test_submissions_one_per_admin_session").on(t.adminUserId, t.sessionId),
+    index("idx_admin_sandbox_test_admin").on(t.adminUserId),
+  ]
+);
+
 export const writingCorrections = writing.table(
   "corrections",
   {

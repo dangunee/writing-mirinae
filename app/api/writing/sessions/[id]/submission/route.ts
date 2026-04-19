@@ -1,13 +1,22 @@
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { getDb } from "../../../../../../server/db/client";
 import { parseRegularWritingGrantIdFromCookieHeader } from "../../../../../../server/lib/regularSessionCookie";
 import { fetchTrialApplicationIdFromMirinaeSessionCookie } from "../../../../../../server/lib/writingTrialUpstream";
 import { requireWritingSubmissionEntitlement, resolveRoleFromEnv } from "../../../../../../server/lib/authMe";
-import { parseSubmissionMode } from "../../../../../../server/lib/writingSubmissionMode";
+import { parseWritingSubmissionPost } from "../../../../../../server/lib/parseWritingSubmissionPost";
 import { getSessionUserId } from "../../../../../../server/lib/supabaseServer";
-import type { PreparedAttachment } from "../../../../../../server/services/writingSubmissionInternal";
+import { resolveWritingRoleFromDbOrEnv } from "../../../../../../server/lib/writingAuthRoles";
 import * as writingStudentRepo from "../../../../../../server/repositories/writingStudentRepository";
+import {
+  appendAdminSandboxAudit,
+  adminSandboxCookieName,
+  loadAdminSandboxContextById,
+  writeAdminSandboxTestSubmission,
+  type AdminSandboxMode,
+} from "../../../../../../server/services/adminSandboxService";
+import type { PreparedAttachment } from "../../../../../../server/services/writingSubmissionInternal";
 import {
   saveOrSubmitSubmission,
   saveOrSubmitSubmissionForRegular,
@@ -27,6 +36,15 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   const trialApplicationId = await fetchTrialApplicationIdFromMirinaeSessionCookie(cookieHeader);
   const grantId = parseRegularWritingGrantIdFromCookieHeader(cookieHeader);
   const userId = await getSessionUserId();
+  const db = getDb();
+  const { id: sessionId } = await context.params;
+
+  const parsed = await parseWritingSubmissionPost(req);
+  if (!parsed.ok) {
+    return NextResponse.json({ error: parsed.error }, { status: parsed.status });
+  }
+
+  const { action, bodyText, attachments, submissionMode } = parsed;
 
   console.log("[submission] path:", {
     trial: !!trialApplicationId,
@@ -41,10 +59,57 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     return NextResponse.json({ error: "ambiguous_identity" }, { status: 400 });
   }
 
-  const db = getDb();
-  const { id: sessionId } = await context.params;
-
+  /** Admin QA sandbox — isolated table; session must match cookie context. */
   if (userId && !trialApplicationId && !grantId) {
+    const role = await resolveWritingRoleFromDbOrEnv(db, userId);
+    if (role === "admin") {
+      const cookieStore = await cookies();
+      const ctxId = cookieStore.get(adminSandboxCookieName())?.value?.trim();
+      if (ctxId) {
+        const ctx = await loadAdminSandboxContextById(db, ctxId, userId);
+        if (ctx && ctx.sessionId === sessionId) {
+          if (attachments.length > 0) {
+            return NextResponse.json({ error: "sandbox_attachments_not_supported" }, { status: 400 });
+          }
+          const r = await writeAdminSandboxTestSubmission(db, {
+            adminUserId: userId,
+            mode: ctx.mode as AdminSandboxMode,
+            courseId: ctx.courseId,
+            sessionId,
+            action,
+            bodyText,
+            contextValid: true,
+          });
+          if (!r.ok) {
+            await appendAdminSandboxAudit(db, {
+              adminUserId: userId,
+              action: "sandbox_submit",
+              mode: ctx.mode,
+              courseId: ctx.courseId,
+              sessionId,
+              success: false,
+              detail: { code: r.code },
+            });
+            return NextResponse.json({ error: r.code }, { status: r.status });
+          }
+          await appendAdminSandboxAudit(db, {
+            adminUserId: userId,
+            action: "sandbox_submit",
+            mode: ctx.mode,
+            courseId: ctx.courseId,
+            sessionId,
+            success: true,
+            detail: { submissionId: r.submissionId },
+          });
+          return NextResponse.json({
+            submissionId: r.submissionId,
+            status: r.status,
+            adminSandboxTest: true as const,
+          });
+        }
+      }
+    }
+
     const probe = await writingStudentRepo.getSessionByIdWithCourse(db, sessionId);
     if (probe?.course.isAdminSandbox) {
       if (resolveRoleFromEnv(userId) !== "admin" || probe.course.userId !== userId) {
@@ -57,88 +122,6 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
       }
     }
   }
-  const contentType = req.headers.get("content-type") ?? "";
-
-  let action: "save" | "submit" = "save";
-  let bodyText: string | null = null;
-  const attachments: PreparedAttachment[] = [];
-  let submissionMode = null as ReturnType<typeof parseSubmissionMode>;
-
-  if (contentType.includes("multipart/form-data")) {
-    const form = await req.formData();
-    const forbiddenFormKeys = [
-      "userId",
-      "user_id",
-      "status",
-      "courseId",
-      "course_id",
-      "sessionId",
-      "session_id",
-      "grantId",
-      "grant_id",
-      "trialApplicationId",
-      "trial_application_id",
-    ];
-    for (const k of forbiddenFormKeys) {
-      if (form.has(k)) {
-        return NextResponse.json({ error: "forbidden_fields" }, { status: 400 });
-      }
-    }
-    const act = form.get("action");
-    action = act === "submit" ? "submit" : "save";
-    const bt = form.get("bodyText");
-    bodyText = typeof bt === "string" ? bt : null;
-    const sm = form.get("submissionMode");
-    submissionMode = typeof sm === "string" ? parseSubmissionMode(sm) : null;
-    const legacyImage = form.get("image");
-    if (legacyImage instanceof File && legacyImage.size > 0) {
-      attachments.push({
-        buffer: Buffer.from(await legacyImage.arrayBuffer()),
-        mimeType: legacyImage.type || "application/octet-stream",
-        originalFilename: legacyImage.name || "image",
-      });
-    }
-    for (const entry of form.getAll("files")) {
-      if (entry instanceof File && entry.size > 0) {
-        attachments.push({
-          buffer: Buffer.from(await entry.arrayBuffer()),
-          mimeType: entry.type || "application/octet-stream",
-          originalFilename: entry.name || "file",
-        });
-      }
-    }
-  } else if (contentType.includes("application/json")) {
-    let json: Record<string, unknown>;
-    try {
-      json = (await req.json()) as Record<string, unknown>;
-    } catch {
-      return NextResponse.json({ error: "invalid_json" }, { status: 400 });
-    }
-    const forbiddenJsonKeys = [
-      "userId",
-      "user_id",
-      "status",
-      "courseId",
-      "course_id",
-      "sessionId",
-      "session_id",
-      "grantId",
-      "grant_id",
-      "trialApplicationId",
-      "trial_application_id",
-    ];
-    for (const k of forbiddenJsonKeys) {
-      if (k in json) {
-        return NextResponse.json({ error: "forbidden_fields" }, { status: 400 });
-      }
-    }
-    action = json.action === "submit" ? "submit" : "save";
-    bodyText = typeof json.bodyText === "string" ? json.bodyText : null;
-    submissionMode =
-      typeof json.submissionMode === "string" ? parseSubmissionMode(json.submissionMode) : null;
-  } else {
-    return NextResponse.json({ error: "unsupported_content_type" }, { status: 415 });
-  }
 
   const result = trialApplicationId
     ? await saveOrSubmitSubmissionForTrial(db, {
@@ -147,7 +130,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
         action,
         bodyText,
         submissionMode,
-        attachments,
+        attachments: attachments as PreparedAttachment[],
       })
     : grantId
       ? await saveOrSubmitSubmissionForRegular(db, {
@@ -156,7 +139,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
           action,
           bodyText,
           submissionMode,
-          attachments,
+          attachments: attachments as PreparedAttachment[],
         })
       : await saveOrSubmitSubmission(db, {
           userId: userId!,
@@ -164,7 +147,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
           action,
           bodyText,
           submissionMode,
-          attachments,
+          attachments: attachments as PreparedAttachment[],
         });
 
   if (!result.ok) {
