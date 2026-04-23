@@ -111,7 +111,11 @@ export type QueueGroupedResponse = {
 };
 
 export async function getTeacherQueueGrouped(db: Db): Promise<QueueGroupedResponse> {
-  await backfillSubmittedAdminSandboxMirrors(db);
+  try {
+    await backfillSubmittedAdminSandboxMirrors(db);
+  } catch (e) {
+    console.warn("teacher_queue_sandbox_backfill_skipped", { err: e });
+  }
   const rows = await repo.listSubmissionQueue(db);
   const items: QueueItem[] = rows.map((r) => ({
     submissionId: r.submission.id,

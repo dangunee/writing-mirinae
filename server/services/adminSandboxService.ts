@@ -501,18 +501,25 @@ export async function trySyncSandboxMirrorBySubmissionId(db: Db, adminSandboxSub
   }
 }
 
-/** Called when loading the teacher queue so older sandbox submits get a mirror without re-submit. */
+/**
+ * Called when loading the teacher queue so older sandbox submits get a mirror without re-submit.
+ * Never throws: failures (missing table, DB errors, etc.) must not break the teacher queue response.
+ */
 export async function backfillSubmittedAdminSandboxMirrors(db: Db): Promise<void> {
-  const rows = await db
-    .select()
-    .from(adminSandboxTestSubmissions)
-    .where(eq(adminSandboxTestSubmissions.status, "submitted"));
-  for (const testRow of rows) {
-    try {
-      await syncAdminSandboxTestRowToWritingSubmission(db, testRow);
-    } catch (e) {
-      console.warn("admin_sandbox_mirror_backfill_failed", { sandboxId: testRow.id, err: e });
+  try {
+    const rows = await db
+      .select()
+      .from(adminSandboxTestSubmissions)
+      .where(eq(adminSandboxTestSubmissions.status, "submitted"));
+    for (const testRow of rows) {
+      try {
+        await syncAdminSandboxTestRowToWritingSubmission(db, testRow);
+      } catch (e) {
+        console.warn("admin_sandbox_mirror_backfill_failed", { sandboxId: testRow.id, err: e });
+      }
     }
+  } catch (e) {
+    console.warn("admin_sandbox_backfill_unavailable", { err: e });
   }
 }
 
