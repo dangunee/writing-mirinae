@@ -15,10 +15,31 @@ import type { Db } from "../db/client";
 
 const QUEUE_STATUSES = ["submitted", "in_review"] as const;
 
+/**
+ * Some production DBs lack `grammar_check_result`; teacher routes must not select it (avoids PostgresError).
+ * Keep columns in sync with `writing.submissions` minus that field.
+ */
+const submissionColumnsForTeacher = {
+  id: writingSubmissions.id,
+  sessionId: writingSubmissions.sessionId,
+  courseId: writingSubmissions.courseId,
+  userId: writingSubmissions.userId,
+  regularAccessGrantId: writingSubmissions.regularAccessGrantId,
+  trialApplicationId: writingSubmissions.trialApplicationId,
+  status: writingSubmissions.status,
+  submissionMode: writingSubmissions.submissionMode,
+  bodyText: writingSubmissions.bodyText,
+  imageStorageKey: writingSubmissions.imageStorageKey,
+  imageMimeType: writingSubmissions.imageMimeType,
+  submittedAt: writingSubmissions.submittedAt,
+  createdAt: writingSubmissions.createdAt,
+  updatedAt: writingSubmissions.updatedAt,
+} as const;
+
 export async function listSubmissionQueue(db: Db) {
   const rows = await db
     .select({
-      submission: writingSubmissions,
+      submission: submissionColumnsForTeacher,
       session: writingSessions,
       course: writingCourses,
       correction: writingCorrections,
@@ -35,7 +56,7 @@ export async function listSubmissionQueue(db: Db) {
 export async function getSubmissionFullForTeacher(db: Db, submissionId: string) {
   const rows = await db
     .select({
-      submission: writingSubmissions,
+      submission: submissionColumnsForTeacher,
       session: writingSessions,
       course: writingCourses,
     })

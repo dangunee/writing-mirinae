@@ -275,7 +275,7 @@ export async function getTeacherSubmissionDetail(
       bodyText: row.submission.bodyText,
       imageMimeType: row.submission.imageMimeType,
       imageUrl,
-      grammarCheckResult: row.submission.grammarCheckResult ?? null,
+      grammarCheckResult: null,
       submittedAt: row.submission.submittedAt?.toISOString() ?? null,
       createdAt: row.submission.createdAt.toISOString(),
       updatedAt: row.submission.updatedAt.toISOString(),
