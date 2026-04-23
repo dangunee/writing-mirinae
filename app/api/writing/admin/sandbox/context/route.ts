@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { getDb } from "../../../../../../server/db/client";
 import { requireAdminUserId } from "../../../../../../server/lib/adminAuth";
+import { resolveWritingTrialCourseIdForAdmin } from "../../../../../../server/lib/writingTrialCourseResolve";
 import {
   adminSandboxCookieMaxAgeSeconds,
   adminSandboxCookieName,
@@ -24,6 +25,15 @@ function parseJson(req: Request): Promise<Record<string, unknown>> {
   return req.json().catch(() => ({})) as Promise<Record<string, unknown>>;
 }
 
+async function adminSandboxHints(db: ReturnType<typeof getDb>) {
+  const trialCourseId = await resolveWritingTrialCourseIdForAdmin(db);
+  return {
+    trialCourseId,
+    regularAllowlistActive: Boolean(process.env.ADMIN_SANDBOX_REGULAR_ALLOWED_COURSE_IDS?.trim()),
+    academyAllowlist: process.env.ADMIN_SANDBOX_ACADEMY_COURSE_IDS?.trim() ?? null,
+  };
+}
+
 /**
  * GET /api/writing/admin/sandbox/context — current sandbox + env hints for UI (admin only).
  */
@@ -39,16 +49,13 @@ export async function GET() {
   const c = await cookies();
   const id = c.get(adminSandboxCookieName())?.value?.trim();
   const db = getDb();
+  const hints = await adminSandboxHints(db);
 
   if (!id) {
     return NextResponse.json({
       ok: true,
       active: false,
-      hints: {
-        trialCourseId: process.env.WRITING_TRIAL_COURSE_ID?.trim() ?? null,
-        regularAllowlistActive: Boolean(process.env.ADMIN_SANDBOX_REGULAR_ALLOWED_COURSE_IDS?.trim()),
-        academyAllowlist: process.env.ADMIN_SANDBOX_ACADEMY_COURSE_IDS?.trim() ?? null,
-      },
+      hints,
     });
   }
 
@@ -57,11 +64,7 @@ export async function GET() {
     return NextResponse.json({
       ok: true,
       active: false,
-      hints: {
-        trialCourseId: process.env.WRITING_TRIAL_COURSE_ID?.trim() ?? null,
-        regularAllowlistActive: Boolean(process.env.ADMIN_SANDBOX_REGULAR_ALLOWED_COURSE_IDS?.trim()),
-        academyAllowlist: process.env.ADMIN_SANDBOX_ACADEMY_COURSE_IDS?.trim() ?? null,
-      },
+      hints,
     });
   }
 
@@ -78,11 +81,7 @@ export async function GET() {
       expiresAt: ctx.expiresAt.toISOString(),
     },
     sessionPreview: sessionJson,
-    hints: {
-      trialCourseId: process.env.WRITING_TRIAL_COURSE_ID?.trim() ?? null,
-      regularAllowlistActive: Boolean(process.env.ADMIN_SANDBOX_REGULAR_ALLOWED_COURSE_IDS?.trim()),
-      academyAllowlist: process.env.ADMIN_SANDBOX_ACADEMY_COURSE_IDS?.trim() ?? null,
-    },
+    hints,
   });
 }
 

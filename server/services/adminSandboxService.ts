@@ -14,6 +14,7 @@ import {
 import { PostgresError } from "postgres";
 
 import type { Db } from "../db/client";
+import { resolveWritingTrialCourseIdForAdmin } from "../lib/writingTrialCourseResolve";
 import { checkSessionEligibleForAdminSandboxTest } from "../lib/writingSubmissionEligibility";
 import * as repo from "../repositories/writingStudentRepository";
 
@@ -80,7 +81,7 @@ export async function validateAdminSandboxSelection(
   | { ok: true }
   | { ok: false; code: string }
 > {
-  const trialCourseId = process.env.WRITING_TRIAL_COURSE_ID?.trim() ?? "";
+  const trialCourseIdResolved = await resolveWritingTrialCourseIdForAdmin(db);
 
   const row = await repo.getSessionByIdWithCourse(db, input.sessionId);
   if (!row || row.session.courseId !== input.courseId) {
@@ -90,7 +91,7 @@ export async function validateAdminSandboxSelection(
   const course = row.course;
 
   if (input.mode === "trial") {
-    if (!trialCourseId || course.id !== trialCourseId) {
+    if (!trialCourseIdResolved || course.id !== trialCourseIdResolved) {
       return { ok: false, code: "trial_course_mismatch" };
     }
     /** Align with admin assignment list: trial authoring course may be pending_setup until schedule finalizes. */
@@ -108,7 +109,7 @@ export async function validateAdminSandboxSelection(
     if (course.isAdminSandbox) {
       return { ok: false, code: "invalid_course_for_mode" };
     }
-    if (trialCourseId && course.id === trialCourseId) {
+    if (trialCourseIdResolved && course.id === trialCourseIdResolved) {
       return { ok: false, code: "invalid_course_for_mode" };
     }
     const allowIds = parseCsvIds(process.env.ADMIN_SANDBOX_REGULAR_ALLOWED_COURSE_IDS);
