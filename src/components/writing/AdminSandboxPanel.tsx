@@ -132,27 +132,29 @@ export default function AdminSandboxPanel({
     })
   }, [courses, hints, mode])
 
+  /** Trial: allow empty local courseId — use server hint for assignments + POST (same as WRITING_TRIAL_COURSE_ID). */
+  const effectiveCourseId = useMemo(() => {
+    if (mode === 'trial') {
+      const fromUi = courseId.trim()
+      if (fromUi) return fromUi
+      return hints?.trialCourseId?.trim() ?? ''
+    }
+    return courseId.trim()
+  }, [mode, courseId, hints?.trialCourseId])
+
   useEffect(() => {
     if (!courseId && filteredCourses.length > 0) {
       setCourseId(filteredCourses[0].courseId)
     }
   }, [filteredCourses, courseId])
 
-  /** Trial: server-resolved course id from env (hints); no manual dropdown pick required once hints load. */
   useEffect(() => {
-    if (mode !== 'trial') return
-    const tid = hints?.trialCourseId?.trim()
-    if (!tid) return
-    setCourseId(tid)
-  }, [mode, hints?.trialCourseId])
-
-  useEffect(() => {
-    if (!courseId) {
+    if (!effectiveCourseId) {
       setSessions([])
       return
     }
     let cancelled = false
-    const q = new URLSearchParams({ courseId })
+    const q = new URLSearchParams({ courseId: effectiveCourseId })
     void fetch(apiUrl(`/api/writing/admin/assignments/list?${q}`), { credentials: 'include' })
       .then((r) => r.json())
       .then((data: { sessions?: { sessionIndex: number; sessionId: string | null }[] }) => {
@@ -170,7 +172,7 @@ export default function AdminSandboxPanel({
     return () => {
       cancelled = true
     }
-  }, [courseId])
+  }, [effectiveCourseId])
 
   const selectedSessionId = useMemo(() => {
     const row = sessions.find((s) => s.sessionIndex === sessionIndex)
@@ -181,7 +183,8 @@ export default function AdminSandboxPanel({
     setLoading(true)
     setMessage(null)
     try {
-      if (!courseId || !selectedSessionId) {
+      const cid = effectiveCourseId
+      if (!cid || !selectedSessionId) {
         setMessage('コースとセッション（作成済み）を選んでください。')
         return
       }
@@ -189,7 +192,7 @@ export default function AdminSandboxPanel({
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode, courseId, sessionId: selectedSessionId }),
+        body: JSON.stringify({ mode, courseId: cid, sessionId: selectedSessionId }),
       })
       const j = (await res.json()) as { ok?: boolean; error?: string }
       if (!res.ok || !j.ok) {
@@ -290,7 +293,7 @@ export default function AdminSandboxPanel({
           </label>
           <button
             type="button"
-            disabled={loading || !selectedSessionId}
+            disabled={loading || (mode !== 'trial' && !courseId.trim()) || !selectedSessionId}
             onClick={() => void activate()}
             className="rounded bg-amber-700 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-amber-800 disabled:opacity-50"
           >
