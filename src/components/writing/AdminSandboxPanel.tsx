@@ -40,6 +40,25 @@ type SandboxGet =
 
 type ListSession = { sessionIndex: number; sessionId: string | null }
 
+type ResultBanner = { tone: 'success' | 'error'; text: string }
+
+function formatSandboxActivateError(code: string): string {
+  const c = code.trim()
+  const labels: Record<string, string> = {
+    course_not_active: 'コースがアクティブではありません',
+    trial_course_mismatch: '体験コースが一致しません',
+    session_not_found: 'セッションが見つかりません',
+    invalid_course_for_mode: 'このモードでは選べないコースです',
+    course_not_allowlisted: 'このコースは regular サンドボックスの許可リストにありません',
+    academy_course_invalid: 'アカデミー対象のコースではありません',
+    invalid_body: 'リクエスト内容が不正です',
+    unauthorized: '認可されませんでした',
+    forbidden: '権限がありません',
+  }
+  const human = labels[c] ?? '有効化に失敗しました'
+  return `${human}（${c}）`
+}
+
 let adminCoursesCache: { at: number; courses: CourseRow[] } | null = null
 const ADMIN_COURSES_CACHE_TTL_MS = 60_000
 
@@ -74,8 +93,10 @@ export default function AdminSandboxPanel({
   const [courseId, setCourseId] = useState('')
   const [sessionIndex, setSessionIndex] = useState(1)
   const [sessions, setSessions] = useState<ListSession[]>([])
+  const [assignmentsLoading, setAssignmentsLoading] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState<string | null>(null)
+  /** Last activate outcome (green / red). Cleared when mode or course changes. */
+  const [lastResult, setLastResult] = useState<ResultBanner | null>(null)
 
   const refresh = useCallback(async () => {
     const r = await fetch(apiUrl('/api/writing/admin/sandbox/context'), { credentials: 'include' })
@@ -154,9 +175,11 @@ export default function AdminSandboxPanel({
   useEffect(() => {
     if (!effectiveCourseId) {
       setSessions([])
+      setAssignmentsLoading(false)
       return
     }
     let cancelled = false
+    setAssignmentsLoading(true)
     const q = new URLSearchParams({ courseId: effectiveCourseId })
     void fetch(apiUrl(`/api/writing/admin/assignments/list?${q}`), { credentials: 'include' })
       .then((r) => r.json())
@@ -172,10 +195,17 @@ export default function AdminSandboxPanel({
       .catch(() => {
         if (!cancelled) setSessions([])
       })
+      .finally(() => {
+        if (!cancelled) setAssignmentsLoading(false)
+      })
     return () => {
       cancelled = true
     }
   }, [effectiveCourseId])
+
+  useEffect(() => {
+    setLastResult(null)
+  }, [mode, courseId])
 
   /** Trial: auto-pick first row with a real session UUID so 有効化 enables without manual 回 selection. */
   useEffect(() => {
@@ -191,26 +221,93 @@ export default function AdminSandboxPanel({
     return row?.sessionId?.trim() ?? null
   }, [sessions, sessionIndex])
 
+  const activationBlockedReason = useMemo((): string | null => {
+    const sandboxActive = status != null && 'active' in status && status.active === true
+    if (sandboxActive || loading) return null
+    if (mode === 'trial' && !effectiveCourseId) {
+      return '体験コースが見つかりません（trial設定またはコース状態を確認してください）'
+    }
+    if (mode !== 'trial' && !courseId.trim()) {
+      return 'コースを選択してください'
+    }
+    if (!effectiveCourseId) {
+      return 'コースを選択してください'
+    }
+    if (assignmentsLoading) {
+      return 'セッション情報を読み込み中です…'
+    }
+    if (sessions.length === 0) {
+      return 'セッション一覧を取得できていません。コースを確認してください。'
+    }
+    const hasValid = sessions.some((s) => (s.sessionId ?? '').trim().length > 0)
+    if (!hasValid) {
+      return '有効なセッションがありません（コースが未セットアップの可能性があります）'
+    }
+    if (!selectedSessionId) {
+      return '回（セッション）が選択されていません'
+    }
+    return null
+  }, [
+    status,
+    loading,
+    mode,
+    courseId,
+    effectiveCourseId,
+    assignmentsLoading,
+    sessions,
+    selectedSessionId,
+  ])
+
+  function runActivatePrecheck(): string | null {
+    if (mode === 'trial' && !effectiveCourseId) {
+      return '体験コースが見つかりません（trial設定またはコース状態を確認してください）'
+    }
+    if (mode !== 'trial' && !courseId.trim()) {
+      return 'コースを選択してください'
+    }
+    if (!effectiveCourseId) {
+      return 'コースを選択してください'
+    }
+    if (assignmentsLoading) {
+      return 'セッション情報を読み込み中です。完了してから再度お試しください。'
+    }
+    if (sessions.length === 0) {
+      return 'セッション一覧を取得できていません。コースを確認してください。'
+    }
+    const hasValid = sessions.some((s) => (s.sessionId ?? '').trim().length > 0)
+    if (!hasValid) {
+      return '有効なセッションがありません（コースが未セットアップの可能性があります）'
+    }
+    if (!selectedSessionId) {
+      return '回（セッション）が選択されていません'
+    }
+    return null
+  }
+
   async function activate() {
     setLoading(true)
-    setMessage(null)
+    setLastResult(null)
     try {
-      const cid = effectiveCourseId
-      if (!cid || !selectedSessionId) {
-        setMessage('コースとセッション（作成済み）を選んでください。')
+      const pre = runActivatePrecheck()
+      if (pre) {
+        setLastResult({ tone: 'error', text: pre })
         return
       }
+      const cid = effectiveCourseId
+      const sid = selectedSessionId!
       const res = await fetch(apiUrl('/api/writing/admin/sandbox/context'), {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode, courseId: cid, sessionId: selectedSessionId }),
+        body: JSON.stringify({ mode, courseId: cid, sessionId: sid }),
       })
       const j = (await res.json()) as { ok?: boolean; error?: string }
       if (!res.ok || !j.ok) {
-        setMessage(typeof j.error === 'string' ? j.error : `HTTP ${res.status}`)
+        const raw = typeof j.error === 'string' ? j.error.trim() : `HTTP_${res.status}`
+        setLastResult({ tone: 'error', text: formatSandboxActivateError(raw) })
         return
       }
+      setLastResult({ tone: 'success', text: 'Sandboxが有効化されました' })
       await refresh()
       onSandboxChange()
     } finally {
@@ -220,7 +317,7 @@ export default function AdminSandboxPanel({
 
   async function clearSandbox() {
     setLoading(true)
-    setMessage(null)
+    setLastResult(null)
     try {
       await fetch(apiUrl('/api/writing/admin/sandbox/context'), {
         method: 'DELETE',
@@ -265,7 +362,7 @@ export default function AdminSandboxPanel({
             <select
               value={mode}
               onChange={(e) => {
-                setMessage(null)
+                setLastResult(null)
                 setMode(e.target.value as SandboxMode)
                 setCourseId('')
               }}
@@ -315,7 +412,20 @@ export default function AdminSandboxPanel({
           </button>
         </div>
       )}
-      {message ? <p className="mt-2 text-[11px] text-red-700">{message}</p> : null}
+      {lastResult ? (
+        <p
+          className={`mt-2 text-[11px] font-medium ${
+            lastResult.tone === 'success' ? 'text-green-800' : 'text-red-700'
+          }`}
+          role={lastResult.tone === 'success' ? 'status' : 'alert'}
+        >
+          {lastResult.text}
+        </p>
+      ) : activationBlockedReason ? (
+        <p className="mt-2 text-[11px] font-medium text-amber-900" role="note">
+          {activationBlockedReason}
+        </p>
+      ) : null}
     </div>
   )
 }
