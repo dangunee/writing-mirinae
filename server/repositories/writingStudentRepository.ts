@@ -47,6 +47,25 @@ export async function findAdminSandboxCourseForUser(db: Db, userId: string) {
   return rows[0] ?? null;
 }
 
+/**
+ * Admin sandbox row for this user (at most one per partial unique index), any provisioning status.
+ * Used to repair stuck pending_setup (e.g. unique-race + failed provision) without weakening auth.
+ */
+export async function findAdminSandboxCourseForUserAnyStatus(db: Db, userId: string) {
+  const rows = await db
+    .select()
+    .from(writingCourses)
+    .where(
+      and(
+        eq(writingCourses.userId, userId),
+        eq(writingCourses.isAdminSandbox, true),
+        inArray(writingCourses.status, ["active", "pending_setup"])
+      )
+    )
+    .limit(1);
+  return rows[0] ?? null;
+}
+
 export async function getWritingCourseById(db: Db, courseId: string) {
   const rows = await db.select().from(writingCourses).where(eq(writingCourses.id, courseId)).limit(1);
   return rows[0] ?? null;

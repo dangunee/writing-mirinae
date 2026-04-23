@@ -1,7 +1,7 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { PostgresError } from "postgres";
 
-import { products } from "../../db/schema";
+import { products, writingCourses } from "../../db/schema";
 import type { Db } from "../db/client";
 import { resolveWritingRoleFromDbOrEnv } from "../lib/writingAuthRoles";
 import { assertIsoDateOnly, DEFAULT_TZ } from "../lib/schedule";
@@ -15,6 +15,47 @@ const ADMIN_SANDBOX_SKU = "writing_admin_sandbox_v1";
 function calendarIsoInTokyo(): string {
   const s = new Date().toLocaleDateString("en-CA", { timeZone: DEFAULT_TZ });
   return assertIsoDateOnly(s);
+}
+
+/**
+ * Ensures writing.sessions rows exist for the admin sandbox course. Idempotent.
+ * - pending_setup + 0 sessions: provisionWritingSessions
+ * - active + 0 sessions (bad data): temporarily pending_setup, then provision (provision rejects "active")
+ * Unique-index race (23505): insert skipped; this repair path still runs on next call via findAnyStatus.
+ */
+async function ensureAdminSandboxSessionsExist(
+  db: Db,
+  userId: string,
+  course: typeof writingCourses.$inferSelect
+): Promise<void> {
+  const sessions = await studentRepo.listSessionsForCourseOrdered(db, course.id);
+  if (sessions.length > 0) {
+    return;
+  }
+
+  if (course.status === "active") {
+    await db
+      .update(writingCourses)
+      .set({ status: "pending_setup", updatedAt: new Date() })
+      .where(and(eq(writingCourses.id, course.id), eq(writingCourses.userId, userId)));
+  }
+
+  const interval: CourseInterval = "interval_1d";
+  const startDateIso = calendarIsoInTokyo();
+  const provision = await provisionWritingSessions(db, {
+    courseId: course.id,
+    actorUserId: userId,
+    startDateIso,
+    interval,
+  });
+  if (!provision.ok) {
+    console.error("admin_sandbox_provision_failed", {
+      userId,
+      courseId: course.id,
+      reason: provision.reason,
+      httpStatus: provision.httpStatus,
+    });
+  }
 }
 
 /**
@@ -32,8 +73,9 @@ export async function ensureAdminSandboxCourse(db: Db, userId: string): Promise<
     return;
   }
 
-  const existing = await studentRepo.findAdminSandboxCourseForUser(db, userId);
-  if (existing) {
+  const stuck = await studentRepo.findAdminSandboxCourseForUserAnyStatus(db, userId);
+  if (stuck) {
+    await ensureAdminSandboxSessionsExist(db, userId, stuck);
     return;
   }
 
@@ -81,19 +123,13 @@ export async function ensureAdminSandboxCourse(db: Db, userId: string): Promise<
       isAdminSandbox: true,
     });
 
-    const interval: CourseInterval = "interval_1d";
-    const startDateIso = calendarIsoInTokyo();
-    const provision = await provisionWritingSessions(db, {
-      courseId: course.id,
-      actorUserId: userId,
-      startDateIso,
-      interval,
-    });
-    if (!provision.ok) {
-      console.error("admin_sandbox_provision_failed", { userId, reason: provision.reason });
-    }
+    await ensureAdminSandboxSessionsExist(db, userId, course);
   } catch (e) {
     if (e instanceof PostgresError && e.code === "23505") {
+      const row = await studentRepo.findAdminSandboxCourseForUserAnyStatus(db, userId);
+      if (row) {
+        await ensureAdminSandboxSessionsExist(db, userId, row);
+      }
       return;
     }
     throw e;
