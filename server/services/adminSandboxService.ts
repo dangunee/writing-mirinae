@@ -1,6 +1,8 @@
 /**
  * Admin-only QA sandbox: preview student UX for trial / regular / academy without impersonation.
- * Context is server-validated; test submissions live in writing.admin_sandbox_test_submissions (not writing.submissions).
+ * Context is server-validated; test submissions live in writing.admin_sandbox_test_submissions.
+ * On submit, a mirror row is upserted into writing.submissions (submission_mode = admin_sandbox) so
+ * the teacher correction flow (FK to writing.submissions) can run without schema changes.
  */
 
 import { and, eq } from "drizzle-orm";
@@ -10,6 +12,7 @@ import {
   adminSandboxContexts,
   adminSandboxTestSubmissions,
   type writingSessions,
+  writingSubmissions,
 } from "../../db/schema";
 import { PostgresError } from "postgres";
 
@@ -19,6 +22,9 @@ import { checkSessionEligibleForAdminSandboxTest } from "../lib/writingSubmissio
 import * as repo from "../repositories/writingStudentRepository";
 
 export type AdminSandboxMode = "trial" | "regular" | "academy";
+
+/** Mirrors into writing.submissions.submission_mode so teacher queue/detail can detect QA rows. */
+export const ADMIN_SANDBOX_SUBMISSION_MODE = "admin_sandbox";
 
 const COOKIE_NAME = "writing_admin_sbx_ctx";
 
@@ -410,6 +416,106 @@ export type AdminSandboxSubmissionResult =
   | { ok: true; submissionId: string; status: string; alreadySubmitted?: boolean }
   | { ok: false; status: number; code: string };
 
+/**
+ * Ensures a writing.submissions row exists for this sandbox test row so corrections can attach (FK).
+ * Skips if another (non-sandbox) submission already occupies the session.
+ */
+export async function syncAdminSandboxTestRowToWritingSubmission(
+  db: Db,
+  testRow: typeof adminSandboxTestSubmissions.$inferSelect
+): Promise<void> {
+  if (testRow.status !== "submitted") return;
+
+  const [existingForSession] = await db
+    .select()
+    .from(writingSubmissions)
+    .where(eq(writingSubmissions.sessionId, testRow.sessionId))
+    .limit(1);
+
+  const now = new Date();
+  const submittedAt = testRow.submittedAt ?? now;
+
+  if (existingForSession) {
+    if (
+      existingForSession.submissionMode === ADMIN_SANDBOX_SUBMISSION_MODE &&
+      existingForSession.userId === testRow.adminUserId
+    ) {
+      await db
+        .update(writingSubmissions)
+        .set({
+          bodyText: testRow.bodyText,
+          courseId: testRow.courseId,
+          updatedAt: now,
+        })
+        .where(eq(writingSubmissions.id, existingForSession.id));
+      return;
+    }
+    console.warn("admin_sandbox_mirror_session_conflict", {
+      sessionId: testRow.sessionId,
+      sandboxTestId: testRow.id,
+      existingSubmissionId: existingForSession.id,
+    });
+    return;
+  }
+
+  try {
+    await db.insert(writingSubmissions).values({
+      sessionId: testRow.sessionId,
+      courseId: testRow.courseId,
+      userId: testRow.adminUserId,
+      regularAccessGrantId: null,
+      trialApplicationId: null,
+      status: "submitted",
+      submissionMode: ADMIN_SANDBOX_SUBMISSION_MODE,
+      bodyText: testRow.bodyText,
+      imageStorageKey: null,
+      imageMimeType: null,
+      grammarCheckResult: null,
+      submittedAt,
+    });
+  } catch (e) {
+    if (e instanceof PostgresError && e.code === "23505") {
+      console.warn("admin_sandbox_mirror_insert_unique_violation", {
+        sessionId: testRow.sessionId,
+        adminUserId: testRow.adminUserId,
+      });
+      return;
+    }
+    throw e;
+  }
+}
+
+/** Best-effort mirror sync after sandbox persist (does not fail the HTTP handler). */
+export async function trySyncSandboxMirrorBySubmissionId(db: Db, adminSandboxSubmissionId: string): Promise<void> {
+  try {
+    const [row] = await db
+      .select()
+      .from(adminSandboxTestSubmissions)
+      .where(eq(adminSandboxTestSubmissions.id, adminSandboxSubmissionId))
+      .limit(1);
+    if (row?.status === "submitted") {
+      await syncAdminSandboxTestRowToWritingSubmission(db, row);
+    }
+  } catch (e) {
+    console.warn("admin_sandbox_mirror_sync_failed", { adminSandboxSubmissionId, err: e });
+  }
+}
+
+/** Called when loading the teacher queue so older sandbox submits get a mirror without re-submit. */
+export async function backfillSubmittedAdminSandboxMirrors(db: Db): Promise<void> {
+  const rows = await db
+    .select()
+    .from(adminSandboxTestSubmissions)
+    .where(eq(adminSandboxTestSubmissions.status, "submitted"));
+  for (const testRow of rows) {
+    try {
+      await syncAdminSandboxTestRowToWritingSubmission(db, testRow);
+    } catch (e) {
+      console.warn("admin_sandbox_mirror_backfill_failed", { sandboxId: testRow.id, err: e });
+    }
+  }
+}
+
 export function sandboxSubmitErrorMessage(code: string): string {
   const map: Record<string, string> = {
     session_missed: "この回は失効済みのため、サンドボックス提出できません。",
@@ -480,6 +586,7 @@ export async function writeAdminSandboxTestSubmission(
         sessionId: input.sessionId,
         adminUserId: input.adminUserId,
       });
+      await trySyncSandboxMirrorBySubmissionId(db, cur.id);
       return {
         ok: true,
         submissionId: cur.id,
@@ -518,6 +625,9 @@ export async function writeAdminSandboxTestSubmission(
         updatedAt: now,
       })
       .where(eq(adminSandboxTestSubmissions.id, existing.id));
+    if (status === "submitted") {
+      await trySyncSandboxMirrorBySubmissionId(db, existing.id);
+    }
     return { ok: true, submissionId: existing.id, status };
   }
 
@@ -534,6 +644,9 @@ export async function writeAdminSandboxTestSubmission(
         submittedAt,
       })
       .returning({ id: adminSandboxTestSubmissions.id });
+    if (status === "submitted") {
+      await trySyncSandboxMirrorBySubmissionId(db, ins.id);
+    }
     return { ok: true, submissionId: ins.id, status };
   } catch (e) {
     if (e instanceof PostgresError && e.code === "23505") {
@@ -549,6 +662,7 @@ export async function writeAdminSandboxTestSubmission(
         .limit(1);
       if (cur?.status === "submitted" && input.action === "submit") {
         console.info("admin_sandbox_submit_idempotent_after_race", { submissionId: cur.id, sessionId: input.sessionId });
+        await trySyncSandboxMirrorBySubmissionId(db, cur.id);
         return {
           ok: true,
           submissionId: cur.id,

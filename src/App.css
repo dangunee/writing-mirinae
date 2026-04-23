@@ -401,6 +401,19 @@ a.status-badge.status.corrected {
   animation: writing-badge-pulse 1.6s ease-in-out infinite;
 }
 
+.teacher-queue-sandbox-badge {
+  display: inline-block;
+  margin-left: 0.45rem;
+  padding: 0.12rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #5c4a00;
+  background: #fff8e6;
+  border: 1px solid #e5d28a;
+  vertical-align: middle;
+}
+
 /* Modal */
 .modal-overlay {
   position: fixed;

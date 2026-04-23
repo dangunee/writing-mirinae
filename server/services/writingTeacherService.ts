@@ -15,6 +15,7 @@ import { PostgresError } from "postgres";
 
 import type { Db } from "../db/client";
 import * as repo from "../repositories/writingTeacherRepository";
+import { ADMIN_SANDBOX_SUBMISSION_MODE, backfillSubmittedAdminSandboxMirrors } from "./adminSandboxService";
 import { getSignedImageUrl } from "./writingStudentService";
 
 const EDITABLE_SUBMISSION_STATUSES = ["submitted", "in_review"] as const;
@@ -94,6 +95,8 @@ export type QueueItem = {
   courseStatus: string;
   bodyPreview: string | null;
   hasImage: boolean;
+  /** Admin Sandbox QA mirror (writing.submissions.submission_mode = admin_sandbox). */
+  isSandbox: boolean;
   correction: null | {
     id: string;
     teacherId: string;
@@ -108,6 +111,7 @@ export type QueueGroupedResponse = {
 };
 
 export async function getTeacherQueueGrouped(db: Db): Promise<QueueGroupedResponse> {
+  await backfillSubmittedAdminSandboxMirrors(db);
   const rows = await repo.listSubmissionQueue(db);
   const items: QueueItem[] = rows.map((r) => ({
     submissionId: r.submission.id,
@@ -124,6 +128,7 @@ export async function getTeacherQueueGrouped(db: Db): Promise<QueueGroupedRespon
         ? r.submission.bodyText.slice(0, 280) + (r.submission.bodyText.length > 280 ? "…" : "")
         : null,
     hasImage: Boolean(r.submission.imageStorageKey),
+    isSandbox: r.submission.submissionMode === ADMIN_SANDBOX_SUBMISSION_MODE,
     correction: r.correction?.id
       ? {
           id: r.correction.id,

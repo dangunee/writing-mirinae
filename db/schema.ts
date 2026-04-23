@@ -633,7 +633,7 @@ export const adminSandboxAudit = writing.table(
   (t) => [index("idx_admin_sandbox_audit_admin_created").on(t.adminUserId, t.createdAt)]
 );
 
-/** Isolated from writing.submissions — never joins teacher queue. */
+/** QA test text; teacher queue uses a mirror row in writing.submissions (submission_mode admin_sandbox). */
 export const adminSandboxTestSubmissions = writing.table(
   "admin_sandbox_test_submissions",
   {

@@ -10,6 +10,8 @@ type QueueItem = {
   createdAt: string
   sessionIndex: number
   bodyPreview: string | null
+  /** Admin Sandbox mirror row — QA test data */
+  isSandbox?: boolean
   correction: null | {
     id: string
     teacherId: string
@@ -130,6 +132,11 @@ export default function TeacherQueuePage() {
                         <Link className="view-link" to={`/writing/teacher/correct/${item.submissionId}`}>
                           {item.sessionIndex}
                         </Link>
+                        {item.isSandbox ? (
+                          <span className="teacher-queue-sandbox-badge" title="Admin sandbox QA">
+                            Sandbox (QA)
+                          </span>
+                        ) : null}
                       </td>
                       <td>{formatDateTime(item.submittedAt)}</td>
                       <td>
