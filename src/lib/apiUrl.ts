@@ -1,20 +1,13 @@
 /**
  * API ベース URL の解決。
  *
- * - `VITE_API_BASE_URL` があればそのオリジンに接続（別ドメインの API 用）。
- * - 未設定時は相対パス `/api/...`（開発: Vite proxy → Next、本番: 同一オリジンの Vercel Serverless `api/`）。
+ * **すべての `/api/...` は同一オリジン（相対パス）のみ。** writing-mirinae / Next Route Handlers
+ * （`/api/auth/*`, `/api/writing/*`, `/api/teacher/*`, `/api/admin/*` など）はこのデプロイに存在する。
+ * `VITE_API_BASE_URL`（例: mirinae-api.vercel.app）へ送ると 404 / Cookie 欠落で壊れる。
  *
- * `/api/auth/*` は常に同一オリジン（相対パス）のみ。Supabase セッション Cookie はこのデプロイの
- * `api/auth/*` に送る必要があり、`VITE_API_BASE_URL`（例: mirinae-api）へ送ると 404/CORS で壊れる。
+ * `VITE_API_BASE_URL` は **`/api/` で始まらないパス** にだけ適用する（レガシー非 `/api` 用）。
  *
- * `/api/writing/*` も常に同一オリジン。`writing_trial_access` 等の Cookie は writing-mirinae のホストに
- * 紐づくため、`mirinae-api` へ `GET /api/writing/sessions/current` を送ると Cookie が付かず体験判定が壊れる。
- *
- * `/api/admin/*` はこのデプロイの Route Handler（例: ユーザー一覧・体験紐付け件数）用。セッション Cookie が必要。
- *
- * 体験決済（trial-payment）は writing-mirinae 同一デプロイの `api/writing/trial-payment/*` を叩く必要がある。
- * `VITE_API_BASE_URL` が mirinae-api 等を指していると Next/Vercel 側のハンドラに届かないため、
- * `trialPaymentApiUrl` は常に相対パス（同一オリジン）を返す。
+ * 体験決済など: `trialPaymentApiUrl` / `trialAdminBffApiUrl` も常に相対パス。
  */
 
 function normalizePath(path: string): string {
@@ -23,13 +16,7 @@ function normalizePath(path: string): string {
 
 function resolveApiUrl(path: string): string {
   const p = normalizePath(path)
-  if (p.startsWith('/api/auth')) {
-    return p
-  }
-  if (p.startsWith('/api/writing/')) {
-    return p
-  }
-  if (p.startsWith('/api/admin')) {
+  if (p === '/api' || p.startsWith('/api/')) {
     return p
   }
   const raw = import.meta.env.VITE_API_BASE_URL?.trim() ?? ''
