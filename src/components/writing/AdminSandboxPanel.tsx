@@ -60,8 +60,11 @@ async function fetchAdminCoursesCached(): Promise<CourseRow[]> {
  */
 export default function AdminSandboxPanel({
   onSandboxChange,
+  embedded = false,
 }: {
   onSandboxChange: () => void
+  /** Wrapped in a details/summary block on WritingPage — omit outer margin */
+  embedded?: boolean
 }) {
   const [status, setStatus] = useState<SandboxGet | null>(null)
   const [courses, setCourses] = useState<CourseRow[]>([])
@@ -235,7 +238,9 @@ export default function AdminSandboxPanel({
     active && 'context' in status ? new Date(status.context.expiresAt).toLocaleString() : ''
 
   return (
-    <div className="mb-3 rounded-lg border border-amber-500/40 bg-amber-50/90 px-3 py-2 text-xs text-amber-950">
+    <div
+      className={`${embedded ? 'mb-0' : 'mb-3'} rounded-lg border border-amber-500/40 bg-amber-50/90 px-3 py-2 text-xs text-amber-950`}
+    >
       <p className="font-bold text-amber-900">Admin Sandbox（QA）</p>
       {active && 'context' in status && status.active ? (
         <div className="mt-2 space-y-2">

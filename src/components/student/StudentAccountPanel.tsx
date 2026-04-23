@@ -42,12 +42,17 @@ function EntitlementBadges({ e }: { e: AuthMePayload['entitlements'] }) {
 type Props = {
   /** 作文ページ上段などで余白を詰める */
   compact?: boolean
+  /**
+   * false: メール・ロール・権限バッジのみ（リンク・ログアウトなし）。
+   * 管理者が /writing/app にいるときはヘッダに 管理コンソール / ログアウト があるため重複を避ける。
+   */
+  showAccountActions?: boolean
 }
 
 /**
  * Stitch トーン — GET /api/auth/me のみ（モック・クライアント userId なし）
  */
-export default function StudentAccountPanel({ compact = false }: Props) {
+export default function StudentAccountPanel({ compact = false, showAccountActions = true }: Props) {
   const { me, loading, error, refetch } = useAuthMe()
   const navigate = useNavigate()
 
@@ -124,7 +129,13 @@ export default function StudentAccountPanel({ compact = false }: Props) {
         compact ? 'mb-3' : 'mb-6'
       }`}
     >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div
+        className={
+          showAccountActions
+            ? 'flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'
+            : 'flex flex-col gap-2'
+        }
+      >
         <div className="min-w-0 flex-1 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-bold uppercase tracking-widest text-[#595c5e]">Account</span>
@@ -137,35 +148,37 @@ export default function StudentAccountPanel({ compact = false }: Props) {
           </p>
           <EntitlementBadges e={me.entitlements} />
         </div>
-        <div className="flex flex-shrink-0 flex-wrap items-center gap-2 sm:justify-end">
-          {me.role === 'admin' ? (
+        {showAccountActions ? (
+          <div className="flex flex-shrink-0 flex-wrap items-center gap-2 sm:justify-end">
+            {me.role === 'admin' ? (
+              <Link
+                to="/writing/admin"
+                className="rounded-lg border border-[#1e1b13]/15 bg-white px-3 py-1.5 text-xs font-bold text-[#4052b6] hover:bg-[#fafafa]"
+              >
+                管理コンソール
+              </Link>
+            ) : null}
             <Link
-              to="/writing/admin"
-              className="rounded-lg border border-[#1e1b13]/15 bg-white px-3 py-1.5 text-xs font-bold text-[#4052b6] hover:bg-[#fafafa]"
+              to="/writing/app/settings"
+              className="rounded-lg border border-[#1e1b13]/15 bg-white px-3 py-1.5 text-xs font-bold text-[#000666] hover:bg-[#fafafa]"
             >
-              관리 콘솔
+              設定
             </Link>
-          ) : null}
-          <Link
-            to="/writing/app/settings"
-            className="rounded-lg border border-[#1e1b13]/15 bg-white px-3 py-1.5 text-xs font-bold text-[#000666] hover:bg-[#fafafa]"
-          >
-            設定
-          </Link>
-          <Link
-            to="/writing/app/mypage"
-            className="rounded-lg border border-[#1e1b13]/15 bg-[#F5F5F5] px-3 py-1.5 text-xs font-bold text-[#000666] hover:bg-[#ebebeb]"
-          >
-            マイページ
-          </Link>
-          <button
-            type="button"
-            onClick={() => void onLogout()}
-            className="rounded-lg border border-[#1e1b13]/20 px-3 py-1.5 text-xs font-semibold text-[#595c5e] hover:bg-[#fafafa]"
-          >
-            ログアウト
-          </button>
-        </div>
+            <Link
+              to="/writing/app/mypage"
+              className="rounded-lg border border-[#1e1b13]/15 bg-[#F5F5F5] px-3 py-1.5 text-xs font-bold text-[#000666] hover:bg-[#ebebeb]"
+            >
+              マイページ
+            </Link>
+            <button
+              type="button"
+              onClick={() => void onLogout()}
+              className="rounded-lg border border-[#1e1b13]/20 px-3 py-1.5 text-xs font-semibold text-[#595c5e] hover:bg-[#fafafa]"
+            >
+              ログアウト
+            </button>
+          </div>
+        ) : null}
       </div>
     </div>
   )

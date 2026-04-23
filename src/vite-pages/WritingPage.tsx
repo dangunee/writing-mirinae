@@ -623,14 +623,22 @@ export default function WritingPage() {
           {adminSandboxErrorBannerText(sandboxErrorCode)}
         </div>
       ) : null}
-      <StudentAccountPanel compact />
+      <StudentAccountPanel compact showAccountActions={!isAdmin} />
       {isAdmin ? (
         <>
-          <AdminSandboxPanel
-            onSandboxChange={() => {
-              void loadCurrent()
-            }}
-          />
+          <details className="mb-3 rounded-lg border border-amber-600/25 bg-amber-50/50 shadow-sm open:bg-amber-50/80">
+            <summary className="cursor-pointer select-none px-3 py-2 text-[11px] font-bold text-amber-950 marker:text-amber-800">
+              QAツール · Admin Sandbox（内部検証 · テスト提出用）
+            </summary>
+            <div className="border-t border-amber-700/15 px-1 pb-2 pt-0">
+              <AdminSandboxPanel
+                embedded
+                onSandboxChange={() => {
+                  void loadCurrent()
+                }}
+              />
+            </div>
+          </details>
           <WritingPageAdminPreview onPreview={onAdminPreview} />
         </>
       ) : null}

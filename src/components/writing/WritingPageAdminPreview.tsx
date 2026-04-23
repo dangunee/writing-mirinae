@@ -216,11 +216,11 @@ export default function WritingPageAdminPreview({ onPreview }: Props) {
     <div
       className="mb-4 rounded-xl border border-[#4052b6]/30 bg-[#f5f7ff] px-4 py-3 text-sm text-[#1e1b13] shadow-sm"
       role="region"
-      aria-label="管理者プレビュー"
+      aria-label="管理者プレビュー（閲覧専用）"
     >
-      <p className="text-xs font-bold uppercase tracking-wider text-[#4052b6]">管理者プレビュー</p>
+      <p className="text-xs font-bold uppercase tracking-wider text-[#4052b6]">管理者プレビュー（閲覧専用）</p>
       <p className="mt-1 text-xs text-[#454652]">
-        コース・回次を選ぶと、DB に保存された課題（theme_snapshot）をこの画面に表示します。提出はできません。
+        Sandbox の有効化とは別ツールです。コース・回次を選ぶと DB の theme_snapshot のみをこの画面に反映します。提出・保存は行いません。
       </p>
       {coursesLoading ? (
         <p className="mt-2 text-xs text-[#595c5e]" role="status">
