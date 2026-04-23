@@ -426,8 +426,13 @@ export async function syncAdminSandboxTestRowToWritingSubmission(
 ): Promise<void> {
   if (testRow.status !== "submitted") return;
 
+  /** Omit columns not present on all production DBs (e.g. grammar_check_result). */
   const [existingForSession] = await db
-    .select()
+    .select({
+      id: writingSubmissions.id,
+      userId: writingSubmissions.userId,
+      submissionMode: writingSubmissions.submissionMode,
+    })
     .from(writingSubmissions)
     .where(eq(writingSubmissions.sessionId, testRow.sessionId))
     .limit(1);
@@ -470,7 +475,6 @@ export async function syncAdminSandboxTestRowToWritingSubmission(
       bodyText: testRow.bodyText,
       imageStorageKey: null,
       imageMimeType: null,
-      grammarCheckResult: null,
       submittedAt,
     });
   } catch (e) {
