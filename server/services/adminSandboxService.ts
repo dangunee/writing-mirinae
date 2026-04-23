@@ -88,15 +88,20 @@ export async function validateAdminSandboxSelection(
   }
 
   const course = row.course;
-  if (course.status !== "active") {
-    return { ok: false, code: "course_not_active" };
-  }
 
   if (input.mode === "trial") {
     if (!trialCourseId || course.id !== trialCourseId) {
       return { ok: false, code: "trial_course_mismatch" };
     }
+    /** Align with admin assignment list: trial authoring course may be pending_setup until schedule finalizes. */
+    if (course.status !== "active" && course.status !== "pending_setup") {
+      return { ok: false, code: "course_not_active" };
+    }
     return { ok: true };
+  }
+
+  if (course.status !== "active") {
+    return { ok: false, code: "course_not_active" };
   }
 
   if (input.mode === "regular") {

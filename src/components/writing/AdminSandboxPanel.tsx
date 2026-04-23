@@ -138,6 +138,14 @@ export default function AdminSandboxPanel({
     }
   }, [filteredCourses, courseId])
 
+  /** Trial: server-resolved course id from env (hints); no manual dropdown pick required once hints load. */
+  useEffect(() => {
+    if (mode !== 'trial') return
+    const tid = hints?.trialCourseId?.trim()
+    if (!tid) return
+    setCourseId(tid)
+  }, [mode, hints?.trialCourseId])
+
   useEffect(() => {
     if (!courseId) {
       setSessions([])
@@ -240,6 +248,7 @@ export default function AdminSandboxPanel({
             <select
               value={mode}
               onChange={(e) => {
+                setMessage(null)
                 setMode(e.target.value as SandboxMode)
                 setCourseId('')
               }}
