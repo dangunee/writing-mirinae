@@ -66,7 +66,8 @@ export default function AdminSandboxPanel({
   const [status, setStatus] = useState<SandboxGet | null>(null)
   const [courses, setCourses] = useState<CourseRow[]>([])
   const [hints, setHints] = useState<Hints | null>(null)
-  const [mode, setMode] = useState<SandboxMode>('trial')
+  /** Default regular: trial mode requires WRITING_TRIAL_COURSE_ID hint or the course list is empty. */
+  const [mode, setMode] = useState<SandboxMode>('regular')
   const [courseId, setCourseId] = useState('')
   const [sessionIndex, setSessionIndex] = useState(1)
   const [sessions, setSessions] = useState<ListSession[]>([])
@@ -120,7 +121,8 @@ export default function AdminSandboxPanel({
       return courses.filter((c) => {
         if (c.isAdminSandbox) return false
         if (trialId && c.courseId === trialId) return false
-        return c.status === 'active'
+        // Match GET /api/writing/admin/courses + listActiveWritingCoursesWithTerm (active | pending_setup).
+        return c.status === 'active' || c.status === 'pending_setup'
       })
     }
     return courses.filter((c) => {
