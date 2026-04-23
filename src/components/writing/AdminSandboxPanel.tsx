@@ -330,6 +330,60 @@ export default function AdminSandboxPanel({
     }
   }
 
+  async function resetSandboxAttempt() {
+    if (!window.confirm('この回のSandbox提出を削除して、最初からやり直しますか？')) {
+      return
+    }
+    const ctxSnapshot =
+      status != null && 'active' in status && status.active === true && 'context' in status
+        ? status.context
+        : null
+    setLoading(true)
+    setLastResult(null)
+    try {
+      const res = await fetch(apiUrl('/api/writing/admin/sandbox/reset'), {
+        method: 'POST',
+        credentials: 'include',
+      })
+      const j = (await res.json()) as { ok?: boolean }
+      if (!res.ok || !j.ok) {
+        setLastResult({ tone: 'error', text: 'リセットに失敗しました' })
+        return
+      }
+      setSessionIndex(1)
+      setLastResult({ tone: 'success', text: 'Sandbox提出をリセットしました' })
+      await refresh()
+      onSandboxChange()
+      const courseIdToReload = ctxSnapshot?.courseId?.trim()
+      if (courseIdToReload) {
+        setAssignmentsLoading(true)
+        try {
+          const q = new URLSearchParams({ courseId: courseIdToReload })
+          const r = await fetch(apiUrl(`/api/writing/admin/assignments/list?${q}`), {
+            credentials: 'include',
+          })
+          const data = (await r.json()) as {
+            sessions?: { sessionIndex: number; sessionId: string | null }[]
+          }
+          if (Array.isArray(data.sessions)) {
+            setSessions(
+              data.sessions.map((s) => ({
+                sessionIndex: Number(s.sessionIndex),
+                sessionId: s.sessionId,
+              }))
+            )
+          }
+        } catch {
+          /* list refresh is best-effort */
+        } finally {
+          setAssignmentsLoading(false)
+        }
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const active = status && 'active' in status && status.active === true
   const expires =
     active && 'context' in status ? new Date(status.context.expiresAt).toLocaleString() : ''
@@ -354,6 +408,16 @@ export default function AdminSandboxPanel({
           >
             サンドボックスを解除
           </button>
+          <div className="mt-2">
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => void resetSandboxAttempt()}
+              className="rounded border border-red-600 bg-white px-2 py-1 text-[11px] font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+            >
+              この回をリセットしてやり直す
+            </button>
+          </div>
         </div>
       ) : (
         <div className="mt-2 flex flex-wrap items-end gap-2">

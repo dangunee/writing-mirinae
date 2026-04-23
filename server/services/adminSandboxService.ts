@@ -516,6 +516,43 @@ export async function backfillSubmittedAdminSandboxMirrors(db: Db): Promise<void
   }
 }
 
+/**
+ * Destructive QA reset: removes the admin's sandbox test row and the mirrored writing.submissions row
+ * for the given session only. Guards: submission_mode must be admin_sandbox and user_id must match.
+ * Does not modify writing.sessions (shared with real learners) or sandbox context cookie.
+ */
+export async function resetAdminSandboxSessionSubmissions(
+  db: Db,
+  input: { adminUserId: string; sessionId: string }
+): Promise<{ ok: true } | { ok: false; code: string }> {
+  const sessionId = input.sessionId?.trim();
+  if (!sessionId) return { ok: false, code: "invalid_session" };
+
+  const sessionRow = await repo.getSessionByIdWithCourse(db, sessionId);
+  if (!sessionRow) return { ok: false, code: "session_not_found" };
+
+  await db
+    .delete(writingSubmissions)
+    .where(
+      and(
+        eq(writingSubmissions.sessionId, sessionId),
+        eq(writingSubmissions.userId, input.adminUserId),
+        eq(writingSubmissions.submissionMode, ADMIN_SANDBOX_SUBMISSION_MODE)
+      )
+    );
+
+  await db
+    .delete(adminSandboxTestSubmissions)
+    .where(
+      and(
+        eq(adminSandboxTestSubmissions.adminUserId, input.adminUserId),
+        eq(adminSandboxTestSubmissions.sessionId, sessionId)
+      )
+    );
+
+  return { ok: true };
+}
+
 export function sandboxSubmitErrorMessage(code: string): string {
   const map: Record<string, string> = {
     session_missed: "この回は失効済みのため、サンドボックス提出できません。",
