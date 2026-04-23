@@ -161,7 +161,7 @@ export default function AdminSandboxPanel({
         if (cancelled || !Array.isArray(data.sessions)) return
         setSessions(
           data.sessions.map((s) => ({
-            sessionIndex: s.sessionIndex,
+            sessionIndex: Number(s.sessionIndex),
             sessionId: s.sessionId,
           }))
         )
@@ -173,6 +173,15 @@ export default function AdminSandboxPanel({
       cancelled = true
     }
   }, [effectiveCourseId])
+
+  /** Trial: auto-pick first row with a real session UUID so 有効化 enables without manual 回 selection. */
+  useEffect(() => {
+    if (mode !== 'trial') return
+    if (sessions.length === 0) return
+    const usable = sessions.find((s) => (s.sessionId ?? '').trim().length > 0)
+    if (!usable) return
+    setSessionIndex(usable.sessionIndex)
+  }, [mode, sessions])
 
   const selectedSessionId = useMemo(() => {
     const row = sessions.find((s) => s.sessionIndex === sessionIndex)
