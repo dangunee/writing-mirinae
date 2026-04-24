@@ -1,8 +1,8 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
-import { PostgresError } from "postgres";
 
 import { products, writingCourses, writingTerms } from "../../db/schema";
 import type { Db } from "../db/client";
+import { isPostgresUniqueViolation } from "../lib/postgresErrorGuards";
 import { getTermById } from "../repositories/writingMasterRepository";
 import * as repo from "../repositories/platformWritingRepository";
 
@@ -113,7 +113,7 @@ export async function ensureCourseForAssignmentTerm(
     }
     return { ok: true, courseId: course.id, created: true };
   } catch (e) {
-    if (e instanceof PostgresError && e.code === "23505") {
+    if (isPostgresUniqueViolation(e)) {
       const retry = await db
         .select({ id: writingCourses.id })
         .from(writingCourses)

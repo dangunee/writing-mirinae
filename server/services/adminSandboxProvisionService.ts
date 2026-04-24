@@ -1,8 +1,8 @@
 import { and, eq } from "drizzle-orm";
-import { PostgresError } from "postgres";
 
 import { products, writingCourses } from "../../db/schema";
 import type { Db } from "../db/client";
+import { isPostgresUniqueViolation } from "../lib/postgresErrorGuards";
 import { resolveWritingRoleFromDbOrEnv } from "../lib/writingAuthRoles";
 import { assertIsoDateOnly, DEFAULT_TZ } from "../lib/schedule";
 import type { CourseInterval } from "../types/writing";
@@ -125,7 +125,7 @@ export async function ensureAdminSandboxCourse(db: Db, userId: string): Promise<
 
     await ensureAdminSandboxSessionsExist(db, userId, course);
   } catch (e) {
-    if (e instanceof PostgresError && e.code === "23505") {
+    if (isPostgresUniqueViolation(e)) {
       const row = await studentRepo.findAdminSandboxCourseForUserAnyStatus(db, userId);
       if (row) {
         await ensureAdminSandboxSessionsExist(db, userId, row);

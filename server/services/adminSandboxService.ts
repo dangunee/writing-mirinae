@@ -14,9 +14,9 @@ import {
   type writingSessions,
   writingSubmissions,
 } from "../../db/schema";
-import { PostgresError } from "postgres";
 
 import type { Db } from "../db/client";
+import { getPostgresErrorDetail, isPostgresUniqueViolation, pgErrMeta } from "../lib/postgresErrorGuards";
 import { resolveWritingTrialCourseIdForAdmin } from "../lib/writingTrialCourseResolve";
 import { checkSessionEligibleForAdminSandboxTest } from "../lib/writingSubmissionEligibility";
 import * as repo from "../repositories/writingStudentRepository";
@@ -446,16 +446,6 @@ export type SandboxMirrorSyncResult =
     }
   | { outcome: "skipped_no_test_row"; adminSandboxSubmissionId: string };
 
-function pgErrMeta(e: unknown): { message: string; pgCode?: string } {
-  if (e instanceof PostgresError) {
-    return { message: e.message ?? String(e), pgCode: e.code };
-  }
-  if (e instanceof Error) {
-    return { message: e.message };
-  }
-  return { message: String(e) };
-}
-
 /**
  * Ensures a writing.submissions row exists for this sandbox test row so corrections can attach (FK).
  * Skips if another (non-sandbox) submission already occupies the session.
@@ -620,13 +610,13 @@ export async function syncAdminSandboxTestRowToWritingSubmission(
     console.info("admin_sandbox_mirror_sync", r);
     return r;
   } catch (e) {
-    if (e instanceof PostgresError && e.code === "23505") {
+    if (isPostgresUniqueViolation(e)) {
       const r: SandboxMirrorSyncResult = {
         outcome: "skipped_unique_violation",
         sandboxTestId,
         sessionId,
         adminUserId: testRow.adminUserId,
-        detail: e.detail ?? undefined,
+        detail: getPostgresErrorDetail(e),
       };
       console.warn("admin_sandbox_mirror_sync", r);
       return r;
@@ -767,6 +757,8 @@ export function sandboxSubmitErrorMessage(code: string): string {
     session_locked: "この回はまだ開始できません（解除日時前）。",
     session_expired: "提出期限を過ぎています。",
     sandbox_already_submitted: "既にサンドボックス提出済みです。GET /sessions/current で状態を確認してください。",
+    sandbox_submit_unexpected: "サンドボックス提出の処理中にエラーが発生しました。",
+    sandbox_insert_race: "同時更新のため保存できませんでした。再度お試しください。",
   };
   return map[code] ?? `サンドボックス提出を処理できません (${code})`;
 }
@@ -894,7 +886,7 @@ export async function writeAdminSandboxTestSubmission(
     }
     return { ok: true, submissionId: ins.id, status };
   } catch (e) {
-    if (e instanceof PostgresError && e.code === "23505") {
+    if (isPostgresUniqueViolation(e)) {
       const [cur] = await db
         .select()
         .from(adminSandboxTestSubmissions)
@@ -916,7 +908,9 @@ export async function writeAdminSandboxTestSubmission(
         };
       }
       console.warn("admin_sandbox_submit_unique_race", { sessionId: input.sessionId, err: e });
+      return { ok: false, status: 409, code: "sandbox_insert_race" };
     }
-    throw e;
+    console.error("admin_sandbox_submit_unexpected", { sessionId: input.sessionId, err: e });
+    return { ok: false, status: 500, code: "sandbox_submit_unexpected" };
   }
 }

@@ -1,7 +1,6 @@
-import { PostgresError } from "postgres";
-
 import type { writingSubmissions } from "../../db/schema";
 import type { Db } from "../db/client";
+import { isPostgresUniqueViolation } from "../lib/postgresErrorGuards";
 import { getServiceRoleClient } from "../lib/supabaseServiceRole";
 import {
   buildStorageObjectKey,
@@ -167,7 +166,7 @@ export async function executeSubmissionWrite(
           const ins = await insertDraft(tx, identity, sessionId, courseId, bodyText, modeInput);
           submissionId = ins.id;
         } catch (e) {
-          if (e instanceof PostgresError && e.code === "23505") {
+          if (isPostgresUniqueViolation(e)) {
             return { ok: false, status: 409, code: "active_submission_conflict" };
           }
           throw e;
@@ -266,7 +265,7 @@ export async function executeSubmissionWrite(
       return { ok: true, submissionId: sub.id, status: sub.status };
     });
   } catch (e) {
-    if (e instanceof PostgresError && e.code === "23505") {
+    if (isPostgresUniqueViolation(e)) {
       return { ok: false, status: 409, code: "active_submission_conflict" };
     }
     throw e;

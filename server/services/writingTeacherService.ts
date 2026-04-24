@@ -11,9 +11,8 @@
  * fragments replace dual-writes feedback_items; evaluation save dual-writes correction_evaluations (publish trigger still reads writing.evaluations).
  */
 
-import { PostgresError } from "postgres";
-
 import type { Db } from "../db/client";
+import { isPostgresErrorLike, isPostgresUniqueViolation } from "../lib/postgresErrorGuards";
 import * as repo from "../repositories/writingTeacherRepository";
 import { ADMIN_SANDBOX_SUBMISSION_MODE, backfillSubmittedAdminSandboxMirrors } from "./adminSandboxService";
 import { getSignedImageUrl } from "./writingStudentService";
@@ -409,7 +408,7 @@ async function ensureCorrectionDraftForTeacher(
     await maybeSetInReview(db, submissionId, submissionStatus);
     return { ok: true, correction: created };
   } catch (e) {
-    if (e instanceof PostgresError && e.code === "23505") {
+    if (isPostgresUniqueViolation(e)) {
       return { ok: false, code: "correction_create_conflict", status: 409 };
     }
     throw e;
@@ -936,8 +935,8 @@ export async function publishTeacherCorrection(
       },
     };
   } catch (e) {
-    if (e instanceof PostgresError) {
-      const msg = e.message ?? "";
+    if (isPostgresErrorLike(e)) {
+      const msg = typeof e.message === "string" ? e.message : "";
       if (msg.includes("Cannot publish correction without all evaluation scores")) {
         return { ok: false, status: 422, code: "publish_incomplete_evaluation" };
       }
