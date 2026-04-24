@@ -416,26 +416,125 @@ export type AdminSandboxSubmissionResult =
   | { ok: true; submissionId: string; status: string; alreadySubmitted?: boolean }
   | { ok: false; status: number; code: string };
 
+/** Result of mirroring `admin_sandbox_test_submissions` → `writing.submissions` (teacher FK). */
+export type SandboxMirrorSyncResult =
+  | { outcome: "skipped_not_submitted"; sandboxTestId: string; sessionId: string }
+  | {
+      outcome: "skipped_missing_session";
+      sandboxTestId: string;
+      sessionId: string;
+      reason: "session_not_found" | "course_mismatch";
+    }
+  | { outcome: "updated"; sandboxTestId: string; sessionId: string; writingSubmissionId: string }
+  | { outcome: "created"; sandboxTestId: string; sessionId: string; writingSubmissionId: string }
+  | {
+      outcome: "skipped_conflict";
+      sandboxTestId: string;
+      sessionId: string;
+      existingSubmissionId: string;
+      existingSubmissionMode: string | null;
+      existingUserId: string | null;
+    }
+  | { outcome: "skipped_unique_violation"; sandboxTestId: string; sessionId: string; adminUserId: string; detail?: string }
+  | {
+      outcome: "failed";
+      sandboxTestId: string;
+      sessionId: string;
+      phase: "session_lookup" | "select_existing" | "update" | "insert" | "unexpected";
+      message: string;
+      pgCode?: string;
+    }
+  | { outcome: "skipped_no_test_row"; adminSandboxSubmissionId: string };
+
+function pgErrMeta(e: unknown): { message: string; pgCode?: string } {
+  if (e instanceof PostgresError) {
+    return { message: e.message ?? String(e), pgCode: e.code };
+  }
+  if (e instanceof Error) {
+    return { message: e.message };
+  }
+  return { message: String(e) };
+}
+
 /**
  * Ensures a writing.submissions row exists for this sandbox test row so corrections can attach (FK).
  * Skips if another (non-sandbox) submission already occupies the session.
+ * Does not throw; inspect `outcome` and server logs. Insert omits `grammar_check_result` (not on all prod DBs).
  */
 export async function syncAdminSandboxTestRowToWritingSubmission(
   db: Db,
   testRow: typeof adminSandboxTestSubmissions.$inferSelect
-): Promise<void> {
-  if (testRow.status !== "submitted") return;
+): Promise<SandboxMirrorSyncResult> {
+  const sandboxTestId = testRow.id;
+  const sessionId = testRow.sessionId;
 
-  /** Omit columns not present on all production DBs (e.g. grammar_check_result). */
-  const [existingForSession] = await db
-    .select({
-      id: writingSubmissions.id,
-      userId: writingSubmissions.userId,
-      submissionMode: writingSubmissions.submissionMode,
-    })
-    .from(writingSubmissions)
-    .where(eq(writingSubmissions.sessionId, testRow.sessionId))
-    .limit(1);
+  if (testRow.status !== "submitted") {
+    const r: SandboxMirrorSyncResult = { outcome: "skipped_not_submitted", sandboxTestId, sessionId };
+    console.warn("admin_sandbox_mirror_sync", r);
+    return r;
+  }
+
+  try {
+    const sessionRow = await repo.getSessionByIdWithCourse(db, testRow.sessionId);
+    if (!sessionRow) {
+      const r: SandboxMirrorSyncResult = {
+        outcome: "skipped_missing_session",
+        sandboxTestId,
+        sessionId,
+        reason: "session_not_found",
+      };
+      console.warn("admin_sandbox_mirror_sync", r);
+      return r;
+    }
+    if (sessionRow.course.id !== testRow.courseId) {
+      const r: SandboxMirrorSyncResult = {
+        outcome: "skipped_missing_session",
+        sandboxTestId,
+        sessionId,
+        reason: "course_mismatch",
+      };
+      console.warn("admin_sandbox_mirror_sync", r);
+      return r;
+    }
+  } catch (e) {
+    const { message, pgCode } = pgErrMeta(e);
+    const r: SandboxMirrorSyncResult = {
+      outcome: "failed",
+      sandboxTestId,
+      sessionId,
+      phase: "session_lookup",
+      message,
+      pgCode,
+    };
+    console.error("admin_sandbox_mirror_sync", r, e);
+    return r;
+  }
+
+  let existingForSession: { id: string; userId: string | null; submissionMode: string | null } | undefined;
+  try {
+    const rows = await db
+      .select({
+        id: writingSubmissions.id,
+        userId: writingSubmissions.userId,
+        submissionMode: writingSubmissions.submissionMode,
+      })
+      .from(writingSubmissions)
+      .where(eq(writingSubmissions.sessionId, testRow.sessionId))
+      .limit(1);
+    existingForSession = rows[0];
+  } catch (e) {
+    const { message, pgCode } = pgErrMeta(e);
+    const r: SandboxMirrorSyncResult = {
+      outcome: "failed",
+      sandboxTestId,
+      sessionId,
+      phase: "select_existing",
+      message,
+      pgCode,
+    };
+    console.error("admin_sandbox_mirror_sync", r, e);
+    return r;
+  }
 
   const now = new Date();
   const submittedAt = testRow.submittedAt ?? now;
@@ -445,63 +544,145 @@ export async function syncAdminSandboxTestRowToWritingSubmission(
       existingForSession.submissionMode === ADMIN_SANDBOX_SUBMISSION_MODE &&
       existingForSession.userId === testRow.adminUserId
     ) {
-      await db
-        .update(writingSubmissions)
-        .set({
-          bodyText: testRow.bodyText,
-          courseId: testRow.courseId,
-          updatedAt: now,
-        })
-        .where(eq(writingSubmissions.id, existingForSession.id));
-      return;
+      try {
+        await db
+          .update(writingSubmissions)
+          .set({
+            bodyText: testRow.bodyText,
+            courseId: testRow.courseId,
+            updatedAt: now,
+          })
+          .where(eq(writingSubmissions.id, existingForSession.id));
+        const r: SandboxMirrorSyncResult = {
+          outcome: "updated",
+          sandboxTestId,
+          sessionId,
+          writingSubmissionId: existingForSession.id,
+        };
+        console.info("admin_sandbox_mirror_sync", r);
+        return r;
+      } catch (e) {
+        const { message, pgCode } = pgErrMeta(e);
+        const r: SandboxMirrorSyncResult = {
+          outcome: "failed",
+          sandboxTestId,
+          sessionId,
+          phase: "update",
+          message,
+          pgCode,
+        };
+        console.error("admin_sandbox_mirror_sync", r, e);
+        return r;
+      }
     }
-    console.warn("admin_sandbox_mirror_session_conflict", {
-      sessionId: testRow.sessionId,
-      sandboxTestId: testRow.id,
+    const r: SandboxMirrorSyncResult = {
+      outcome: "skipped_conflict",
+      sandboxTestId,
+      sessionId,
       existingSubmissionId: existingForSession.id,
-    });
-    return;
+      existingSubmissionMode: existingForSession.submissionMode,
+      existingUserId: existingForSession.userId,
+    };
+    console.warn("admin_sandbox_mirror_sync", r);
+    return r;
   }
 
   try {
-    await db.insert(writingSubmissions).values({
-      sessionId: testRow.sessionId,
-      courseId: testRow.courseId,
-      userId: testRow.adminUserId,
-      regularAccessGrantId: null,
-      trialApplicationId: null,
-      status: "submitted",
-      submissionMode: ADMIN_SANDBOX_SUBMISSION_MODE,
-      bodyText: testRow.bodyText,
-      imageStorageKey: null,
-      imageMimeType: null,
-      submittedAt,
-    });
+    const [inserted] = await db
+      .insert(writingSubmissions)
+      .values({
+        sessionId: testRow.sessionId,
+        courseId: testRow.courseId,
+        userId: testRow.adminUserId,
+        regularAccessGrantId: null,
+        trialApplicationId: null,
+        status: "submitted",
+        submissionMode: ADMIN_SANDBOX_SUBMISSION_MODE,
+        bodyText: testRow.bodyText,
+        imageStorageKey: null,
+        imageMimeType: null,
+        submittedAt,
+      })
+      .returning({ id: writingSubmissions.id });
+    const writingSubmissionId = inserted?.id;
+    if (!writingSubmissionId) {
+      const r: SandboxMirrorSyncResult = {
+        outcome: "failed",
+        sandboxTestId,
+        sessionId,
+        phase: "insert",
+        message: "insert_returned_no_id",
+      };
+      console.error("admin_sandbox_mirror_sync", r);
+      return r;
+    }
+    const r: SandboxMirrorSyncResult = { outcome: "created", sandboxTestId, sessionId, writingSubmissionId };
+    console.info("admin_sandbox_mirror_sync", r);
+    return r;
   } catch (e) {
     if (e instanceof PostgresError && e.code === "23505") {
-      console.warn("admin_sandbox_mirror_insert_unique_violation", {
-        sessionId: testRow.sessionId,
+      const r: SandboxMirrorSyncResult = {
+        outcome: "skipped_unique_violation",
+        sandboxTestId,
+        sessionId,
         adminUserId: testRow.adminUserId,
-      });
-      return;
+        detail: e.detail ?? undefined,
+      };
+      console.warn("admin_sandbox_mirror_sync", r);
+      return r;
     }
-    throw e;
+    const { message, pgCode } = pgErrMeta(e);
+    const r: SandboxMirrorSyncResult = {
+      outcome: "failed",
+      sandboxTestId,
+      sessionId,
+      phase: "insert",
+      message,
+      pgCode,
+    };
+    console.error("admin_sandbox_mirror_sync", r, e);
+    return r;
   }
 }
 
 /** Best-effort mirror sync after sandbox persist (does not fail the HTTP handler). */
-export async function trySyncSandboxMirrorBySubmissionId(db: Db, adminSandboxSubmissionId: string): Promise<void> {
+export async function trySyncSandboxMirrorBySubmissionId(
+  db: Db,
+  adminSandboxSubmissionId: string
+): Promise<SandboxMirrorSyncResult> {
   try {
     const [row] = await db
       .select()
       .from(adminSandboxTestSubmissions)
       .where(eq(adminSandboxTestSubmissions.id, adminSandboxSubmissionId))
       .limit(1);
-    if (row?.status === "submitted") {
-      await syncAdminSandboxTestRowToWritingSubmission(db, row);
+    if (!row) {
+      const r: SandboxMirrorSyncResult = { outcome: "skipped_no_test_row", adminSandboxSubmissionId };
+      console.warn("admin_sandbox_mirror_sync", r);
+      return r;
     }
+    if (row.status !== "submitted") {
+      const r: SandboxMirrorSyncResult = {
+        outcome: "skipped_not_submitted",
+        sandboxTestId: row.id,
+        sessionId: row.sessionId,
+      };
+      console.warn("admin_sandbox_mirror_sync", r);
+      return r;
+    }
+    return await syncAdminSandboxTestRowToWritingSubmission(db, row);
   } catch (e) {
-    console.warn("admin_sandbox_mirror_sync_failed", { adminSandboxSubmissionId, err: e });
+    const { message, pgCode } = pgErrMeta(e);
+    const r: SandboxMirrorSyncResult = {
+      outcome: "failed",
+      sandboxTestId: adminSandboxSubmissionId,
+      sessionId: "",
+      phase: "unexpected",
+      message: `trySync_unexpected: ${message}`,
+      pgCode,
+    };
+    console.error("admin_sandbox_mirror_sync", r, e);
+    return r;
   }
 }
 
@@ -516,11 +697,12 @@ export async function backfillSubmittedAdminSandboxMirrors(db: Db): Promise<void
       .from(adminSandboxTestSubmissions)
       .where(eq(adminSandboxTestSubmissions.status, "submitted"));
     for (const testRow of rows) {
-      try {
-        await syncAdminSandboxTestRowToWritingSubmission(db, testRow);
-      } catch (e) {
-        console.warn("admin_sandbox_mirror_backfill_failed", { sandboxId: testRow.id, err: e });
-      }
+      const result = await syncAdminSandboxTestRowToWritingSubmission(db, testRow);
+      console.info("admin_sandbox_mirror_backfill_row", {
+        sandboxTestId: testRow.id,
+        sessionId: testRow.sessionId,
+        mirror: result,
+      });
     }
   } catch (e) {
     console.warn("admin_sandbox_backfill_unavailable", { err: e });
@@ -562,6 +744,21 @@ export async function resetAdminSandboxSessionSubmissions(
     );
 
   return { ok: true };
+}
+
+async function syncMirrorAfterSandboxSubmit(
+  db: Db,
+  adminSandboxTestSubmissionId: string,
+  sessionId: string,
+  adminUserId: string
+): Promise<void> {
+  const mirror = await trySyncSandboxMirrorBySubmissionId(db, adminSandboxTestSubmissionId);
+  console.info("admin_sandbox_submit_mirror_result", {
+    adminSandboxTestSubmissionId,
+    sessionId,
+    adminUserId,
+    mirror,
+  });
 }
 
 export function sandboxSubmitErrorMessage(code: string): string {
@@ -634,7 +831,7 @@ export async function writeAdminSandboxTestSubmission(
         sessionId: input.sessionId,
         adminUserId: input.adminUserId,
       });
-      await trySyncSandboxMirrorBySubmissionId(db, cur.id);
+      await syncMirrorAfterSandboxSubmit(db, cur.id, input.sessionId, input.adminUserId);
       return {
         ok: true,
         submissionId: cur.id,
@@ -674,7 +871,7 @@ export async function writeAdminSandboxTestSubmission(
       })
       .where(eq(adminSandboxTestSubmissions.id, existing.id));
     if (status === "submitted") {
-      await trySyncSandboxMirrorBySubmissionId(db, existing.id);
+      await syncMirrorAfterSandboxSubmit(db, existing.id, input.sessionId, input.adminUserId);
     }
     return { ok: true, submissionId: existing.id, status };
   }
@@ -693,7 +890,7 @@ export async function writeAdminSandboxTestSubmission(
       })
       .returning({ id: adminSandboxTestSubmissions.id });
     if (status === "submitted") {
-      await trySyncSandboxMirrorBySubmissionId(db, ins.id);
+      await syncMirrorAfterSandboxSubmit(db, ins.id, input.sessionId, input.adminUserId);
     }
     return { ok: true, submissionId: ins.id, status };
   } catch (e) {
@@ -710,7 +907,7 @@ export async function writeAdminSandboxTestSubmission(
         .limit(1);
       if (cur?.status === "submitted" && input.action === "submit") {
         console.info("admin_sandbox_submit_idempotent_after_race", { submissionId: cur.id, sessionId: input.sessionId });
-        await trySyncSandboxMirrorBySubmissionId(db, cur.id);
+        await syncMirrorAfterSandboxSubmit(db, cur.id, input.sessionId, input.adminUserId);
         return {
           ok: true,
           submissionId: cur.id,
