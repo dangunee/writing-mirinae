@@ -544,6 +544,8 @@ export async function syncAdminSandboxTestRowToWritingSubmission(
 
   const now = new Date();
   const submittedAt = testRow.submittedAt ?? now;
+  const submittedAtIso =
+    submittedAt instanceof Date ? submittedAt.toISOString() : String(submittedAt);
 
   if (existingForSession) {
     if (
@@ -556,7 +558,7 @@ export async function syncAdminSandboxTestRowToWritingSubmission(
           set
             body_text = ${testRow.bodyText},
             course_id = ${testRow.courseId}::uuid,
-            updated_at = ${now}
+            updated_at = ${now.toISOString()}::timestamptz
           where id = ${existingForSession.id}::uuid
         `);
         const r: SandboxMirrorSyncResult = {
@@ -619,7 +621,7 @@ export async function syncAdminSandboxTestRowToWritingSubmission(
         ${testRow.bodyText},
         null,
         null,
-        ${submittedAt}
+        ${submittedAtIso}::timestamptz
       )
       returning id
     `);
