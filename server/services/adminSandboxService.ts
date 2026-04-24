@@ -5,7 +5,7 @@
  * the teacher correction flow (FK to writing.submissions) can run without schema changes.
  */
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import {
   adminSandboxAudit,
@@ -446,10 +446,26 @@ export type SandboxMirrorSyncResult =
     }
   | { outcome: "skipped_no_test_row"; adminSandboxSubmissionId: string };
 
+function logAdminSandboxMirrorSyncFailed(
+  e: unknown,
+  r: Extract<SandboxMirrorSyncResult, { outcome: "failed" }>
+): void {
+  console.error("admin_sandbox_mirror_sync_failed", {
+    outcome: "failed" as const,
+    sandboxTestId: r.sandboxTestId,
+    sessionId: r.sessionId,
+    phase: r.phase,
+    message: r.message,
+    pgCode: r.pgCode,
+    error: e,
+  });
+}
+
 /**
  * Ensures a writing.submissions row exists for this sandbox test row so corrections can attach (FK).
  * Skips if another (non-sandbox) submission already occupies the session.
- * Does not throw; inspect `outcome` and server logs. Insert omits `grammar_check_result` (not on all prod DBs).
+ * Does not throw; inspect `outcome` and server logs. Mirror insert uses explicit SQL columns (not
+ * `db.insert(writingSubmissions)`) so Postgres never sees `grammar_check_result` (absent on some prod DBs).
  */
 export async function syncAdminSandboxTestRowToWritingSubmission(
   db: Db,
@@ -496,7 +512,7 @@ export async function syncAdminSandboxTestRowToWritingSubmission(
       message,
       pgCode,
     };
-    console.error("admin_sandbox_mirror_sync", r, e);
+    logAdminSandboxMirrorSyncFailed(e, r);
     return r;
   }
 
@@ -522,7 +538,7 @@ export async function syncAdminSandboxTestRowToWritingSubmission(
       message,
       pgCode,
     };
-    console.error("admin_sandbox_mirror_sync", r, e);
+    logAdminSandboxMirrorSyncFailed(e, r);
     return r;
   }
 
@@ -535,14 +551,14 @@ export async function syncAdminSandboxTestRowToWritingSubmission(
       existingForSession.userId === testRow.adminUserId
     ) {
       try {
-        await db
-          .update(writingSubmissions)
-          .set({
-            bodyText: testRow.bodyText,
-            courseId: testRow.courseId,
-            updatedAt: now,
-          })
-          .where(eq(writingSubmissions.id, existingForSession.id));
+        await db.execute(sql`
+          update writing.submissions
+          set
+            body_text = ${testRow.bodyText},
+            course_id = ${testRow.courseId}::uuid,
+            updated_at = ${now}
+          where id = ${existingForSession.id}::uuid
+        `);
         const r: SandboxMirrorSyncResult = {
           outcome: "updated",
           sandboxTestId,
@@ -561,7 +577,7 @@ export async function syncAdminSandboxTestRowToWritingSubmission(
           message,
           pgCode,
         };
-        console.error("admin_sandbox_mirror_sync", r, e);
+        logAdminSandboxMirrorSyncFailed(e, r);
         return r;
       }
     }
@@ -578,32 +594,46 @@ export async function syncAdminSandboxTestRowToWritingSubmission(
   }
 
   try {
-    const [inserted] = await db
-      .insert(writingSubmissions)
-      .values({
-        sessionId: testRow.sessionId,
-        courseId: testRow.courseId,
-        userId: testRow.adminUserId,
-        regularAccessGrantId: null,
-        trialApplicationId: null,
-        status: "submitted",
-        submissionMode: ADMIN_SANDBOX_SUBMISSION_MODE,
-        bodyText: testRow.bodyText,
-        imageStorageKey: null,
-        imageMimeType: null,
-        submittedAt,
-      })
-      .returning({ id: writingSubmissions.id });
-    const writingSubmissionId = inserted?.id;
+    const insertRows = await db.execute(sql`
+      insert into writing.submissions (
+        session_id,
+        course_id,
+        user_id,
+        regular_access_grant_id,
+        trial_application_id,
+        status,
+        submission_mode,
+        body_text,
+        image_storage_key,
+        image_mime_type,
+        submitted_at
+      )
+      values (
+        ${testRow.sessionId}::uuid,
+        ${testRow.courseId}::uuid,
+        ${testRow.adminUserId}::uuid,
+        null,
+        null,
+        'submitted',
+        ${ADMIN_SANDBOX_SUBMISSION_MODE},
+        ${testRow.bodyText},
+        null,
+        null,
+        ${submittedAt}
+      )
+      returning id
+    `);
+    const writingSubmissionId = (insertRows[0] as { id: string } | undefined)?.id;
     if (!writingSubmissionId) {
+      const err = new Error("insert_returned_no_id");
       const r: SandboxMirrorSyncResult = {
         outcome: "failed",
         sandboxTestId,
         sessionId,
         phase: "insert",
-        message: "insert_returned_no_id",
+        message: err.message,
       };
-      console.error("admin_sandbox_mirror_sync", r);
+      logAdminSandboxMirrorSyncFailed(err, r);
       return r;
     }
     const r: SandboxMirrorSyncResult = { outcome: "created", sandboxTestId, sessionId, writingSubmissionId };
@@ -630,7 +660,7 @@ export async function syncAdminSandboxTestRowToWritingSubmission(
       message,
       pgCode,
     };
-    console.error("admin_sandbox_mirror_sync", r, e);
+    logAdminSandboxMirrorSyncFailed(e, r);
     return r;
   }
 }
@@ -671,7 +701,7 @@ export async function trySyncSandboxMirrorBySubmissionId(
       message: `trySync_unexpected: ${message}`,
       pgCode,
     };
-    console.error("admin_sandbox_mirror_sync", r, e);
+    logAdminSandboxMirrorSyncFailed(e, r);
     return r;
   }
 }
