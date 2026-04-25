@@ -11,7 +11,16 @@ import { buildInitialEditorHtml, htmlToPlainText } from "../lib/teacherRichDocum
 type TeacherAssignmentSnapshot = {
   sessionIndex: number;
   termTitle: string | null;
+  title: string | null;
   theme: string | null;
+  prompt: string | null;
+  requirementItems: Array<{
+    grammarLevel?: string;
+    expressionLabel?: string;
+    pattern?: string;
+    translationJa?: string;
+    exampleKo?: string;
+  }>;
   requiredExpressions: unknown | null;
   referenceModelAnswer: string | null;
 };
@@ -72,35 +81,108 @@ function parseScoreField(raw: string): number | null {
   return Math.min(100, Math.max(0, n));
 }
 
+function RequirementCard({ item }: { item: TeacherAssignmentSnapshot["requirementItems"][number] }) {
+  const hasAny = [item.grammarLevel, item.expressionLabel, item.pattern, item.translationJa, item.exampleKo].some(
+    (x) => x != null && String(x).trim() !== ""
+  );
+  if (!hasAny) return null;
+  return (
+    <div className="requirement-card">
+      {item.expressionLabel != null && String(item.expressionLabel).trim() !== "" ? (
+        <div className="requirement-card-title">{item.expressionLabel}</div>
+      ) : null}
+      <dl className="requirement-card-dl">
+        {item.grammarLevel != null && String(item.grammarLevel).trim() !== "" ? (
+          <>
+            <dt>レベル</dt>
+            <dd>{item.grammarLevel}</dd>
+          </>
+        ) : null}
+        {item.pattern != null && String(item.pattern).trim() !== "" ? (
+          <>
+            <dt>パターン</dt>
+            <dd className="whitespace-pre-wrap">{item.pattern}</dd>
+          </>
+        ) : null}
+        {item.translationJa != null && String(item.translationJa).trim() !== "" ? (
+          <>
+            <dt>訳（日）</dt>
+            <dd className="whitespace-pre-wrap">{item.translationJa}</dd>
+          </>
+        ) : null}
+        {item.exampleKo != null && String(item.exampleKo).trim() !== "" ? (
+          <>
+            <dt>例（韓）</dt>
+            <dd className="whitespace-pre-wrap">{item.exampleKo}</dd>
+          </>
+        ) : null}
+      </dl>
+    </div>
+  );
+}
+
 function AssignmentSnapshotPanel({ a }: { a: TeacherAssignmentSnapshot }) {
   const termLine = [a.termTitle && `コース・ターム: ${a.termTitle}`, `第${a.sessionIndex}回`]
     .filter(Boolean)
     .join(" · ");
   const req = a.requiredExpressions;
   const requiredStrings = Array.isArray(req) ? req.filter((x): x is string => typeof x === "string") : [];
+  const hasThemeBlock =
+    (a.title != null && a.title.trim() !== "") ||
+    (a.theme != null && a.theme.trim() !== "") ||
+    (a.prompt != null && a.prompt.trim() !== "");
+  const hasStructuredReq = a.requirementItems != null && a.requirementItems.length > 0;
+  const hasAnyAssignment = hasThemeBlock || hasStructuredReq || requiredStrings.length > 0;
   return (
     <div className="editor-section">
       <label>課題・出題（参照）</label>
       <div className="original-text assignment-snapshot">
         {termLine ? <p className="assignment-snapshot-meta">{termLine}</p> : null}
-        {a.theme && a.theme.trim() !== "" ? (
-          <div>
-            <strong className="assignment-snapshot-h">テーマ / 出題文</strong>
-            <p className="whitespace-pre-wrap assignment-snapshot-theme">{a.theme}</p>
-          </div>
-        ) : (
+        {!hasAnyAssignment ? (
           <p className="assignment-snapshot-empty">出題テーマが未登録です</p>
+        ) : (
+          <>
+            {hasThemeBlock ? (
+              <>
+                {a.title != null && a.title.trim() !== "" ? (
+                  <h2 className="assignment-snapshot-title">{a.title}</h2>
+                ) : null}
+                {a.theme != null && a.theme.trim() !== "" ? (
+                  <div className="assignment-snapshot-block">
+                    <strong className="assignment-snapshot-h">テーマ</strong>
+                    <p className="whitespace-pre-wrap assignment-snapshot-body">{a.theme}</p>
+                  </div>
+                ) : null}
+                {a.prompt != null && a.prompt.trim() !== "" ? (
+                  <div className="assignment-snapshot-block">
+                    <strong className="assignment-snapshot-h">出題文・指示</strong>
+                    <p className="whitespace-pre-wrap assignment-snapshot-body">{a.prompt}</p>
+                  </div>
+                ) : null}
+              </>
+            ) : null}
+            {hasStructuredReq ? (
+              <div className="assignment-snapshot-req">
+                <strong className="assignment-snapshot-h">必須表現（要件）</strong>
+                <div className="requirement-cards">
+                  {a.requirementItems!.map((item, i) => (
+                    <RequirementCard key={i} item={item} />
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            {requiredStrings.length > 0 ? (
+              <div className="assignment-snapshot-req">
+                <strong className="assignment-snapshot-h">必須表現</strong>
+                <ul>
+                  {requiredStrings.map((ex, i) => (
+                    <li key={i}>{ex}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </>
         )}
-        {requiredStrings.length > 0 ? (
-          <div className="assignment-snapshot-req">
-            <strong className="assignment-snapshot-h">必須表現</strong>
-            <ul>
-              {requiredStrings.map((ex, i) => (
-                <li key={i}>{ex}</li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
       </div>
     </div>
   );
@@ -317,13 +399,20 @@ export default function CorrectionPage() {
   const handleCopyCorrected = async () => {
     const doc = richEditorRef.current?.getDocumentJson();
     const plain = htmlToPlainText(doc?.html ?? "");
+    setImprovedText(plain);
+    let copied = false;
     try {
       await navigator.clipboard.writeText(plain);
-      setCopyCorrectedMessage("修正文をコピーしました");
+      copied = true;
     } catch {
-      setCopyCorrectedMessage("修正文のコピーに失敗しました");
+      copied = false;
     }
-    setTimeout(() => setCopyCorrectedMessage(null), 2500);
+    if (copied) {
+      setCopyCorrectedMessage("修正文をコピーし、比較文欄に反映しました");
+    } else {
+      setCopyCorrectedMessage("比較文欄に反映しました（コピーは失敗しました）");
+    }
+    setTimeout(() => setCopyCorrectedMessage(null), 3000);
   };
 
   const handlePublish = async () => {

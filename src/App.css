@@ -741,6 +741,60 @@ a.status-badge.status.corrected {
   font-size: 0.95rem;
 }
 
+.assignment-snapshot-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin: 0 0 0.75rem;
+  line-height: 1.4;
+}
+
+.assignment-snapshot-block {
+  margin-bottom: 0.75rem;
+}
+
+.assignment-snapshot-body {
+  margin: 0.35rem 0 0;
+  font-size: 0.98rem;
+}
+
+.requirement-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 0.4rem;
+}
+
+.requirement-card {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 0.65rem 0.85rem;
+  background: #fafafa;
+}
+
+.requirement-card-title {
+  font-weight: 600;
+  font-size: 0.92rem;
+  margin-bottom: 0.35rem;
+}
+
+.requirement-card-dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.2rem 0.75rem;
+  font-size: 0.88rem;
+}
+
+.requirement-card-dl dt {
+  margin: 0;
+  color: var(--color-text-muted, #666);
+  font-weight: 500;
+}
+
+.requirement-card-dl dd {
+  margin: 0;
+}
+
 .correction-textarea {
   width: 100%;
   padding: 1rem;

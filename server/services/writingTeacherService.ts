@@ -12,6 +12,7 @@
  */
 
 import type { Db } from "../db/client";
+import { parseThemeSnapshot } from "../lib/themeSnapshotParse";
 import { isPostgresErrorLike, isPostgresUniqueViolation } from "../lib/postgresErrorGuards";
 import * as repo from "../repositories/writingTeacherRepository";
 import { ADMIN_SANDBOX_SUBMISSION_MODE, backfillSubmittedAdminSandboxMirrors } from "./adminSandboxService";
@@ -189,9 +190,23 @@ export type TeacherSubmissionDetail = {
   assignment: {
     sessionIndex: number;
     termTitle: string | null;
+    /** From parsed theme_snapshot JSON (not raw). */
+    title: string | null;
+    /** Theme / topic line. */
     theme: string | null;
+    /** Instructions / prompt. */
+    prompt: string | null;
+    /** Structured `requirements` array from theme_snapshot JSON. */
+    requirementItems: Array<{
+      grammarLevel?: string;
+      expressionLabel?: string;
+      pattern?: string;
+      translationJa?: string;
+      exampleKo?: string;
+    }>;
+    /** legacy: string[] from required_expressions_snapshot or assignment master. */
     requiredExpressions: unknown | null;
-    /** From writing.sessions.model_answer_snapshot or writing.assignment_masters.model_answer. */
+    /** modelAnswer inside theme_snapshot JSON, else model_answer_snapshot, else master. */
     referenceModelAnswer: string | null;
   };
   correction: null | {
@@ -282,15 +297,23 @@ export async function getTeacherSubmissionDetail(
     termTitle = t?.title ?? null;
   }
   const master = s.assignmentMasterId ? await repo.getAssignmentMasterById(db, s.assignmentMasterId) : null;
-  const theme =
-    typeof s.themeSnapshot === "string" && s.themeSnapshot.trim() !== ""
-      ? s.themeSnapshot.trim()
-      : master?.theme?.trim() || null;
+  const parsed = parseThemeSnapshot(
+    typeof s.themeSnapshot === "string" && s.themeSnapshot.trim() !== "" ? s.themeSnapshot : null
+  );
   const requiredExpressions = s.requiredExpressionsSnapshot ?? master?.requiredExpressions ?? null;
+  let title: string | null = parsed?.title ?? null;
+  let theme: string | null = parsed?.theme ?? null;
+  const prompt: string | null = parsed?.prompt ?? null;
+  const requirementItems = parsed?.requirementItems ?? [];
+  if (parsed == null && master?.theme?.trim()) {
+    theme = master.theme.trim();
+  }
   const referenceModelAnswer =
-    typeof s.modelAnswerSnapshot === "string" && s.modelAnswerSnapshot.trim() !== ""
-      ? s.modelAnswerSnapshot.trim()
-      : master?.modelAnswer?.trim() || null;
+    parsed?.modelAnswerFromThemeJson && parsed.modelAnswerFromThemeJson.trim() !== ""
+      ? parsed.modelAnswerFromThemeJson.trim()
+      : typeof s.modelAnswerSnapshot === "string" && s.modelAnswerSnapshot.trim() !== ""
+        ? s.modelAnswerSnapshot.trim()
+        : master?.modelAnswer?.trim() || null;
 
   return {
     submission: {
@@ -321,7 +344,10 @@ export async function getTeacherSubmissionDetail(
     assignment: {
       sessionIndex: s.index,
       termTitle,
+      title,
       theme,
+      prompt,
+      requirementItems,
       requiredExpressions,
       referenceModelAnswer,
     },
