@@ -760,39 +760,35 @@ a.status-badge.status.corrected {
 .requirement-cards {
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
-  margin-top: 0.4rem;
+  gap: 0.45rem;
+  margin-top: 0.35rem;
 }
 
 .requirement-card {
   border: 1px solid var(--color-border);
   border-radius: 8px;
-  padding: 0.65rem 0.85rem;
+  padding: 0.45rem 0.65rem;
   background: #fafafa;
 }
 
-.requirement-card-title {
+.requirement-card-head {
   font-weight: 600;
-  font-size: 0.92rem;
-  margin-bottom: 0.35rem;
+  font-size: 0.9rem;
+  line-height: 1.35;
+  margin-bottom: 0.2rem;
 }
 
-.requirement-card-dl {
+.requirement-card-meta {
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--color-text-muted, #5a5a5a);
   margin: 0;
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0.2rem 0.75rem;
+}
+
+.requirement-card-example {
   font-size: 0.88rem;
-}
-
-.requirement-card-dl dt {
-  margin: 0;
-  color: var(--color-text-muted, #666);
-  font-weight: 500;
-}
-
-.requirement-card-dl dd {
-  margin: 0;
+  line-height: 1.5;
+  margin-top: 0.25rem;
 }
 
 .correction-textarea {

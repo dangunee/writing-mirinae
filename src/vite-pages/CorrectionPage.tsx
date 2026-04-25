@@ -86,37 +86,20 @@ function RequirementCard({ item }: { item: TeacherAssignmentSnapshot["requiremen
     (x) => x != null && String(x).trim() !== ""
   );
   if (!hasAny) return null;
+  const el = item.expressionLabel?.trim();
+  const pat = item.pattern?.trim();
+  const head = el || pat || null;
+  const g = item.grammarLevel?.trim() || "—";
+  const p = pat || "—";
+  const t = item.translationJa?.trim() || "—";
+  const ex = item.exampleKo?.trim();
   return (
     <div className="requirement-card">
-      {item.expressionLabel != null && String(item.expressionLabel).trim() !== "" ? (
-        <div className="requirement-card-title">{item.expressionLabel}</div>
-      ) : null}
-      <dl className="requirement-card-dl">
-        {item.grammarLevel != null && String(item.grammarLevel).trim() !== "" ? (
-          <>
-            <dt>レベル</dt>
-            <dd>{item.grammarLevel}</dd>
-          </>
-        ) : null}
-        {item.pattern != null && String(item.pattern).trim() !== "" ? (
-          <>
-            <dt>パターン</dt>
-            <dd className="whitespace-pre-wrap">{item.pattern}</dd>
-          </>
-        ) : null}
-        {item.translationJa != null && String(item.translationJa).trim() !== "" ? (
-          <>
-            <dt>訳（日）</dt>
-            <dd className="whitespace-pre-wrap">{item.translationJa}</dd>
-          </>
-        ) : null}
-        {item.exampleKo != null && String(item.exampleKo).trim() !== "" ? (
-          <>
-            <dt>例（韓）</dt>
-            <dd className="whitespace-pre-wrap">{item.exampleKo}</dd>
-          </>
-        ) : null}
-      </dl>
+      {head != null && head !== "" ? <div className="requirement-card-head">{head}</div> : null}
+      <div className="requirement-card-meta">
+        レベル：{g} ｜ パターン：{p} ｜ 訳：{t}
+      </div>
+      {ex != null && ex !== "" ? <div className="requirement-card-example">例：{ex}</div> : null}
     </div>
   );
 }
@@ -200,7 +183,6 @@ export default function CorrectionPage() {
   const [loading, setLoading] = useState(true);
   const [selectedSubmission, setSelectedSubmission] = useState<ListRow | null>(null);
   const [improvedText, setImprovedText] = useState("");
-  const [modelAnswer, setModelAnswer] = useState("");
   const [teacherComment, setTeacherComment] = useState("");
   const [grammarScore, setGrammarScore] = useState("");
   const [vocabularyScore, setVocabularyScore] = useState("");
@@ -279,7 +261,6 @@ export default function CorrectionPage() {
   useEffect(() => {
     if (!detail) {
       setImprovedText("");
-      setModelAnswer("");
       setTeacherComment("");
       setGrammarScore("");
       setVocabularyScore("");
@@ -287,7 +268,6 @@ export default function CorrectionPage() {
       return;
     }
     setImprovedText(detail.correction?.improvedText ?? "");
-    setModelAnswer(detail.correction?.modelAnswer ?? "");
     setTeacherComment(detail.correction?.teacherComment ?? "");
     const ev = detail.evaluation;
     setGrammarScore(ev?.grammarAccuracy != null ? String(ev.grammarAccuracy) : "");
@@ -299,10 +279,13 @@ export default function CorrectionPage() {
 
   /** 모범답 · 코멘트 · 점수만 저장 (기존 「저장」) */
   const handleSave = async () => {
-    if (!activeRow || !submissionId || busy || saveLockRef.current) return;
+    if (!activeRow || !submissionId || !detail || busy || saveLockRef.current) return;
     saveLockRef.current = true;
     setSaving(true);
     try {
+      const refModel = detail.assignment?.referenceModelAnswer?.trim() ?? "";
+      const storedModel = detail.correction?.modelAnswer?.trim() ?? "";
+      const modelAnswerToPersist = refModel || storedModel;
       const correctionRes = await fetch(
         apiUrl(`/api/teacher/writing/submissions/${submissionId}/correction`),
         {
@@ -310,7 +293,7 @@ export default function CorrectionPage() {
           credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            modelAnswer: modelAnswer ?? "",
+            modelAnswer: modelAnswerToPersist,
             teacherComment: teacherComment ?? "",
           }),
         }
@@ -574,16 +557,6 @@ export default function CorrectionPage() {
                       <p className="assignment-snapshot-empty">モ범文が登録されていません</p>
                     )}
                   </div>
-                </div>
-                <div className="editor-section">
-                  <label>掲載用モ범文（生徒向け・公開時）</label>
-                  <textarea
-                    value={modelAnswer}
-                    onChange={(e) => setModelAnswer(e.target.value)}
-                    className="correction-textarea"
-                    rows={6}
-                    placeholder="공개·학생画面에 표시할 모범답"
-                  />
                 </div>
                 <div className="editor-section">
                   <label>강사 코멘트</label>
