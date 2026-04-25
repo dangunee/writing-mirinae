@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { apiUrl } from '../lib/apiUrl'
+import { TeacherPageNav } from '../components/teacher/TeacherPageNav'
 
 /** GET /api/teacher/writing/submissions/queue — 서버 QueueGroupedResponse와 동형 */
 type QueueItem = {
@@ -88,6 +89,10 @@ export default function TeacherQueuePage() {
   if (loading) {
     return (
       <div className="writing-page">
+        <div className="writing-page-top">
+          <h1 className="writing-page-title">첨삭 대기 목록</h1>
+          <TeacherPageNav />
+        </div>
         <p className="status pending">불러오는 중…</p>
       </div>
     )
@@ -96,6 +101,10 @@ export default function TeacherQueuePage() {
   if (error) {
     return (
       <div className="writing-page">
+        <div className="writing-page-top">
+          <h1 className="writing-page-title">첨삭 대기 목록</h1>
+          <TeacherPageNav />
+        </div>
         <p className="status pending">{error}</p>
       </div>
     )
@@ -106,7 +115,10 @@ export default function TeacherQueuePage() {
 
   return (
     <div className="writing-page">
-      <h1 className="writing-page-title">첨삭 대기 목록</h1>
+      <div className="writing-page-top">
+        <h1 className="writing-page-title">첨삭 대기 목록</h1>
+        <TeacherPageNav />
+      </div>
       {empty ? (
         <p className="no-assignments">대기 중인 제출이 없습니다.</p>
       ) : (

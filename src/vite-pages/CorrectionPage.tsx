@@ -5,6 +5,7 @@ import { apiUrl } from "../lib/apiUrl";
 import TeacherRichCorrectionEditor, {
   type TeacherRichCorrectionEditorHandle,
 } from "../components/teacher/TeacherRichCorrectionEditor";
+import { TeacherPageNav } from "../components/teacher/TeacherPageNav";
 import { buildInitialEditorHtml, htmlToPlainText } from "../lib/teacherRichDocument";
 
 /** GET /api/teacher/writing/submissions/:id 응답 (TeacherSubmissionDetail 요약) */
@@ -432,8 +433,17 @@ export default function CorrectionPage() {
     return (
       <WritingLayout>
         <div className="correction-page">
-          <p>과제를 찾을 수 없습니다.</p>
-          <Link to="/writing/teacher">목록으로</Link>
+          <div className="correction-header">
+            <div className="correction-header-row">
+              <div className="correction-header-main">
+                <Link to="/writing/teacher" className="back-link">
+                  ← 목록으로
+                </Link>
+                <p>과제를 찾을 수 없습니다.</p>
+              </div>
+              <TeacherPageNav />
+            </div>
+          </div>
         </div>
       </WritingLayout>
     );
@@ -443,8 +453,17 @@ export default function CorrectionPage() {
     return (
       <WritingLayout>
         <div className="correction-page">
-          <p>로딩 중...</p>
-          <Link to="/writing/teacher">목록으로</Link>
+          <div className="correction-header">
+            <div className="correction-header-row">
+              <div className="correction-header-main">
+                <Link to="/writing/teacher" className="back-link">
+                  ← 목록으로
+                </Link>
+                <p>로딩 중...</p>
+              </div>
+              <TeacherPageNav />
+            </div>
+          </div>
         </div>
       </WritingLayout>
     );
@@ -454,8 +473,17 @@ export default function CorrectionPage() {
     return (
       <WritingLayout>
         <div className="correction-page">
-          <p>과제를 찾을 수 없습니다.</p>
-          <Link to="/writing/teacher">목록으로</Link>
+          <div className="correction-header">
+            <div className="correction-header-row">
+              <div className="correction-header-main">
+                <Link to="/writing/teacher" className="back-link">
+                  ← 목록으로
+                </Link>
+                <p>과제를 찾을 수 없습니다.</p>
+              </div>
+              <TeacherPageNav />
+            </div>
+          </div>
         </div>
       </WritingLayout>
     );
@@ -465,10 +493,15 @@ export default function CorrectionPage() {
     <WritingLayout>
       <div className="correction-page">
         <div className="correction-header">
-          <Link to="/writing/teacher" className="back-link">
-            ← 목록으로
-          </Link>
-          <h1>첨삭: 세션 {sessionIdx}회</h1>
+          <div className="correction-header-row">
+            <div className="correction-header-main">
+              <Link to="/writing/teacher" className="back-link">
+                ← 목록으로
+              </Link>
+              <h1>첨삭: 세션 {sessionIdx}회</h1>
+            </div>
+            <TeacherPageNav />
+          </div>
         </div>
 
         <div className="correction-layout">

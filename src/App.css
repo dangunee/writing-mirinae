@@ -149,6 +149,32 @@
   animation: fadeIn 0.3s ease;
 }
 
+.teacher-page-nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  margin: 0 0 0.5rem;
+}
+
+.teacher-page-nav .view-link {
+  white-space: nowrap;
+}
+
+.writing-page-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.writing-page-top .writing-page-title {
+  margin: 0 0 0.75rem;
+}
+
 .writing-page-title {
   margin: 0 0 1.5rem;
   font-size: 1.35rem;
@@ -619,6 +645,20 @@ a.status-badge.status.corrected {
 
 .correction-header {
   margin-bottom: 1.5rem;
+}
+
+.correction-header-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.correction-header-main {
+  flex: 1;
+  min-width: 0;
 }
 
 .back-link {
