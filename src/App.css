@@ -724,6 +724,95 @@ a.status-badge.status.corrected {
   border-color: var(--color-primary);
 }
 
+.teacher-rich-wrap {
+  border: 2px solid var(--color-border);
+  border-radius: 10px;
+  padding: 0.5rem 0.75rem 0.75rem;
+  background: var(--color-surface);
+}
+
+.teacher-rich-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.teacher-rich-tool {
+  min-width: 2rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.teacher-rich-tool:hover {
+  border-color: var(--color-primary);
+}
+
+.teacher-rich-color {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.teacher-rich-color input[type="color"] {
+  width: 2rem;
+  height: 1.75rem;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.teacher-rich-editable {
+  min-height: 12rem;
+  padding: 0.75rem;
+  font-size: 1rem;
+  font-family: var(--font-hangul), inherit;
+  line-height: 1.7;
+  outline: none;
+  border-radius: 6px;
+}
+
+.teacher-rich-editable:focus {
+  box-shadow: 0 0 0 2px rgba(44, 95, 45, 0.2);
+}
+
+.teacher-rich-content u,
+.teacher-rich-content strike,
+.teacher-rich-content font,
+.teacher-rich-content span {
+  font-family: inherit;
+}
+
+.teacher-rich-content p {
+  margin: 0 0 0.5rem;
+}
+
+.copy-toast {
+  font-size: 0.85rem;
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.save-btn--secondary {
+  background: #fff;
+  color: var(--color-primary);
+  border: 2px solid var(--color-primary);
+}
+
+.save-btn--secondary:hover:not(:disabled) {
+  filter: brightness(0.97);
+}
+
 .editor-actions {
   display: flex;
   gap: 1rem;

@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import WritingLayout from '../components/WritingLayout'
 import StudentAccountPanel from '../components/student/StudentAccountPanel'
 import { apiUrl } from '../lib/apiUrl'
+import { isHtmlVisiblyNonEmpty, parseTeacherHtmlV1 } from '../lib/teacherRichDocument'
 
 function ViewCorrectionShell({ children }: { children: ReactNode }) {
   return (
@@ -84,17 +85,24 @@ function normalizeResultPayload(raw: Record<string, unknown>): Record<string, un
   return { ...raw, outcome: 'published' }
 }
 
-/** Published: correction + improved + comment + model answer — single block as before (no rich JSON render). */
-function correctionDisplayText(
-  correction: NonNullable<Extract<StudentResultResponse, { outcome: 'published' }>['correction']>,
-): string {
-  const parts = [
-    correction.polishedSentence,
-    correction.improvedText,
-    correction.teacherComment,
-    correction.modelAnswer,
-  ].filter((x): x is string => x != null && String(x).trim() !== '')
-  return parts.join('\n\n')
+type PublishedCorrection = NonNullable<
+  Extract<StudentResultResponse, { outcome: 'published' }>['correction']
+>
+
+function textNonEmpty(s: string | null | undefined): boolean {
+  return s != null && String(s).trim() !== ''
+}
+
+/** Any block we can show in the published correction panel. */
+function hasPublishedCorrectionContent(correction: PublishedCorrection | null): boolean {
+  if (!correction) return false
+  const rawHtml = parseTeacherHtmlV1(correction.richDocumentJson)
+  if (rawHtml != null && isHtmlVisiblyNonEmpty(rawHtml)) return true
+  if (textNonEmpty(correction.polishedSentence)) return true
+  if (textNonEmpty(correction.improvedText)) return true
+  if (textNonEmpty(correction.teacherComment)) return true
+  if (textNonEmpty(correction.modelAnswer)) return true
+  return false
 }
 
 function formatSessionMetaLine(session: ResultSessionCommon & { modelAnswerSnapshot?: string | null }): string {
@@ -264,9 +272,7 @@ export default function ViewCorrectionPage() {
   }
 
   const correction = result.correction
-  const correctedText =
-    correction != null ? correctionDisplayText(correction) : ''
-  const hasCorrectedBody = (correctedText ?? '').trim() !== ''
+  const hasCorrectedBody = hasPublishedCorrectionContent(correction)
 
   return (
     <ViewCorrectionShell>
@@ -304,7 +310,43 @@ export default function ViewCorrectionPage() {
         <div className="view-section">
           <h3>강사님 첨삭</h3>
           {correction != null && hasCorrectedBody ? (
-            <div className="corrected-content">{correctedText}</div>
+            <div className="published-correction-blocks">
+              {(() => {
+                const rawHtml = parseTeacherHtmlV1(correction.richDocumentJson)
+                const hasRich = rawHtml != null && isHtmlVisiblyNonEmpty(rawHtml)
+                return (
+                  <>
+                    {hasRich && (
+                      <div
+                        className="corrected-content teacher-rich-content"
+                        dangerouslySetInnerHTML={{ __html: rawHtml }}
+                      />
+                    )}
+                    {!hasRich && textNonEmpty(correction.polishedSentence) && (
+                      <div className="corrected-content whitespace-pre-wrap">{correction.polishedSentence}</div>
+                    )}
+                    {textNonEmpty(correction.improvedText) && (
+                      <div className="improved-block" style={{ marginTop: '1rem' }}>
+                        <h4 className="improved-block-title">整理した比較文</h4>
+                        <div className="corrected-content whitespace-pre-wrap">{correction.improvedText}</div>
+                      </div>
+                    )}
+                    {textNonEmpty(correction.teacherComment) && (
+                      <div style={{ marginTop: '1rem' }}>
+                        <strong>강사 코멘트</strong>
+                        <div className="corrected-content whitespace-pre-wrap">{correction.teacherComment}</div>
+                      </div>
+                    )}
+                    {textNonEmpty(correction.modelAnswer) && (
+                      <div style={{ marginTop: '1rem' }}>
+                        <strong>모범답</strong>
+                        <div className="corrected-content whitespace-pre-wrap">{correction.modelAnswer}</div>
+                      </div>
+                    )}
+                  </>
+                )
+              })()}
+            </div>
           ) : (
             <p className="pending">아직 첨삭이 완료되지 않았습니다.</p>
           )}
