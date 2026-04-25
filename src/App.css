@@ -708,6 +708,39 @@ a.status-badge.status.corrected {
   line-height: 1.7;
 }
 
+.assignment-snapshot-meta {
+  font-size: 0.9rem;
+  color: var(--color-text-muted, #5c5c5c);
+  margin: 0 0 0.75rem;
+}
+
+.assignment-snapshot-h {
+  display: block;
+  font-size: 0.85rem;
+  margin-bottom: 0.25rem;
+}
+
+.assignment-snapshot-theme {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.assignment-snapshot-empty {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #6b6b6b;
+}
+
+.assignment-snapshot-req {
+  margin-top: 0.75rem;
+}
+
+.assignment-snapshot-req ul {
+  margin: 0.35rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.95rem;
+}
+
 .correction-textarea {
   width: 100%;
   padding: 1rem;

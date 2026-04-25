@@ -5,9 +5,17 @@ import { apiUrl } from "../lib/apiUrl";
 import TeacherRichCorrectionEditor, {
   type TeacherRichCorrectionEditorHandle,
 } from "../components/teacher/TeacherRichCorrectionEditor";
-import { buildInitialEditorHtml } from "../lib/teacherRichDocument";
+import { buildInitialEditorHtml, htmlToPlainText } from "../lib/teacherRichDocument";
 
 /** GET /api/teacher/writing/submissions/:id 응답 (TeacherSubmissionDetail 요약) */
+type TeacherAssignmentSnapshot = {
+  sessionIndex: number;
+  termTitle: string | null;
+  theme: string | null;
+  requiredExpressions: unknown | null;
+  referenceModelAnswer: string | null;
+};
+
 type TeacherSubmissionDetail = {
   submission: {
     id: string;
@@ -15,6 +23,8 @@ type TeacherSubmissionDetail = {
     grammarCheckResult?: unknown | null;
   };
   session: { index: number };
+  /** Session/course theme & reference model (read-only for teacher). */
+  assignment?: TeacherAssignmentSnapshot;
   correction: null | {
     id: string;
     polishedSentence: string | null;
@@ -62,6 +72,40 @@ function parseScoreField(raw: string): number | null {
   return Math.min(100, Math.max(0, n));
 }
 
+function AssignmentSnapshotPanel({ a }: { a: TeacherAssignmentSnapshot }) {
+  const termLine = [a.termTitle && `コース・ターム: ${a.termTitle}`, `第${a.sessionIndex}回`]
+    .filter(Boolean)
+    .join(" · ");
+  const req = a.requiredExpressions;
+  const requiredStrings = Array.isArray(req) ? req.filter((x): x is string => typeof x === "string") : [];
+  return (
+    <div className="editor-section">
+      <label>課題・出題（参照）</label>
+      <div className="original-text assignment-snapshot">
+        {termLine ? <p className="assignment-snapshot-meta">{termLine}</p> : null}
+        {a.theme && a.theme.trim() !== "" ? (
+          <div>
+            <strong className="assignment-snapshot-h">テーマ / 出題文</strong>
+            <p className="whitespace-pre-wrap assignment-snapshot-theme">{a.theme}</p>
+          </div>
+        ) : (
+          <p className="assignment-snapshot-empty">出題テーマが未登録です</p>
+        )}
+        {requiredStrings.length > 0 ? (
+          <div className="assignment-snapshot-req">
+            <strong className="assignment-snapshot-h">必須表現</strong>
+            <ul>
+              {requiredStrings.map((ex, i) => (
+                <li key={i}>{ex}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 type ListRow = {
   id: string;
   studentName: string;
@@ -82,7 +126,7 @@ export default function CorrectionPage() {
   const [saved, setSaved] = useState(false);
   const [savedRich, setSavedRich] = useState(false);
   const [savedImproved, setSavedImproved] = useState(false);
-  const [copyMessage, setCopyMessage] = useState<string | null>(null);
+  const [copyCorrectedMessage, setCopyCorrectedMessage] = useState<string | null>(null);
   const saveLockRef = useRef(false);
   const [saving, setSaving] = useState(false);
   const [savingRich, setSavingRich] = useState(false);
@@ -123,11 +167,12 @@ export default function CorrectionPage() {
     setSelectedSubmission(null);
   }, [submissionId]);
 
+  const sessionIdx = detail?.assignment?.sessionIndex ?? detail?.session.index ?? 0;
   const submissions: ListRow[] = detail
     ? [
         {
           id: detail.submission.id,
-          studentName: `세션 ${detail.session.index}회`,
+          studentName: `세션 ${sessionIdx}회`,
           content: detail.submission.bodyText ?? "",
         },
       ]
@@ -269,15 +314,16 @@ export default function CorrectionPage() {
     }
   };
 
-  const handleCopyImproved = async () => {
-    const text = improvedText ?? "";
+  const handleCopyCorrected = async () => {
+    const doc = richEditorRef.current?.getDocumentJson();
+    const plain = htmlToPlainText(doc?.html ?? "");
     try {
-      await navigator.clipboard.writeText(text);
-      setCopyMessage("コピーしました");
+      await navigator.clipboard.writeText(plain);
+      setCopyCorrectedMessage("修正文をコピーしました");
     } catch {
-      setCopyMessage("コピーに失敗しました");
+      setCopyCorrectedMessage("修正文のコピーに失敗しました");
     }
-    setTimeout(() => setCopyMessage(null), 2500);
+    setTimeout(() => setCopyCorrectedMessage(null), 2500);
   };
 
   const handlePublish = async () => {
@@ -350,7 +396,7 @@ export default function CorrectionPage() {
           <Link to="/writing/teacher" className="back-link">
             ← 목록으로
           </Link>
-          <h1>첨삭: 세션 {detail.session.index}회</h1>
+          <h1>첨삭: 세션 {sessionIdx}회</h1>
         </div>
 
         <div className="correction-layout">
@@ -373,6 +419,7 @@ export default function CorrectionPage() {
             {activeRow ? (
               <>
                 <p className="instructor-label">↑ 강사 편집</p>
+                {detail.assignment && <AssignmentSnapshotPanel a={detail.assignment} />}
                 <div className="editor-section">
                   <label>원문 (학생 제출)</label>
                   <div className="original-text">{activeRow.content}</div>
@@ -385,7 +432,7 @@ export default function CorrectionPage() {
                     key={richEditorSeedKey}
                     initialHtml={initialEditorHtml}
                   />
-                  <div className="editor-actions" style={{ marginTop: "0.75rem" }}>
+                  <div className="editor-actions" style={{ marginTop: "0.75rem", flexWrap: "wrap" }}>
                     <button
                       type="button"
                       className="save-btn"
@@ -394,6 +441,18 @@ export default function CorrectionPage() {
                     >
                       {savedRich ? "保存しました ✓" : "修正文を保存"}
                     </button>
+                    <button
+                      type="button"
+                      className="save-btn save-btn--secondary"
+                      onClick={() => void handleCopyCorrected()}
+                    >
+                      修正文をコピー
+                    </button>
+                    {copyCorrectedMessage && (
+                      <span className="copy-toast" role="status">
+                        {copyCorrectedMessage}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="editor-section">
@@ -405,7 +464,7 @@ export default function CorrectionPage() {
                     rows={6}
                     placeholder="比較用の清書テキストを入力"
                   />
-                  <div className="editor-actions" style={{ marginTop: "0.75rem", flexWrap: "wrap" }}>
+                  <div className="editor-actions" style={{ marginTop: "0.75rem" }}>
                     <button
                       type="button"
                       className="save-btn"
@@ -414,28 +473,27 @@ export default function CorrectionPage() {
                     >
                       {savedImproved ? "保存しました ✓" : "比較文を保存"}
                     </button>
-                    <button
-                      type="button"
-                      className="save-btn save-btn--secondary"
-                      onClick={() => void handleCopyImproved()}
-                    >
-                      比較文をコピー
-                    </button>
-                    {copyMessage && (
-                      <span className="copy-toast" role="status">
-                        {copyMessage}
-                      </span>
+                  </div>
+                </div>
+                <div className="editor-section">
+                  <label>課題モ범文（登録・参考）</label>
+                  <div className="original-text">
+                    {detail.assignment?.referenceModelAnswer != null &&
+                    String(detail.assignment.referenceModelAnswer).trim() !== "" ? (
+                      <div className="whitespace-pre-wrap">{detail.assignment.referenceModelAnswer}</div>
+                    ) : (
+                      <p className="assignment-snapshot-empty">モ범文が登録されていません</p>
                     )}
                   </div>
                 </div>
                 <div className="editor-section">
-                  <label>모범답</label>
+                  <label>掲載用モ범文（生徒向け・公開時）</label>
                   <textarea
                     value={modelAnswer}
                     onChange={(e) => setModelAnswer(e.target.value)}
                     className="correction-textarea"
                     rows={6}
-                    placeholder="모범답을 입력하세요"
+                    placeholder="공개·학생画面에 표시할 모범답"
                   />
                 </div>
                 <div className="editor-section">

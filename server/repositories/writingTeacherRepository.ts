@@ -1,6 +1,7 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 
 import {
+  writingAssignmentMasters,
   writingCorrectionAnnotations,
   writingCorrectionEvaluations,
   writingCorrectionFeedbackItems,
@@ -10,6 +11,7 @@ import {
   writingFragments,
   writingSessions,
   writingSubmissions,
+  writingTerms,
 } from "../../db/schema";
 import type { Db } from "../db/client";
 
@@ -65,6 +67,20 @@ export async function getSubmissionFullForTeacher(db: Db, submissionId: string) 
     .innerJoin(writingCourses, eq(writingSubmissions.courseId, writingCourses.id))
     .where(eq(writingSubmissions.id, submissionId))
     .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function getWritingTermById(db: Db, termId: string) {
+  const rows = await db
+    .select({ id: writingTerms.id, title: writingTerms.title })
+    .from(writingTerms)
+    .where(eq(writingTerms.id, termId))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function getAssignmentMasterById(db: Db, id: string) {
+  const rows = await db.select().from(writingAssignmentMasters).where(eq(writingAssignmentMasters.id, id)).limit(1);
   return rows[0] ?? null;
 }
 

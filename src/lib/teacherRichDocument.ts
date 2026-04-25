@@ -56,3 +56,20 @@ export function isHtmlVisiblyNonEmpty(html: string): boolean {
   const t = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
   return t.length > 0;
 }
+
+/** Strip tags for clipboard; prefer DOM innerText in the browser. */
+export function htmlToPlainText(html: string): string {
+  if (typeof html !== "string" || html === "") return "";
+  if (typeof document !== "undefined") {
+    const d = document.createElement("div");
+    d.innerHTML = html;
+    const t = d.innerText ?? d.textContent ?? "";
+    return t.replace(/\u00a0/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+  }
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}

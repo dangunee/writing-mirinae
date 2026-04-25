@@ -185,6 +185,15 @@ export type TeacherSubmissionDetail = {
     unlockAt: string;
   };
   course: { id: string; status: string; sessionCount: number };
+  /** Session/course assignment snapshot for teacher context (read-only). */
+  assignment: {
+    sessionIndex: number;
+    termTitle: string | null;
+    theme: string | null;
+    requiredExpressions: unknown | null;
+    /** From writing.sessions.model_answer_snapshot or writing.assignment_masters.model_answer. */
+    referenceModelAnswer: string | null;
+  };
   correction: null | {
     id: string;
     teacherId: string;
@@ -265,6 +274,24 @@ export async function getTeacherSubmissionDetail(
     ? await repo.getCorrectionEvaluationByCorrectionId(db, correction.id)
     : null;
 
+  const s = row.session;
+  const c = row.course;
+  let termTitle: string | null = null;
+  if (c.termId) {
+    const t = await repo.getWritingTermById(db, c.termId);
+    termTitle = t?.title ?? null;
+  }
+  const master = s.assignmentMasterId ? await repo.getAssignmentMasterById(db, s.assignmentMasterId) : null;
+  const theme =
+    typeof s.themeSnapshot === "string" && s.themeSnapshot.trim() !== ""
+      ? s.themeSnapshot.trim()
+      : master?.theme?.trim() || null;
+  const requiredExpressions = s.requiredExpressionsSnapshot ?? master?.requiredExpressions ?? null;
+  const referenceModelAnswer =
+    typeof s.modelAnswerSnapshot === "string" && s.modelAnswerSnapshot.trim() !== ""
+      ? s.modelAnswerSnapshot.trim()
+      : master?.modelAnswer?.trim() || null;
+
   return {
     submission: {
       id: row.submission.id,
@@ -290,6 +317,13 @@ export async function getTeacherSubmissionDetail(
       id: row.course.id,
       status: row.course.status,
       sessionCount: row.course.sessionCount,
+    },
+    assignment: {
+      sessionIndex: s.index,
+      termTitle,
+      theme,
+      requiredExpressions,
+      referenceModelAnswer,
     },
     correction: correction
       ? {
