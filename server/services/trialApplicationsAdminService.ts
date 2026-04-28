@@ -47,7 +47,7 @@ function iso(d: Date | null | undefined): string | null {
 }
 
 function deriveSubmissionStatus(
-  sub: (typeof writingSubmissions.$inferSelect) | null
+  sub: Pick<typeof writingSubmissions.$inferSelect, "status" | "submittedAt"> | null
 ): TrialAdminListItem["submissionStatus"] {
   if (!sub || !sub.submittedAt) return "not_submitted";
   switch (sub.status) {
@@ -174,12 +174,20 @@ export async function listTrialApplicationsForAdmin(
     };
   }
 
+  /** Omit optional columns some prod DBs lack (e.g. grammar_check_result). */
   const allSubs = await db
-    .select()
+    .select({
+      id: writingSubmissions.id,
+      trialApplicationId: writingSubmissions.trialApplicationId,
+      status: writingSubmissions.status,
+      submittedAt: writingSubmissions.submittedAt,
+      createdAt: writingSubmissions.createdAt,
+    })
     .from(writingSubmissions)
     .where(inArray(writingSubmissions.trialApplicationId, trialIds));
 
-  const subByTrial = new Map<string, (typeof writingSubmissions.$inferSelect)[]>();
+  type SubRow = (typeof allSubs)[number];
+  const subByTrial = new Map<string, SubRow[]>();
   for (const s of allSubs) {
     const tid = s.trialApplicationId;
     if (!tid) continue;
@@ -188,7 +196,7 @@ export async function listTrialApplicationsForAdmin(
     subByTrial.set(tid, arr);
   }
 
-  function pickLatestSubmission(trialId: string): (typeof writingSubmissions.$inferSelect) | null {
+  function pickLatestSubmission(trialId: string): SubRow | null {
     const arr = subByTrial.get(trialId);
     if (!arr?.length) return null;
     return arr.reduce((a, b) => (a.createdAt >= b.createdAt ? a : b));
