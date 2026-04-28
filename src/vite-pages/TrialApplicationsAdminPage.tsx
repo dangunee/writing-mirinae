@@ -181,6 +181,20 @@ function mailStatusLabel(log: ExtensionLogItem): string {
   return '—'
 }
 
+async function trashApplicationPost(id: string): Promise<boolean> {
+  const res = await trialAdminFetch(
+    apiUrl(`/api/writing/admin/trial-applications/${encodeURIComponent(id)}/trash`),
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({}),
+    }
+  )
+  const data = (await res.json()) as { ok?: boolean }
+  return res.ok && data.ok === true
+}
+
 export default function TrialApplicationsAdminPage() {
   const [rows, setRows] = useState<Row[] | null>(null)
   const [loading, setLoading] = useState(false)
@@ -205,6 +219,9 @@ export default function TrialApplicationsAdminPage() {
   const [sort, setSort] = useState<SortKey>('created_desc')
   const [pagination, setPagination] = useState<PaginationState | null>(null)
   const [listView, setListView] = useState<'active' | 'trash'>('active')
+  const [selectedTrialIds, setSelectedTrialIds] = useState<Set<string>>(() => new Set())
+  const [bulkTrashBusy, setBulkTrashBusy] = useState(false)
+  const headerSelectAllRef = useRef<HTMLInputElement>(null)
 
   const [activeTab, setActiveTab] = useState<AdminTab>('trial')
   const [sessionAdminUsers, setSessionAdminUsers] = useState<
@@ -308,6 +325,7 @@ export default function TrialApplicationsAdminPage() {
       }
       setRows(data.items.map(normalizeTrialAdminRow))
       setPagination(data.pagination)
+      setSelectedTrialIds(new Set())
       const sig = `${debouncedSearch}|${paymentMethodFilter}|${sort}|${listView}|${pageForRequest}`
       lastFetchedSigRef.current = sig
     } catch (e) {
@@ -494,41 +512,43 @@ export default function TrialApplicationsAdminPage() {
     }
   }
 
-  const runTrash = async (id: string) => {
-    if (mutationInFlightRef.current) return
-    if (!window.confirm('この体験申込をゴミ箱に移動します。後で復元できます。')) return
+  const runBulkTrash = async () => {
+    if (mutationInFlightRef.current || bulkTrashBusy || selectedTrialIds.size === 0 || listView !== 'active') return
+    if (!window.confirm('選択した申込をゴミ箱に移動します。後で復元できます。')) return
     mutationInFlightRef.current = true
-    setBusyId(id)
+    setBulkTrashBusy(true)
     setBanner(null)
+    const ids = [...selectedTrialIds]
     try {
-      const res = await trialAdminFetch(
-        apiUrl(`/api/writing/admin/trial-applications/${encodeURIComponent(id)}/trash`),
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({}),
-        }
-      )
-      const data = (await res.json()) as { ok?: boolean; error?: string }
-      if (!res.ok || data.ok !== true) {
-        setBanner({ kind: 'err', text: 'ゴミ箱への移動に失敗しました。' })
-        return
+      let fail = 0
+      for (const id of ids) {
+        const ok = await trashApplicationPost(id)
+        if (!ok) fail += 1
       }
-      setBanner({ kind: 'ok', text: 'ゴミ箱に移動しました。' })
+      if (fail > 0) {
+        setBanner({
+          kind: 'err',
+          text:
+            fail === ids.length
+              ? 'ゴミ箱への移動に失敗しました。'
+              : `${ids.length - fail}件を移動しました。${fail}件は失敗しました。`,
+        })
+      } else {
+        setBanner({ kind: 'ok', text: `${ids.length}件をゴミ箱に移動しました。` })
+      }
       setLogsByAppId((prev) => {
         const next = { ...prev }
-        delete next[id]
+        for (const id of ids) delete next[id]
         return next
       })
-      if (historyOpenId === id) setHistoryOpenId(null)
+      if (historyOpenId != null && ids.includes(historyOpenId)) setHistoryOpenId(null)
       lastFetchedSigRef.current = null
       await fetchList(page)
     } catch {
       setBanner({ kind: 'err', text: '通信に失敗しました。' })
     } finally {
       mutationInFlightRef.current = false
-      setBusyId(null)
+      setBulkTrashBusy(false)
     }
   }
 
@@ -595,6 +615,42 @@ export default function TrialApplicationsAdminPage() {
       setBusyId(null)
     }
   }
+
+  const visibleTrialIds = listView === 'active' && rows ? rows.map((r) => r.id) : []
+  const allVisibleTrialSelected =
+    visibleTrialIds.length > 0 && visibleTrialIds.every((id) => selectedTrialIds.has(id))
+  const someVisibleTrialSelected =
+    visibleTrialIds.some((id) => selectedTrialIds.has(id)) && !allVisibleTrialSelected
+
+  useEffect(() => {
+    const el = headerSelectAllRef.current
+    if (el) el.indeterminate = someVisibleTrialSelected
+  }, [someVisibleTrialSelected, listView])
+
+  const tableColSpan = listView === 'active' ? 13 : 12
+
+  const toggleTrialRowSelected = (id: string) => {
+    setSelectedTrialIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleSelectAllVisibleTrials = () => {
+    if (!rows || listView !== 'active') return
+    const vis = rows.map((r) => r.id)
+    setSelectedTrialIds((prev) => {
+      const next = new Set(prev)
+      const allOn = vis.length > 0 && vis.every((id) => next.has(id))
+      if (allOn) vis.forEach((id) => next.delete(id))
+      else vis.forEach((id) => next.add(id))
+      return next
+    })
+  }
+
+  const rowOpsDisabled = loading || bulkTrashBusy || busyId != null
 
   return (
     <div className="min-h-screen bg-[#f5f7fa] px-4 py-8 font-['Be_Vietnam_Pro',sans-serif] text-[#2c2f32] sm:px-6 lg:px-8 xl:px-10">
@@ -784,6 +840,22 @@ export default function TrialApplicationsAdminPage() {
           </div>
         ) : null}
 
+        {!listError && rows !== null && pagination !== null && listView === 'active' && pagination.totalItems > 0 ? (
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={rowOpsDisabled || selectedTrialIds.size === 0}
+              onClick={() => void runBulkTrash()}
+              className="rounded-full border border-[#8b1a1a]/40 bg-[#fff8f8] px-4 py-2 text-sm font-semibold text-[#8b1a1a] disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              {bulkTrashBusy ? '処理中…' : '選択した申込をゴミ箱へ'}
+            </button>
+            {selectedTrialIds.size > 0 ? (
+              <span className="text-xs text-[#595c5e]">{selectedTrialIds.size}件選択中</span>
+            ) : null}
+          </div>
+        ) : null}
+
         {!listError && rows !== null && pagination !== null ? (
           <div
             className={`w-full min-w-0 overflow-x-auto rounded-xl border border-[#abadb0]/15 bg-white shadow-sm ${loading ? 'opacity-[0.72]' : ''}`}
@@ -791,6 +863,20 @@ export default function TrialApplicationsAdminPage() {
             <table className="w-full min-w-[1100px] table-fixed text-left text-sm lg:min-w-0">
               <thead className="border-b border-[#eef1f4] bg-[#f8fafc] text-xs font-bold uppercase tracking-wider text-[#595c5e]">
                 <tr>
+                  {listView === 'active' ? (
+                    <th className="w-9 min-w-[2.25rem] px-1 py-2 text-center align-middle">
+                      <input
+                        ref={headerSelectAllRef}
+                        type="checkbox"
+                        checked={allVisibleTrialSelected}
+                        onChange={() => toggleSelectAllVisibleTrials()}
+                        disabled={rowOpsDisabled}
+                        className="h-3.5 w-3.5 rounded border-[#abadb0] align-middle accent-[#4052b6] disabled:opacity-50"
+                        title="このページを全選択/解除"
+                        aria-label="このページを全選択/解除"
+                      />
+                    </th>
+                  ) : null}
                   <th className="w-[8%] min-w-[5.5rem] whitespace-nowrap px-2 py-2">お名前</th>
                   <th className="w-[18%] min-w-[11rem] whitespace-nowrap px-2 py-2">メール</th>
                   <th className="w-[5%] min-w-[3rem] whitespace-nowrap px-2 py-2">韓国語</th>
@@ -808,7 +894,7 @@ export default function TrialApplicationsAdminPage() {
               <tbody className="divide-y divide-[#eef1f4]">
                 {pagination.totalItems === 0 ? (
                   <tr>
-                    <td colSpan={12} className="px-4 py-8 text-center text-[#595c5e]">
+                    <td colSpan={tableColSpan} className="px-4 py-8 text-center text-[#595c5e]">
                       該当するデータがありません
                     </td>
                   </tr>
@@ -829,6 +915,18 @@ export default function TrialApplicationsAdminPage() {
                     return (
                       <Fragment key={r.id}>
                         <tr className="align-middle">
+                          {listView === 'active' ? (
+                            <td className="w-9 min-w-[2.25rem] px-1 py-1.5 text-center align-middle">
+                              <input
+                                type="checkbox"
+                                checked={selectedTrialIds.has(r.id)}
+                                onChange={() => toggleTrialRowSelected(r.id)}
+                                disabled={rowOpsDisabled}
+                                className="h-3.5 w-3.5 rounded border-[#abadb0] align-middle accent-[#4052b6] disabled:opacity-50"
+                                aria-label={`${r.applicantName} を選択`}
+                              />
+                            </td>
+                          ) : null}
                           <td className="truncate px-2 py-1.5 font-medium" title={r.applicantName}>
                             {r.applicantName}
                           </td>
@@ -888,7 +986,7 @@ export default function TrialApplicationsAdminPage() {
                                 <>
                                   <button
                                     type="button"
-                                    disabled={busy || loading}
+                                    disabled={busy || loading || bulkTrashBusy}
                                     onClick={(e) => {
                                       e.preventDefault()
                                       e.stopPropagation()
@@ -900,7 +998,7 @@ export default function TrialApplicationsAdminPage() {
                                   </button>
                                   <button
                                     type="button"
-                                    disabled={busy || loading}
+                                    disabled={busy || loading || bulkTrashBusy}
                                     onClick={(e) => {
                                       e.preventDefault()
                                       e.stopPropagation()
@@ -915,7 +1013,7 @@ export default function TrialApplicationsAdminPage() {
                               {showActivate ? (
                                 <button
                                   type="button"
-                                  disabled={busy || loading}
+                                  disabled={busy || loading || bulkTrashBusy}
                                   onClick={(e) => {
                                     e.preventDefault()
                                     e.stopPropagation()
@@ -929,7 +1027,7 @@ export default function TrialApplicationsAdminPage() {
                               {showTrialOps ? (
                                 <button
                                   type="button"
-                                  disabled={busy || loading || !canResendLink}
+                                  disabled={busy || loading || bulkTrashBusy || !canResendLink}
                                   title={resendBlockedReason}
                                   onClick={(e) => {
                                     e.preventDefault()
@@ -945,7 +1043,7 @@ export default function TrialApplicationsAdminPage() {
                               {showTrialOps ? (
                                 <button
                                   type="button"
-                                  disabled={busy || loading}
+                                  disabled={busy || loading || bulkTrashBusy}
                                   onClick={(e) => {
                                     e.preventDefault()
                                     e.stopPropagation()
@@ -959,7 +1057,7 @@ export default function TrialApplicationsAdminPage() {
                               {showHistory ? (
                                 <button
                                   type="button"
-                                  disabled={busy || loading}
+                                  disabled={busy || loading || bulkTrashBusy}
                                   onClick={(e) => {
                                     e.preventDefault()
                                     e.stopPropagation()
@@ -970,27 +1068,12 @@ export default function TrialApplicationsAdminPage() {
                                   履歴
                                 </button>
                               ) : null}
-                              {!isTrashTab ? (
-                                <button
-                                  type="button"
-                                  disabled={busy || loading}
-                                  title="ゴミ箱へ移動"
-                                  onClick={(e) => {
-                                    e.preventDefault()
-                                    e.stopPropagation()
-                                    void runTrash(r.id)
-                                  }}
-                                  className="shrink-0 rounded-full border border-[#abadb0]/50 bg-[#fff8f8] px-2 py-1 text-[11px] font-semibold leading-tight text-[#8b1a1a] disabled:opacity-50"
-                                >
-                                  {busy ? '処理中…' : 'ゴミ箱へ'}
-                                </button>
-                              ) : null}
                             </div>
                           </td>
                         </tr>
                         {historyOpen ? (
                           <tr className="bg-[#f8fafc]">
-                            <td colSpan={12} className="px-3 py-2 text-xs text-[#2c2f32]">
+                            <td colSpan={tableColSpan} className="px-3 py-2 text-xs text-[#2c2f32]">
                               <p className="mb-2 font-bold text-[#595c5e]">延長履歴</p>
                               {logsEntry === 'loading' ? (
                                 <p className="text-[#595c5e]">読み込み中…</p>
