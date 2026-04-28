@@ -1,4 +1,5 @@
 import type { Db } from "../db/client";
+import { trialBootstrapVerbose } from "./trialSessionBootstrapLog";
 import { listActiveWritingCoursesWithTerm } from "../repositories/writingAdminRepository";
 
 /** Term titles that identify the public trial course when WRITING_TRIAL_COURSE_ID is unset. */
@@ -33,6 +34,16 @@ export async function resolveWritingTrialCourseIdForLearner(db: Db): Promise<str
       (r.status === "active" || r.status === "pending_setup") &&
       writingTrialTermTitleLooksLikeTrial(r.termTitle)
   );
+  trialBootstrapVerbose("trial_resolver_env_fallback", {
+    candidateCount: candidates.length,
+    ambiguous: candidates.length > 1,
+    note:
+      candidates.length === 0
+        ? "no_course_matching_term_title"
+        : candidates.length === 1
+          ? "single_match"
+          : "set_WRITING_TRIAL_COURSE_ID_to_disambiguate",
+  });
   if (candidates.length === 1) {
     return candidates[0]!.id;
   }

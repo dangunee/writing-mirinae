@@ -1,6 +1,6 @@
 /**
  * Safe diagnostics for trial session bootstrap (no cookies, tokens, or PII).
- * Verbose: set WRITING_TRIAL_BOOTSTRAP_LOG=1 on the server.
+ * Verbose: set WRITING_TRIAL_BOOTSTRAP_LOG=1 or =true on the server.
  */
 const verboseEnabled = (): boolean => {
   const v = process.env.WRITING_TRIAL_BOOTSTRAP_LOG?.trim().toLowerCase();
