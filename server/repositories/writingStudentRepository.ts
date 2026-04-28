@@ -182,6 +182,20 @@ export async function getSubmissionWithSessionForGrant(
   return rows[0] ?? null;
 }
 
+/** Staff preview only: submission + session by id (no student/grant ownership filter). */
+export async function getSubmissionWithSessionById(db: Db, submissionId: string) {
+  const rows = await db
+    .select({
+      submission: writingSubmissions,
+      session: writingSessions,
+    })
+    .from(writingSubmissions)
+    .innerJoin(writingSessions, eq(writingSubmissions.sessionId, writingSessions.id))
+    .where(eq(writingSubmissions.id, submissionId))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
 export async function getSubmissionBySessionId(db: Db, sessionId: string) {
   const rows = await db
     .select()
@@ -498,6 +512,32 @@ export async function getPublishedResultForSubmission(
       and(
         eq(writingSubmissions.id, submissionId),
         eq(writingSubmissions.userId, userId),
+        eq(writingSubmissions.status, "published"),
+        eq(writingCorrections.status, "published")
+      )
+    )
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/**
+ * Same row shape as getPublishedResultForSubmission, without user scoping.
+ * Call only after verifying teacher/admin role; still requires published submission + published correction.
+ */
+export async function getPublishedResultForSubmissionStaffPreview(
+  db: Db,
+  submissionId: string
+): Promise<PublishedResultRow | null> {
+  const rows = await db
+    .select({
+      submission: writingSubmissions,
+      correction: writingCorrections,
+    })
+    .from(writingSubmissions)
+    .innerJoin(writingCorrections, eq(writingCorrections.submissionId, writingSubmissions.id))
+    .where(
+      and(
+        eq(writingSubmissions.id, submissionId),
         eq(writingSubmissions.status, "published"),
         eq(writingCorrections.status, "published")
       )

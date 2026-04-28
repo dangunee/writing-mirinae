@@ -8,6 +8,7 @@
 
 import { writingCourses, writingSessions, writingSubmissions } from "../../db/schema";
 import type { Db } from "../db/client";
+import { resolveWritingRoleFromDbOrEnv } from "../lib/writingAuthRoles";
 import { checkSessionEligibleForWriting } from "../lib/writingSubmissionEligibility";
 import { validateSubmissionFileUpload } from "../lib/writingUploads";
 import { getServiceRoleClient } from "../lib/supabaseServiceRole";
@@ -1089,4 +1090,89 @@ export async function getPublishedRegularResult(db: Db, grantId: string, submiss
   const row = await repo.getPublishedResultForSubmissionGrant(db, submissionId, grantId);
   if (!row) return null;
   return buildPublishedResultPayload(db, row, session);
+}
+
+/**
+ * Student-first: owner sees published/missed same as before.
+ * Teacher/admin may preview the same published-safe payload for any submission id (draft never returned).
+ */
+export async function getPublishedWritingResultForViewer(db: Db, viewerUserId: string, submissionId: string) {
+  const asOwner = await getPublishedStudentResult(db, viewerUserId, submissionId);
+  if (asOwner) return asOwner;
+
+  const role = await resolveWritingRoleFromDbOrEnv(db, viewerUserId);
+  if (role !== "teacher" && role !== "admin") return null;
+
+  const first = await repo.getSubmissionWithSessionById(db, submissionId);
+  if (!first) return null;
+  await repo.lazyUnlockDueSessions(db, first.submission.courseId);
+  const joined = await repo.getSubmissionWithSessionById(db, submissionId);
+  if (!joined) return null;
+  const { submission, session } = joined;
+  const attachments = await listSubmissionAttachmentsForApi(db, submissionId);
+
+  if (sessionIsMissed(session)) {
+    const missed = await buildMissedResultPayload(submission, session, attachments);
+    console.info(
+      JSON.stringify({
+        audit: "writing_results_staff_preview",
+        viewerUserId,
+        submissionId,
+        role,
+        outcome: missed.outcome,
+        submissionStatus: submission.status,
+        sessionRuntimeStatus: session.runtimeStatus,
+      })
+    );
+    return missed;
+  }
+
+  if (submission.status !== "published") {
+    if (process.env.WRITING_DEBUG_RESULTS === "true") {
+      console.info(
+        JSON.stringify({
+          audit: "writing_results_staff_preview_denied_not_published",
+          viewerUserId,
+          submissionId,
+          role,
+          submissionStatus: submission.status,
+          sessionRuntimeStatus: session.runtimeStatus,
+        })
+      );
+    }
+    return null;
+  }
+
+  const row = await repo.getPublishedResultForSubmissionStaffPreview(db, submissionId);
+  if (!row) {
+    if (process.env.WRITING_DEBUG_RESULTS === "true") {
+      console.info(
+        JSON.stringify({
+          audit: "writing_results_staff_preview_denied_no_published_row",
+          viewerUserId,
+          submissionId,
+          role,
+          submissionStatus: submission.status,
+          sessionRuntimeStatus: session.runtimeStatus,
+          correctionStatus: null,
+        })
+      );
+    }
+    return null;
+  }
+
+  const published = await buildPublishedResultPayload(db, row, session);
+  console.info(
+    JSON.stringify({
+      audit: "writing_results_staff_preview",
+      viewerUserId,
+      submissionId,
+      role,
+      outcome: published.outcome,
+      submissionStatus: submission.status,
+      sessionRuntimeStatus: session.runtimeStatus,
+      correctionStatus: row.correction.status,
+    })
+  );
+  return published;
 }

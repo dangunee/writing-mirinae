@@ -5,7 +5,7 @@ import { parseRegularWritingGrantIdFromCookieHeader } from "../../../../../serve
 import { getSessionUserId } from "../../../../../server/lib/supabaseServer";
 import {
   getPublishedRegularResult,
-  getPublishedStudentResult,
+  getPublishedWritingResultForViewer,
 } from "../../../../../server/services/writingStudentService";
 
 export const runtime = "nodejs";
@@ -13,7 +13,8 @@ export const dynamic = "force-dynamic";
 
 /**
  * GET /api/writing/results/:id
- * `:id` = submission id. Only returns data when correction is **published** (draft invisible).
+ * `:id` = submission id. Published correction only (draft never returned). Missed sessions return missed-safe payload.
+ * Students: owner-only. Teachers/admins: same published-safe payload for any submission id (audit log on staff path).
  */
 export async function GET(req: Request, context: { params: Promise<{ id: string }> }) {
   const { id: submissionId } = await context.params;
@@ -21,7 +22,7 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
 
   const userId = await getSessionUserId();
   if (userId) {
-    const result = await getPublishedStudentResult(db, userId, submissionId);
+    const result = await getPublishedWritingResultForViewer(db, userId, submissionId);
     if (!result) {
       return NextResponse.json({ error: "not_found_or_not_published" }, { status: 404 });
     }
