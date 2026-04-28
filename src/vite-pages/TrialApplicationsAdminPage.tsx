@@ -87,6 +87,14 @@ function paymentMethodLabel(m: string): string {
   return m
 }
 
+/** True when accessExpiresAt is strictly before now (ISO from API). */
+function isTrialAccessExpired(accessExpiresAtIso: string | null | undefined): boolean {
+  if (accessExpiresAtIso == null || String(accessExpiresAtIso).trim() === '') return false
+  const t = new Date(accessExpiresAtIso).getTime()
+  if (Number.isNaN(t)) return false
+  return t < Date.now()
+}
+
 function normalizeTrialAdminRow(item: Row): Row {
   return {
     ...item,
@@ -496,8 +504,15 @@ export default function TrialApplicationsAdminPage() {
         method: 'POST',
         credentials: 'include',
       })
-      const data = (await res.json()) as { ok?: boolean }
+      const data = (await res.json()) as { ok?: boolean; error?: string }
       if (!res.ok || data.ok !== true) {
+        if (data.error === 'expired_access') {
+          setBanner({
+            kind: 'err',
+            text: '利用期限が終了しているため再送信できません。延長してからお試しください。',
+          })
+          return
+        }
         setBanner({ kind: 'err', text: '再送信に失敗しました（利用済みなどの可能性があります）。' })
         return
       }
@@ -905,9 +920,15 @@ export default function TrialApplicationsAdminPage() {
                     const isBank = pm === 'bank_transfer' || pm === 'bank'
                     const showActivate = !isTrashTab && isBank && r.paymentStatus === 'pending'
                     const showTrialOps = !isTrashTab && r.paymentStatus === 'paid' && r.accessStatus === 'ready'
-                    const canResendLink = showTrialOps && r.submissionStatus === 'not_submitted'
-                    const resendBlockedReason =
-                      showTrialOps && !canResendLink ? 'すでに提出済みのため再送は不要です' : undefined
+                    const accessExpired = isTrialAccessExpired(r.accessExpiresAt)
+                    const canResendLink =
+                      showTrialOps && r.submissionStatus === 'not_submitted' && !accessExpired
+                    const resendBlockedReason = (() => {
+                      if (!showTrialOps) return undefined
+                      if (accessExpired) return '利用期限が終了しているため再送信できません'
+                      if (r.submissionStatus !== 'not_submitted') return 'すでに提出済みのため再送は不要です'
+                      return undefined
+                    })()
                     const showHistory = !isTrashTab && r.paymentStatus === 'paid'
                     const busy = busyId === r.id
                     const logsEntry = logsByAppId[r.id]

@@ -2,6 +2,9 @@
  * Proxies trial-application admin list/mutations to mirinae-api (server-side secret only).
  */
 
+import { getDb } from "../db/client";
+import { assertTrialResendAllowed } from "../services/trialApplicationsAdminService";
+
 function json(data: unknown, status: number): Response {
   return new Response(JSON.stringify(data), {
     status,
@@ -236,8 +239,17 @@ export async function proxyTrialAdminMutation(req: Request, applicationId: strin
   switch (op) {
     case "extend":
       return handleExtendUpstream(req, id);
-    case "resend":
+    case "resend": {
+      const db = getDb();
+      const gate = await assertTrialResendAllowed(db, id);
+      if (!gate.ok && gate.code === "not_found") {
+        return json({ ok: false, error: "not_found" }, 404);
+      }
+      if (!gate.ok) {
+        return json({ ok: false, error: "expired_access" }, 409);
+      }
       return handleResendUpstream(req, id);
+    }
     default:
       return handleActivateUpstream(req, id);
   }

@@ -11,6 +11,33 @@ import type { Db } from "../db/client";
 /** Must match cron / mirinae-api reminder_type for 24h-before-deadline emails. */
 export const TRIAL_REMINDER_TYPE_24H = "submission_deadline_24h";
 
+/**
+ * Block resend-access when trial window has ended (access_expires_at in the past).
+ * Null expiry: do not block on date alone (legacy / unset).
+ */
+export async function assertTrialResendAllowed(
+  db: Db,
+  applicationId: string
+): Promise<{ ok: true } | { ok: false; code: "not_found" | "expired_access" }> {
+  const id = applicationId.trim();
+  if (!id) return { ok: false, code: "not_found" };
+
+  const [row] = await db
+    .select({ accessExpiresAt: trialApplications.accessExpiresAt })
+    .from(trialApplications)
+    .where(eq(trialApplications.id, id))
+    .limit(1);
+
+  if (!row) return { ok: false, code: "not_found" };
+
+  const exp = row.accessExpiresAt;
+  if (exp != null && exp.getTime() < Date.now()) {
+    return { ok: false, code: "expired_access" };
+  }
+
+  return { ok: true };
+}
+
 export type TrialAdminListItem = {
   id: string;
   applicantName: string;
