@@ -25,6 +25,7 @@ export async function linkTrialApplicationsToUserByEmail(
     .where(
       and(
         isNull(trialApplications.userId),
+        isNull(trialApplications.trashedAt),
         sql`lower(trim(${trialApplications.applicantEmail})) = ${normalized}`
       )
     )

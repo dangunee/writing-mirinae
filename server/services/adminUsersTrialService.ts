@@ -30,7 +30,7 @@ export async function listAdminUsersWithTrialLinkage(db: Db): Promise<AdminUserT
       COALESCE(
         (SELECT COUNT(*)::text
          FROM writing.trial_applications ta
-         WHERE ta.user_id = u.id),
+         WHERE ta.user_id = u.id AND ta.trashed_at IS NULL),
         '0'
       ) AS trial_linked_count
     FROM auth.users u

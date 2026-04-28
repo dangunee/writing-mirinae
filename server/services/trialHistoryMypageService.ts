@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 
 import {
   trialApplications,
@@ -77,7 +77,7 @@ export async function getLinkedTrialHistoryForMypage(
         eq(writingCorrections.status, "published")
       )
     )
-    .where(eq(trialApplications.userId, userId))
+    .where(and(eq(trialApplications.userId, userId), isNull(trialApplications.trashedAt)))
     .orderBy(desc(trialApplications.createdAt));
 
   const items: TrialHistoryMypageItem[] = rows.map((r) => {

@@ -39,6 +39,9 @@ type Row = {
   reminderBefore24hSent?: boolean
   reminderBefore24hSentAt?: string | null
   reminderBefore24hStatus?: ReminderBefore24hStatus
+  trashedAt?: string | null
+  trashedBy?: string | null
+  trashReason?: string | null
 }
 
 type PaymentMethodFilter = 'all' | 'card' | 'bank_transfer'
@@ -93,6 +96,9 @@ function normalizeTrialAdminRow(item: Row): Row {
     reminderBefore24hSent: item.reminderBefore24hSent ?? false,
     reminderBefore24hSentAt: item.reminderBefore24hSentAt ?? null,
     reminderBefore24hStatus: item.reminderBefore24hStatus ?? 'not_sent',
+    trashedAt: item.trashedAt ?? null,
+    trashedBy: item.trashedBy ?? null,
+    trashReason: item.trashReason ?? null,
   }
 }
 
@@ -198,6 +204,7 @@ export default function TrialApplicationsAdminPage() {
   const [page, setPage] = useState(1)
   const [sort, setSort] = useState<SortKey>('created_desc')
   const [pagination, setPagination] = useState<PaginationState | null>(null)
+  const [listView, setListView] = useState<'active' | 'trash'>('active')
 
   const [activeTab, setActiveTab] = useState<AdminTab>('trial')
   const [sessionAdminUsers, setSessionAdminUsers] = useState<
@@ -209,6 +216,7 @@ export default function TrialApplicationsAdminPage() {
     debouncedSearch: '',
     paymentMethodFilter: 'all' as PaymentMethodFilter,
     sort: 'created_desc' as SortKey,
+    listView: 'active' as 'active' | 'trash',
   })
   const lastFetchedSigRef = useRef<string | null>(null)
 
@@ -269,6 +277,9 @@ export default function TrialApplicationsAdminPage() {
       q.set('page', String(pageForRequest))
       q.set('pageSize', String(DEFAULT_PAGE_SIZE))
       q.set('sort', sort)
+      if (listView === 'trash') {
+        q.set('trash', '1')
+      }
       const qs = q.toString()
       const listUrl = `/api/writing/admin/trial-applications?${qs}`
       const res = await trialAdminFetch(apiUrl(listUrl), {
@@ -297,7 +308,7 @@ export default function TrialApplicationsAdminPage() {
       }
       setRows(data.items.map(normalizeTrialAdminRow))
       setPagination(data.pagination)
-      const sig = `${debouncedSearch}|${paymentMethodFilter}|${sort}|${pageForRequest}`
+      const sig = `${debouncedSearch}|${paymentMethodFilter}|${sort}|${listView}|${pageForRequest}`
       lastFetchedSigRef.current = sig
     } catch (e) {
       console.error('[trial-admin] GET /api/writing/admin/trial-applications failed', e)
@@ -307,7 +318,7 @@ export default function TrialApplicationsAdminPage() {
     } finally {
       setLoading(false)
     }
-  }, [paymentMethodFilter, debouncedSearch, sort])
+  }, [paymentMethodFilter, debouncedSearch, sort, listView])
 
   useEffect(() => {
     if (activeTab !== 'trial') return
@@ -315,21 +326,22 @@ export default function TrialApplicationsAdminPage() {
     const filtersChanged =
       prev.debouncedSearch !== debouncedSearch ||
       prev.paymentMethodFilter !== paymentMethodFilter ||
-      prev.sort !== sort
+      prev.sort !== sort ||
+      prev.listView !== listView
 
     if (filtersChanged) {
-      filterKeyRef.current = { debouncedSearch, paymentMethodFilter, sort }
+      filterKeyRef.current = { debouncedSearch, paymentMethodFilter, sort, listView }
       if (page !== 1) setPage(1)
-      const sig = `${debouncedSearch}|${paymentMethodFilter}|${sort}|1`
+      const sig = `${debouncedSearch}|${paymentMethodFilter}|${sort}|${listView}|1`
       if (lastFetchedSigRef.current === sig) return
       void fetchList(1)
       return
     }
 
-    const sig = `${debouncedSearch}|${paymentMethodFilter}|${sort}|${page}`
+    const sig = `${debouncedSearch}|${paymentMethodFilter}|${sort}|${listView}|${page}`
     if (lastFetchedSigRef.current === sig) return
     void fetchList(page)
-  }, [activeTab, page, debouncedSearch, paymentMethodFilter, sort, fetchList])
+  }, [activeTab, page, debouncedSearch, paymentMethodFilter, sort, listView, fetchList])
 
   const fetchExtensionLogs = useCallback(async (applicationId: string) => {
       setLogsByAppId((prev) => ({ ...prev, [applicationId]: 'loading' }))
@@ -482,6 +494,108 @@ export default function TrialApplicationsAdminPage() {
     }
   }
 
+  const runTrash = async (id: string) => {
+    if (mutationInFlightRef.current) return
+    if (!window.confirm('この体験申込をゴミ箱に移動します。後で復元できます。')) return
+    mutationInFlightRef.current = true
+    setBusyId(id)
+    setBanner(null)
+    try {
+      const res = await trialAdminFetch(
+        apiUrl(`/api/writing/admin/trial-applications/${encodeURIComponent(id)}/trash`),
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({}),
+        }
+      )
+      const data = (await res.json()) as { ok?: boolean; error?: string }
+      if (!res.ok || data.ok !== true) {
+        setBanner({ kind: 'err', text: 'ゴミ箱への移動に失敗しました。' })
+        return
+      }
+      setBanner({ kind: 'ok', text: 'ゴミ箱に移動しました。' })
+      setLogsByAppId((prev) => {
+        const next = { ...prev }
+        delete next[id]
+        return next
+      })
+      if (historyOpenId === id) setHistoryOpenId(null)
+      lastFetchedSigRef.current = null
+      await fetchList(page)
+    } catch {
+      setBanner({ kind: 'err', text: '通信に失敗しました。' })
+    } finally {
+      mutationInFlightRef.current = false
+      setBusyId(null)
+    }
+  }
+
+  const runRestore = async (id: string) => {
+    if (mutationInFlightRef.current) return
+    if (!window.confirm('この体験申込を通常一覧に戻しますか？')) return
+    mutationInFlightRef.current = true
+    setBusyId(id)
+    setBanner(null)
+    try {
+      const res = await trialAdminFetch(
+        apiUrl(`/api/writing/admin/trial-applications/${encodeURIComponent(id)}/restore`),
+        { method: 'POST', credentials: 'include' }
+      )
+      const data = (await res.json()) as { ok?: boolean }
+      if (!res.ok || data.ok !== true) {
+        setBanner({ kind: 'err', text: '復元に失敗しました。' })
+        return
+      }
+      setBanner({ kind: 'ok', text: '復元しました。' })
+      lastFetchedSigRef.current = null
+      await fetchList(page)
+    } catch {
+      setBanner({ kind: 'err', text: '通信に失敗しました。' })
+    } finally {
+      mutationInFlightRef.current = false
+      setBusyId(null)
+    }
+  }
+
+  const runPermanentDelete = async (id: string) => {
+    if (mutationInFlightRef.current) return
+    if (
+      !window.confirm('完全に削除すると復元できません。本当に削除しますか？')
+    ) {
+      return
+    }
+    mutationInFlightRef.current = true
+    setBusyId(id)
+    setBanner(null)
+    try {
+      const res = await trialAdminFetch(
+        apiUrl(`/api/writing/admin/trial-applications/${encodeURIComponent(id)}`),
+        { method: 'DELETE', credentials: 'include' }
+      )
+      const data = (await res.json()) as { ok?: boolean; error?: string }
+      if (!res.ok || data.ok !== true) {
+        setBanner({ kind: 'err', text: '完全削除に失敗しました。' })
+        return
+      }
+      setBanner({ kind: 'ok', text: '完全に削除しました。' })
+      setLogsByAppId((prev) => {
+        const next = { ...prev }
+        delete next[id]
+        return next
+      })
+      if (historyOpenId === id) setHistoryOpenId(null)
+      lastFetchedSigRef.current = null
+      await fetchList(page)
+    } catch {
+      setBanner({ kind: 'err', text: '通信に失敗しました。' })
+    } finally {
+      mutationInFlightRef.current = false
+      setBusyId(null)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-[#f5f7fa] px-4 py-8 font-['Be_Vietnam_Pro',sans-serif] text-[#2c2f32] sm:px-6 lg:px-8 xl:px-10">
       <div className="mx-auto w-full max-w-[1800px]">
@@ -536,6 +650,33 @@ export default function TrialApplicationsAdminPage() {
               />
             </label>
             <div className="flex flex-wrap items-end gap-x-4 gap-y-3 sm:gap-x-5">
+              <label className="flex items-center gap-2 text-sm text-[#595c5e]">
+                <span className="whitespace-nowrap font-semibold">一覧</span>
+                <div className="flex rounded-lg border border-[#abadb0]/40 bg-white p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setListView('active')}
+                    className={`rounded-md px-2.5 py-1 text-xs font-semibold ${
+                      listView === 'active'
+                        ? 'bg-[#4052b6] text-white'
+                        : 'text-[#595c5e] hover:bg-[#f8fafc]'
+                    }`}
+                  >
+                    通常
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setListView('trash')}
+                    className={`rounded-md px-2.5 py-1 text-xs font-semibold ${
+                      listView === 'trash'
+                        ? 'bg-[#4052b6] text-white'
+                        : 'text-[#595c5e] hover:bg-[#f8fafc]'
+                    }`}
+                  >
+                    ゴミ箱
+                  </button>
+                </div>
+              </label>
               <label className="flex items-center gap-2 text-sm text-[#595c5e]">
                 <span className="whitespace-nowrap font-semibold">支払方法</span>
                 <select
@@ -673,14 +814,15 @@ export default function TrialApplicationsAdminPage() {
                   </tr>
                 ) : (
                   rows.map((r) => {
+                    const isTrashTab = listView === 'trash'
                     const pm = r.paymentMethod?.trim().toLowerCase() ?? ''
                     const isBank = pm === 'bank_transfer' || pm === 'bank'
-                    const showActivate = isBank && r.paymentStatus === 'pending'
-                    const showTrialOps = r.paymentStatus === 'paid' && r.accessStatus === 'ready'
+                    const showActivate = !isTrashTab && isBank && r.paymentStatus === 'pending'
+                    const showTrialOps = !isTrashTab && r.paymentStatus === 'paid' && r.accessStatus === 'ready'
                     const canResendLink = showTrialOps && r.submissionStatus === 'not_submitted'
                     const resendBlockedReason =
                       showTrialOps && !canResendLink ? 'すでに提出済みのため再送は不要です' : undefined
-                    const showHistory = r.paymentStatus === 'paid'
+                    const showHistory = !isTrashTab && r.paymentStatus === 'paid'
                     const busy = busyId === r.id
                     const logsEntry = logsByAppId[r.id]
                     const historyOpen = historyOpenId === r.id
@@ -742,6 +884,34 @@ export default function TrialApplicationsAdminPage() {
                           <td className="truncate px-2 py-1.5 font-mono text-xs">{r.accessStatus}</td>
                           <td className="px-2 py-1.5">
                             <div className="flex flex-row flex-wrap items-center gap-1">
+                              {isTrashTab ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    disabled={busy || loading}
+                                    onClick={(e) => {
+                                      e.preventDefault()
+                                      e.stopPropagation()
+                                      void runRestore(r.id)
+                                    }}
+                                    className="shrink-0 rounded-full border border-[#4052b6] bg-white px-2 py-1 text-[11px] font-bold leading-tight text-[#4052b6] disabled:opacity-50"
+                                  >
+                                    {busy ? '処理中…' : '復元'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={busy || loading}
+                                    onClick={(e) => {
+                                      e.preventDefault()
+                                      e.stopPropagation()
+                                      void runPermanentDelete(r.id)
+                                    }}
+                                    className="shrink-0 rounded-full border border-[#8b1a1a]/50 bg-white px-2 py-1 text-[11px] font-bold leading-tight text-[#8b1a1a] disabled:opacity-50"
+                                  >
+                                    {busy ? '処理中…' : '完全削除'}
+                                  </button>
+                                </>
+                              ) : null}
                               {showActivate ? (
                                 <button
                                   type="button"
@@ -800,8 +970,20 @@ export default function TrialApplicationsAdminPage() {
                                   履歴
                                 </button>
                               ) : null}
-                              {!showActivate && !showTrialOps && !showHistory ? (
-                                <span className="text-[11px] text-[#95999c]">—</span>
+                              {!isTrashTab ? (
+                                <button
+                                  type="button"
+                                  disabled={busy || loading}
+                                  title="ゴミ箱へ移動"
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    void runTrash(r.id)
+                                  }}
+                                  className="shrink-0 rounded-full border border-[#abadb0]/50 bg-[#fff8f8] px-2 py-1 text-[11px] font-semibold leading-tight text-[#8b1a1a] disabled:opacity-50"
+                                >
+                                  {busy ? '処理中…' : 'ゴミ箱へ'}
+                                </button>
                               ) : null}
                             </div>
                           </td>

@@ -463,6 +463,10 @@ export const trialApplications = writing.table(
     accessEmailSentAt: timestamp("access_email_sent_at", { withTimezone: true }),
     adminNote: text("admin_note"),
     userId: uuid("user_id").references(() => authUsers.id, { onDelete: "set null" }),
+    /** Admin trash (soft-delete). Null = active list; non-null = trash view only until restored or permanently deleted. */
+    trashedAt: timestamp("trashed_at", { withTimezone: true }),
+    trashedBy: uuid("trashed_by").references(() => authUsers.id, { onDelete: "set null" }),
+    trashReason: text("trash_reason"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -471,6 +475,46 @@ export const trialApplications = writing.table(
     index("trial_applications_applicant_email_idx").on(t.applicantEmail),
     index("trial_applications_stripe_checkout_session_id_idx").on(t.stripeCheckoutSessionId),
     index("trial_applications_user_id_idx").on(t.userId),
+  ]
+);
+
+/** Reminder emails (e.g. 24h before deadline); aligned with trial_reminder_logs migration. */
+export const trialReminderLogs = writing.table(
+  "trial_reminder_logs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    applicationId: uuid("application_id")
+      .notNull()
+      .references(() => trialApplications.id, { onDelete: "cascade" }),
+    reminderType: text("reminder_type").notNull(),
+    targetAt: timestamp("target_at", { withTimezone: true }).notNull(),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    status: text("status").notNull(),
+    failureReason: text("failure_reason"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("trial_reminder_logs_application_id_reminder_type_unique").on(t.applicationId, t.reminderType),
+    index("trial_reminder_logs_application_id_idx").on(t.applicationId),
+  ]
+);
+
+/** Admin trash / restore / permanent_delete audit (application_id survives hard delete). */
+export const trialApplicationAdminAudit = writing.table(
+  "trial_application_admin_audit",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    applicationId: uuid("application_id").notNull(),
+    action: text("action").notNull(),
+    actorUserId: uuid("actor_user_id")
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "restrict" }),
+    trashReason: text("trash_reason"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("trial_application_admin_audit_app_idx").on(t.applicationId),
+    index("trial_application_admin_audit_created_idx").on(t.createdAt),
   ]
 );
 
