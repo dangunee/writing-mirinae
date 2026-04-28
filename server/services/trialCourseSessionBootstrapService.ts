@@ -2,6 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 
 import { writingCourses, writingSessions } from "../../db/schema";
 import { intervalToMs } from "../lib/schedule";
+import { trialBootstrapVerbose } from "../lib/trialSessionBootstrapLog";
 import * as masterRepo from "../repositories/writingMasterRepository";
 import type { CourseInterval } from "../types/writing";
 import type { Db } from "../db/client";
@@ -24,6 +25,7 @@ export async function ensureTrialCourseFirstSessionIfMissing(
   db: Db,
   course: typeof writingCourses.$inferSelect
 ): Promise<void> {
+  const courseIdPrefix = `${course.id.slice(0, 8)}…`;
   await db.transaction(async (tx) => {
     await tx.execute(sql`SELECT id FROM writing.courses WHERE id = ${course.id}::uuid FOR UPDATE`);
     const existing = await tx
@@ -31,7 +33,14 @@ export async function ensureTrialCourseFirstSessionIfMissing(
       .from(writingSessions)
       .where(and(eq(writingSessions.courseId, course.id), eq(writingSessions.index, 1)))
       .limit(1);
-    if (existing.length > 0) {
+    const hadIndex1Before = existing.length > 0;
+    trialBootstrapVerbose("precheck_session_index_1", {
+      courseIdPrefix,
+      courseStatus: course.status,
+      courseTermIdPrefix: course.termId ? `${course.termId.slice(0, 8)}…` : null,
+      sessionIndex1Exists: hadIndex1Before,
+    });
+    if (hadIndex1Before) {
       return;
     }
 
@@ -54,7 +63,13 @@ export async function ensureTrialCourseFirstSessionIfMissing(
     const requiredExpressionsSnapshot = master?.requiredExpressions ?? [];
     const modelAnswerSnapshot = master?.modelAnswer ?? "";
 
-    await tx
+    trialBootstrapVerbose("insert_attempt", {
+      courseIdPrefix,
+      index: 1,
+      hasAssignmentMaster: master != null,
+    });
+
+    const inserted = await tx
       .insert(writingSessions)
       .values({
         courseId: course.id,
@@ -72,6 +87,13 @@ export async function ensureTrialCourseFirstSessionIfMissing(
         assignmentMasterId: master?.id ?? null,
         updatedAt: now,
       })
-      .onConflictDoNothing({ target: [writingSessions.courseId, writingSessions.index] });
+      .onConflictDoNothing({ target: [writingSessions.courseId, writingSessions.index] })
+      .returning({ id: writingSessions.id });
+
+    trialBootstrapVerbose("insert_result", {
+      courseIdPrefix,
+      insertedRowCount: inserted.length,
+      insertedIdPrefix: inserted[0]?.id ? `${inserted[0].id.slice(0, 8)}…` : null,
+    });
   });
 }

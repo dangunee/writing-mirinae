@@ -19,6 +19,8 @@ import {
   getCurrentSessionForTrialApplication,
 } from "../../../../../server/services/writingStudentService";
 import type { AuthRole } from "../../../../../server/lib/authMe";
+import { resolveWritingTrialCourseIdForLearner } from "../../../../../server/lib/writingTrialCourseResolve";
+import { trialBootstrapVerbose } from "../../../../../server/lib/trialSessionBootstrapLog";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,7 +51,6 @@ async function tryTrialSessionFromCookie(req: Request, db: ReturnType<typeof get
     if (j?.ok === true && j.application?.id) {
       const applicationId = j.application.id;
       const accessExpiresAt = j.application.accessExpiresAt ?? null;
-      const trialCourseId = process.env.WRITING_TRIAL_COURSE_ID?.trim();
       const trialSession = await getCurrentSessionForTrialApplication(db, applicationId);
       if (trialSession.ok === true && trialSession.accessKind === "trial") {
         return NextResponse.json({
@@ -57,16 +58,23 @@ async function tryTrialSessionFromCookie(req: Request, db: ReturnType<typeof get
           accessExpiresAt: accessExpiresAt ?? trialSession.accessExpiresAt,
         });
       }
+      const trialCourseIdEnv = process.env.WRITING_TRIAL_COURSE_ID?.trim();
+      const courseIdForHint = trialCourseIdEnv ?? (await resolveWritingTrialCourseIdForLearner(db)) ?? undefined;
+      trialBootstrapVerbose("sessions_current_trial_pending_fallback", {
+        applicationIdPrefix: applicationId.slice(0, 8),
+        hasEnvTrialCourseId: Boolean(trialCourseIdEnv),
+        hintCourseIdPrefix: courseIdForHint ? `${courseIdForHint.slice(0, 8)}…` : null,
+      });
       /**
        * Upstream validated writing_trial_access; DB course row may lag or env unset.
        * Still return 200 + ok:true so EntitlementRouteGuard allows /writing/app (WritingPage handles partial trial).
-       * Include `courseId` when WRITING_TRIAL_COURSE_ID is set so the client can keep state (theme UI wiring).
+       * Include `courseId` when resolvable so the client can keep state (theme UI wiring).
        */
       return NextResponse.json({
         ok: true,
         accessKind: "trial" as const,
         applicationId,
-        ...(trialCourseId ? { courseId: trialCourseId } : {}),
+        ...(courseIdForHint ? { courseId: courseIdForHint } : {}),
         accessExpiresAt,
         mode: "fresh" as const,
         session: null,

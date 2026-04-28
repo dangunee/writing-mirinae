@@ -12,6 +12,11 @@ import { resolveWritingRoleFromDbOrEnv } from "../lib/writingAuthRoles";
 import { checkSessionEligibleForWriting } from "../lib/writingSubmissionEligibility";
 import { validateSubmissionFileUpload } from "../lib/writingUploads";
 import { getServiceRoleClient } from "../lib/supabaseServiceRole";
+import {
+  isWritingCourseOpenForTrialLearner,
+  resolveWritingTrialCourseIdForLearner,
+} from "../lib/writingTrialCourseResolve";
+import { trialBootstrapBlocked, trialBootstrapVerbose } from "../lib/trialSessionBootstrapLog";
 import * as repo from "../repositories/writingStudentRepository";
 import type { PublishedResultRow } from "../repositories/writingStudentRepository";
 import type { PreparedAttachment } from "./writingSubmissionInternal";
@@ -49,6 +54,20 @@ function sessionDtoFromRow(
     unlockAt: s.unlockAt.toISOString(),
     status: s.status,
     themeSnapshot: s.themeSnapshot ?? null,
+  };
+}
+
+function trialSessionDtoFromRow(s: typeof writingSessions.$inferSelect) {
+  return {
+    id: s.id,
+    courseId: s.courseId,
+    index: s.index,
+    unlockAt: s.unlockAt.toISOString(),
+    status: s.status,
+    themeSnapshot: s.themeSnapshot ?? null,
+    runtimeStatus: s.runtimeStatus ?? null,
+    requiredExpressionsSnapshot: s.requiredExpressionsSnapshot ?? null,
+    modelAnswerSnapshot: s.modelAnswerSnapshot ?? null,
   };
 }
 
@@ -125,6 +144,9 @@ export type CurrentSessionResponse =
         unlockAt: string;
         status: string;
         themeSnapshot: string | null;
+        runtimeStatus: string | null;
+        requiredExpressionsSnapshot: unknown;
+        modelAnswerSnapshot: string | null;
       } | null;
       submission: {
         id: string;
@@ -382,11 +404,6 @@ export async function getCurrentSessionForRegularGrant(db: Db, grantId: string):
   };
 }
 
-function getTrialWritingCourseId(): string | null {
-  const raw = process.env.WRITING_TRIAL_COURSE_ID?.trim();
-  return raw || null;
-}
-
 /**
  * 体験: trial_application_id は Cookie 経由の upstream 検証後にのみ渡す。
  * 提出データの source of truth は writing.submissions（trial_application_id）。
@@ -395,21 +412,45 @@ export async function getCurrentSessionForTrialApplication(
   db: Db,
   applicationId: string
 ): Promise<CurrentSessionResponse> {
-  const courseId = getTrialWritingCourseId();
+  const hasEnvTrialCourseId = Boolean(process.env.WRITING_TRIAL_COURSE_ID?.trim());
+  const courseId = await resolveWritingTrialCourseIdForLearner(db);
+  trialBootstrapVerbose("trial_resolve_course_id", {
+    hasEnvTrialCourseId,
+    resolved: Boolean(courseId),
+    courseIdPrefix: courseId ? `${courseId.slice(0, 8)}…` : null,
+  });
   if (!courseId) {
+    trialBootstrapBlocked("no_course_id", { hasEnvTrialCourseId });
     return { ok: false, error: "no_active_course" };
   }
   const course = await repo.getWritingCourseById(db, courseId);
-  if (!course || course.status !== "active") {
+  if (!course || !isWritingCourseOpenForTrialLearner(course.status)) {
+    trialBootstrapBlocked("course_not_usable_for_trial", {
+      courseIdPrefix: `${courseId.slice(0, 8)}…`,
+      courseRowFound: Boolean(course),
+      courseStatus: course?.status ?? null,
+      courseTermIdPrefix: course?.termId ? `${course.termId.slice(0, 8)}…` : null,
+    });
     return { ok: false, error: "no_active_course" };
   }
 
   await ensureTrialCourseFirstSessionIfMissing(db, course);
   await repo.lazyUnlockDueSessions(db, course.id);
   const sessions = await repo.listSessionsForCourseOrdered(db, course.id);
+  trialBootstrapVerbose("trial_sessions_after_bootstrap", {
+    courseIdPrefix: `${course.id.slice(0, 8)}…`,
+    courseStatus: course.status,
+    courseTermIdPrefix: course.termId ? `${course.termId.slice(0, 8)}…` : null,
+    sessionCount: sessions.length,
+    sessionIndexes: sessions.map((s) => s.index),
+  });
 
   const pipeline = await repo.findActivePipelineSubmissionForTrial(db, applicationId);
   if (pipeline) {
+    trialBootstrapVerbose("trial_return_pipeline", {
+      sessionIndex: pipeline.session.index,
+      sessionIdPrefix: `${pipeline.session.id.slice(0, 8)}…`,
+    });
     return {
       ok: true,
       accessKind: "trial",
@@ -418,7 +459,7 @@ export async function getCurrentSessionForTrialApplication(
       accessExpiresAt: null,
       pendingSubmissionId: pipeline.submission.id,
       mode: "pipeline",
-      session: sessionDtoFromRow(pipeline.session),
+      session: trialSessionDtoFromRow(pipeline.session),
       submission: {
         id: pipeline.submission.id,
         status: pipeline.submission.status,
@@ -444,6 +485,7 @@ export async function getCurrentSessionForTrialApplication(
     if (!prevAllCompleted) {
       const blocker = lower.find((x) => !sessionIsTerminalForProgression(x.status));
       if (blocker) {
+        trialBootstrapVerbose("trial_return_blocker", { sessionIndex: blocker.index });
         return {
           ok: true,
           accessKind: "trial",
@@ -452,7 +494,7 @@ export async function getCurrentSessionForTrialApplication(
           accessExpiresAt: null,
           pendingSubmissionId: null,
           mode: "fresh",
-          session: sessionDtoFromRow(blocker),
+          session: trialSessionDtoFromRow(blocker),
           submission: null,
           canSubmit: false,
           reasonIfNot: "complete_previous_sessions_first",
@@ -462,6 +504,7 @@ export async function getCurrentSessionForTrialApplication(
 
     const timeOk = s.unlockAt <= now;
     if (!timeOk) {
+      trialBootstrapVerbose("trial_return_not_unlocked_time", { sessionIndex: s.index });
       return {
         ok: true,
         accessKind: "trial",
@@ -470,13 +513,19 @@ export async function getCurrentSessionForTrialApplication(
         accessExpiresAt: null,
         pendingSubmissionId: null,
         mode: "fresh",
-        session: sessionDtoFromRow(s),
+        session: trialSessionDtoFromRow(s),
         submission: null,
         canSubmit: false,
         reasonIfNot: "session_not_unlocked_yet",
       };
     }
 
+    trialBootstrapVerbose("trial_return_can_submit", {
+      sessionIndex: s.index,
+      sessionIdPrefix: `${s.id.slice(0, 8)}…`,
+      status: s.status,
+      runtimeStatus: s.runtimeStatus,
+    });
     return {
       ok: true,
       accessKind: "trial",
@@ -485,12 +534,13 @@ export async function getCurrentSessionForTrialApplication(
       accessExpiresAt: null,
       pendingSubmissionId: null,
       mode: "fresh",
-      session: sessionDtoFromRow(s),
+      session: trialSessionDtoFromRow(s),
       submission: null,
       canSubmit: true,
     };
   }
 
+  trialBootstrapVerbose("trial_return_all_done", { sessionCount: sessions.length });
   return {
     ok: true,
     accessKind: "trial",
@@ -731,13 +781,13 @@ export async function saveOrSubmitSubmissionForTrial(
   const lenErr = assertBodyTextLength(input.bodyText);
   if (lenErr) return lenErr;
 
-  const courseIdEnv = getTrialWritingCourseId();
+  const courseIdEnv = await resolveWritingTrialCourseIdForLearner(db);
   if (!courseIdEnv) {
     return { ok: false, status: 503, code: "trial_course_not_configured" };
   }
 
   const trialCourse = await repo.getWritingCourseById(db, courseIdEnv);
-  if (!trialCourse || trialCourse.status !== "active") {
+  if (!trialCourse || !isWritingCourseOpenForTrialLearner(trialCourse.status)) {
     return { ok: false, status: 404, code: "session_not_found" };
   }
 
@@ -745,7 +795,7 @@ export async function saveOrSubmitSubmissionForTrial(
   if (!row || row.course.id !== trialCourse.id) {
     return { ok: false, status: 404, code: "session_not_found" };
   }
-  if (row.course.status !== "active") {
+  if (!isWritingCourseOpenForTrialLearner(row.course.status)) {
     return { ok: false, status: 409, code: "course_not_active" };
   }
 
