@@ -339,7 +339,7 @@ export default function ViewCorrectionPage() {
                     )}
                     {textNonEmpty(correction.modelAnswer) && (
                       <div style={{ marginTop: '1rem' }}>
-                        <strong>모범답</strong>
+                        <strong>模範文（参考）</strong>
                         <div className="corrected-content whitespace-pre-wrap">{correction.modelAnswer}</div>
                       </div>
                     )}

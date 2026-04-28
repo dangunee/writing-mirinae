@@ -57,14 +57,43 @@ export function isHtmlVisiblyNonEmpty(html: string): boolean {
   return t.length > 0;
 }
 
+function normalizePlainFromDomFragment(el: HTMLElement): string {
+  const t = el.innerText ?? el.textContent ?? "";
+  return t.replace(/\u00a0/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function styleHasLineThrough(styleAttr: string | null): boolean {
+  if (styleAttr == null || styleAttr === "") return false;
+  return styleAttr.toLowerCase().includes("line-through");
+}
+
+/**
+ * Plain text for 整理した比較文 (정서문): derives from rich HTML without strikethrough
+ * (incorrect) segments; corrected / highlight / underline text remains as plain text.
+ */
+export function extractComparisonPlainText(html: string): string {
+  if (typeof html !== "string" || html === "") return "";
+  if (typeof document !== "undefined") {
+    const div = document.createElement("div");
+    div.innerHTML = html;
+    div.querySelectorAll("s, del, strike").forEach((el) => el.remove());
+    div.querySelectorAll("*").forEach((el) => {
+      if (styleHasLineThrough(el.getAttribute("style"))) {
+        el.remove();
+      }
+    });
+    return normalizePlainFromDomFragment(div);
+  }
+  return htmlToPlainText(html);
+}
+
 /** Strip tags for clipboard; prefer DOM innerText in the browser. */
 export function htmlToPlainText(html: string): string {
   if (typeof html !== "string" || html === "") return "";
   if (typeof document !== "undefined") {
     const d = document.createElement("div");
     d.innerHTML = html;
-    const t = d.innerText ?? d.textContent ?? "";
-    return t.replace(/\u00a0/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+    return normalizePlainFromDomFragment(d);
   }
   return html
     .replace(/<br\s*\/?>/gi, "\n")

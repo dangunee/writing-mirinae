@@ -6,7 +6,7 @@ import TeacherRichCorrectionEditor, {
   type TeacherRichCorrectionEditorHandle,
 } from "../components/teacher/TeacherRichCorrectionEditor";
 import { TeacherPageNav } from "../components/teacher/TeacherPageNav";
-import { buildInitialEditorHtml, htmlToPlainText } from "../lib/teacherRichDocument";
+import { buildInitialEditorHtml, extractComparisonPlainText } from "../lib/teacherRichDocument";
 
 /** GET /api/teacher/writing/submissions/:id 응답 (TeacherSubmissionDetail 요약) */
 type TeacherAssignmentSnapshot = {
@@ -382,7 +382,7 @@ export default function CorrectionPage() {
 
   const handleCopyCorrected = async () => {
     const doc = richEditorRef.current?.getDocumentJson();
-    const plain = htmlToPlainText(doc?.html ?? "");
+    const plain = extractComparisonPlainText(doc?.html ?? "");
     setImprovedText(plain);
     let copied = false;
     try {
@@ -581,13 +581,13 @@ export default function CorrectionPage() {
                   </div>
                 </div>
                 <div className="editor-section">
-                  <label>課題モ범文（登録・参考）</label>
+                  <label>模範文（参考）</label>
                   <div className="original-text">
                     {detail.assignment?.referenceModelAnswer != null &&
                     String(detail.assignment.referenceModelAnswer).trim() !== "" ? (
                       <div className="whitespace-pre-wrap">{detail.assignment.referenceModelAnswer}</div>
                     ) : (
-                      <p className="assignment-snapshot-empty">モ범文が登録されていません</p>
+                      <p className="assignment-snapshot-empty">模範文が登録されていません</p>
                     )}
                   </div>
                 </div>
