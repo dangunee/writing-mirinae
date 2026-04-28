@@ -17,6 +17,7 @@ import type { PublishedResultRow } from "../repositories/writingStudentRepositor
 import type { PreparedAttachment } from "./writingSubmissionInternal";
 import { executeSubmissionWrite } from "./writingSubmissionInternal";
 import type { SubmissionMode } from "../lib/writingSubmissionMode";
+import { ensureTrialCourseFirstSessionIfMissing } from "./trialCourseSessionBootstrapService";
 
 type WritingCourseRow = typeof writingCourses.$inferSelect;
 
@@ -403,6 +404,7 @@ export async function getCurrentSessionForTrialApplication(
     return { ok: false, error: "no_active_course" };
   }
 
+  await ensureTrialCourseFirstSessionIfMissing(db, course);
   await repo.lazyUnlockDueSessions(db, course.id);
   const sessions = await repo.listSessionsForCourseOrdered(db, course.id);
 

@@ -50,14 +50,12 @@ async function tryTrialSessionFromCookie(req: Request, db: ReturnType<typeof get
       const applicationId = j.application.id;
       const accessExpiresAt = j.application.accessExpiresAt ?? null;
       const trialCourseId = process.env.WRITING_TRIAL_COURSE_ID?.trim();
-      if (trialCourseId) {
-        const trialSession = await getCurrentSessionForTrialApplication(db, applicationId);
-        if (trialSession.ok === true && trialSession.accessKind === "trial") {
-          return NextResponse.json({
-            ...trialSession,
-            accessExpiresAt: accessExpiresAt ?? trialSession.accessExpiresAt,
-          });
-        }
+      const trialSession = await getCurrentSessionForTrialApplication(db, applicationId);
+      if (trialSession.ok === true && trialSession.accessKind === "trial") {
+        return NextResponse.json({
+          ...trialSession,
+          accessExpiresAt: accessExpiresAt ?? trialSession.accessExpiresAt,
+        });
       }
       /**
        * Upstream validated writing_trial_access; DB course row may lag or env unset.
