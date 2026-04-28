@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getDb } from "../../../../../../../server/db/client";
 import { requireTeacherUserId } from "../../../../../../../server/lib/teacherAuth";
+import type { SaveCorrectionBody } from "../../../../../../../server/services/writingTeacherService";
 import { saveCorrectionDraft } from "../../../../../../../server/services/writingTeacherService";
 
 export const runtime = "nodejs";
@@ -28,14 +29,24 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     return NextResponse.json({ error: "invalid_body" }, { status: 400 });
   }
 
+  /** Only keys present on the JSON body — avoid `{ improvedText: undefined }`-style props that would make `"improvedText" in payload` true and clear DB fields on partial saves. */
   const b = body as Record<string, unknown>;
-  const payload = {
-    polishedSentence: "polishedSentence" in b ? (b.polishedSentence as string | null | undefined) : undefined,
-    modelAnswer: "modelAnswer" in b ? (b.modelAnswer as string | null | undefined) : undefined,
-    teacherComment: "teacherComment" in b ? (b.teacherComment as string | null | undefined) : undefined,
-    improvedText: "improvedText" in b ? (b.improvedText as string | null | undefined) : undefined,
-    richDocumentJson: "richDocumentJson" in b ? b.richDocumentJson : undefined,
-  };
+  const payload: SaveCorrectionBody = {};
+  if ("polishedSentence" in b) {
+    payload.polishedSentence = b.polishedSentence as string | null | undefined;
+  }
+  if ("modelAnswer" in b) {
+    payload.modelAnswer = b.modelAnswer as string | null | undefined;
+  }
+  if ("teacherComment" in b) {
+    payload.teacherComment = b.teacherComment as string | null | undefined;
+  }
+  if ("improvedText" in b) {
+    payload.improvedText = b.improvedText as string | null | undefined;
+  }
+  if ("richDocumentJson" in b) {
+    payload.richDocumentJson = b.richDocumentJson;
+  }
 
   const { id: submissionId } = await context.params;
   const db = getDb();

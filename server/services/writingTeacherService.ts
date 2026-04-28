@@ -506,6 +506,7 @@ export async function saveCorrectionDraft(
   const ensured = await ensureCorrectionDraftForTeacher(db, teacherId, submissionId, row.submission.status);
   if (!ensured.ok) return { ok: false, status: ensured.status, code: ensured.code };
 
+  /** Only keys present on `body` should be patched; omit omitted fields (do not pass undefined-own keys — they wrongly satisfy `in`). */
   const patch: Partial<{
     polishedSentence: string | null;
     modelAnswer: string | null;
