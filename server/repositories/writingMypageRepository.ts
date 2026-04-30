@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 
 import {
   writingCorrectionEvaluations,
@@ -204,7 +204,7 @@ export async function listSessionsWithSubmissionStateForMypage(
       writingEvaluations,
       and(eq(writingEvaluations.submissionId, writingSubmissions.id), publishedSubmission)
     )
-    .where(eq(writingSessions.courseId, courseId))
+    .where(and(eq(writingSessions.courseId, courseId), isNull(writingSessions.trialApplicationId)))
     .orderBy(asc(writingSessions.index));
 
   return rows.map((r) => ({

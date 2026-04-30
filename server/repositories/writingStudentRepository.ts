@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 
 import {
   regularAccessGrants,
@@ -76,11 +76,27 @@ export async function lazyUnlockDueSessions(db: Db, courseId: string) {
   await reconcileCourseSessions(db, courseId);
 }
 
+/** Course template / student-owned sessions only (excludes mail-link trial runtime rows). */
 export async function listSessionsForCourseOrdered(db: Db, courseId: string) {
   return db
     .select()
     .from(writingSessions)
-    .where(eq(writingSessions.courseId, courseId))
+    .where(and(eq(writingSessions.courseId, courseId), isNull(writingSessions.trialApplicationId)))
+    .orderBy(asc(writingSessions.index));
+}
+
+/** Trial learner: sessions for one application on the shared trial course. */
+export async function listSessionsForTrialApplicationOrdered(
+  db: Db,
+  courseId: string,
+  trialApplicationId: string
+) {
+  return db
+    .select()
+    .from(writingSessions)
+    .where(
+      and(eq(writingSessions.courseId, courseId), eq(writingSessions.trialApplicationId, trialApplicationId))
+    )
     .orderBy(asc(writingSessions.index));
 }
 

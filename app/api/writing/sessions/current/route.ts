@@ -39,6 +39,19 @@ async function buildTrialWritingSessionJson(
   accessExpiresAt: string | null
 ): Promise<NextResponse> {
   const trialSession = await getCurrentSessionForTrialApplication(db, applicationId);
+  if (trialSession.ok === false && trialSession.error === "trial_session_missing") {
+    console.warn("trial_sessions_current_branch", {
+      outcome: "trial_session_missing",
+      applicationIdPrefix: applicationId.slice(0, 8),
+    });
+    return NextResponse.json({
+      ok: false as const,
+      accessKind: "trial" as const,
+      applicationId,
+      error: "trial_session_missing" as const,
+      accessExpiresAt,
+    });
+  }
   if (trialSession.ok === true && trialSession.accessKind === "trial") {
     console.info("trial_sessions_current_branch", {
       outcome: "trial_ok",

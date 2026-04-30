@@ -1,4 +1,4 @@
-import { and, asc, eq, lte, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, lte, sql } from "drizzle-orm";
 
 import { writingCourses, writingSessions, writingSubmissions } from "../../db/schema";
 import type { Db } from "../db/client";
@@ -52,11 +52,31 @@ async function legacyLazyTimeUnlock(tx: Db, courseId: string): Promise<void> {
 }
 
 async function reconcileStrictSequentialUnlock(tx: Db, courseId: string): Promise<void> {
+  const scopeRows = await tx
+    .selectDistinct({ trialApplicationId: writingSessions.trialApplicationId })
+    .from(writingSessions)
+    .where(eq(writingSessions.courseId, courseId));
+
+  for (const row of scopeRows) {
+    await reconcileStrictSequentialUnlockScoped(tx, courseId, row.trialApplicationId ?? null);
+  }
+}
+
+async function reconcileStrictSequentialUnlockScoped(
+  tx: Db,
+  courseId: string,
+  trialApplicationId: string | null
+): Promise<void> {
   const now = new Date();
+  const scopeCond =
+    trialApplicationId === null
+      ? isNull(writingSessions.trialApplicationId)
+      : eq(writingSessions.trialApplicationId, trialApplicationId);
+
   const sessions = await tx
     .select()
     .from(writingSessions)
-    .where(eq(writingSessions.courseId, courseId))
+    .where(and(eq(writingSessions.courseId, courseId), scopeCond))
     .orderBy(asc(writingSessions.index));
 
   for (let i = 0; i < sessions.length; i++) {

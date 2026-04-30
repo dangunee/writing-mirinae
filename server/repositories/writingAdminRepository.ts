@@ -39,7 +39,12 @@ export async function listWritingSessionsForAdminAssignmentList(db: Db, courseId
     })
     .from(writingSessions)
     .where(
-      and(eq(writingSessions.courseId, courseId), gte(writingSessions.index, 1), lte(writingSessions.index, 10))
+      and(
+        eq(writingSessions.courseId, courseId),
+        isNull(writingSessions.trialApplicationId),
+        gte(writingSessions.index, 1),
+        lte(writingSessions.index, 10)
+      )
     )
     .orderBy(asc(writingSessions.index));
 }

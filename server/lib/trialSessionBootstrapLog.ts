@@ -12,6 +12,11 @@ export function trialBootstrapVerbose(event: string, fields: Record<string, unkn
   console.log(`[trial_bootstrap] ${event}`, fields);
 }
 
+/** Production-safe diagnostics (always on; use id prefixes only). */
+export function trialBootstrapInfo(event: string, fields: Record<string, unknown>): void {
+  console.info(`[trial_bootstrap] ${event}`, fields);
+}
+
 /** One-line warning when trial UX is blocked (always on; no secrets). */
 export function trialBootstrapBlocked(reason: string, fields: Record<string, unknown>): void {
   console.warn(`[trial_bootstrap] blocked:${reason}`, fields);

@@ -6,8 +6,9 @@
  * Rate limiting / WAF: configure at the edge; optional per-user caps can wrap these handlers later.
  */
 
-import { writingCourses, writingSessions, writingSubmissions } from "../../db/schema";
+import { writingCourses, writingSessions, writingSubmissions, trialApplications } from "../../db/schema";
 import type { Db } from "../db/client";
+import { eq } from "drizzle-orm";
 import { resolveWritingRoleFromDbOrEnv } from "../lib/writingAuthRoles";
 import { checkSessionEligibleForWriting } from "../lib/writingSubmissionEligibility";
 import { validateSubmissionFileUpload } from "../lib/writingUploads";
@@ -16,13 +17,13 @@ import {
   isWritingCourseOpenForTrialLearner,
   resolveWritingTrialCourseIdForLearner,
 } from "../lib/writingTrialCourseResolve";
-import { trialBootstrapBlocked, trialBootstrapVerbose } from "../lib/trialSessionBootstrapLog";
+import { trialBootstrapBlocked, trialBootstrapVerbose, trialBootstrapInfo } from "../lib/trialSessionBootstrapLog";
 import * as repo from "../repositories/writingStudentRepository";
 import type { PublishedResultRow } from "../repositories/writingStudentRepository";
 import type { PreparedAttachment } from "./writingSubmissionInternal";
 import { executeSubmissionWrite } from "./writingSubmissionInternal";
 import type { SubmissionMode } from "../lib/writingSubmissionMode";
-import { ensureTrialCourseFirstSessionIfMissing } from "./trialCourseSessionBootstrapService";
+import { ensureTrialFirstSessionForApplicationIfMissing } from "./trialCourseSessionBootstrapService";
 
 type WritingCourseRow = typeof writingCourses.$inferSelect;
 
@@ -39,6 +40,13 @@ const MAX_BODY_TEXT_CHARS = (() => {
 /** Prior sessions are "done" for progression when corrected or missed (deadline). */
 function sessionIsTerminalForProgression(status: string): boolean {
   return status === "completed" || status === "missed";
+}
+
+/** Trial: same progression rule as status, plus runtime rows reconciled to corrected/missed. */
+function sessionIsTerminalForTrialCourse(s: typeof writingSessions.$inferSelect): boolean {
+  if (sessionIsTerminalForProgression(s.status)) return true;
+  const rt = s.runtimeStatus;
+  return rt === "corrected" || rt === "missed";
 }
 
 function sessionDtoFromRow(
@@ -159,7 +167,7 @@ export type CurrentSessionResponse =
       canSubmit: boolean;
       reasonIfNot?: string;
     }
-  | { ok: false; error: "no_active_course" };
+  | { ok: false; error: "no_active_course" | "trial_session_missing" };
 
 /**
  * Current session = active pipeline session, else first incomplete session (linear order).
@@ -434,9 +442,63 @@ export async function getCurrentSessionForTrialApplication(
     return { ok: false, error: "no_active_course" };
   }
 
-  await ensureTrialCourseFirstSessionIfMissing(db, course);
-  await repo.lazyUnlockDueSessions(db, course.id);
-  const sessions = await repo.listSessionsForCourseOrdered(db, course.id);
+  const [trialApp] = await db
+    .select({ accessExpiresAt: trialApplications.accessExpiresAt })
+    .from(trialApplications)
+    .where(eq(trialApplications.id, applicationId))
+    .limit(1);
+  if (!trialApp) {
+    trialBootstrapBlocked("trial_application_not_found", {
+      applicationIdPrefix: `${applicationId.slice(0, 8)}…`,
+    });
+    return { ok: false, error: "no_active_course" };
+  }
+  const accessExpiresAtIso = trialApp.accessExpiresAt?.toISOString() ?? null;
+
+  const bootstrapAndListSessions = async (attempt: 1 | 2) => {
+    trialBootstrapInfo("bootstrap_called", {
+      applicationIdPrefix: `${applicationId.slice(0, 8)}…`,
+      courseIdPrefix: `${course.id.slice(0, 8)}…`,
+      attempt,
+    });
+    try {
+      await ensureTrialFirstSessionForApplicationIfMissing(
+        db,
+        course,
+        applicationId,
+        trialApp.accessExpiresAt ?? null
+      );
+    } catch (e) {
+      trialBootstrapBlocked("trial_bootstrap_transaction_failed", {
+        applicationIdPrefix: `${applicationId.slice(0, 8)}…`,
+        courseIdPrefix: `${course.id.slice(0, 8)}…`,
+        attempt,
+        message: e instanceof Error ? e.message : String(e),
+      });
+    }
+    await repo.lazyUnlockDueSessions(db, course.id);
+    const list = await repo.listSessionsForTrialApplicationOrdered(db, course.id, applicationId);
+    trialBootstrapInfo("sessions_after_bootstrap_count", {
+      applicationIdPrefix: `${applicationId.slice(0, 8)}…`,
+      courseIdPrefix: `${course.id.slice(0, 8)}…`,
+      count: list.length,
+      attempt,
+    });
+    return list;
+  };
+
+  let sessions = await bootstrapAndListSessions(1);
+  if (sessions.length === 0) {
+    sessions = await bootstrapAndListSessions(2);
+  }
+  if (sessions.length === 0) {
+    trialBootstrapBlocked("trial_session_missing_after_bootstrap", {
+      applicationIdPrefix: `${applicationId.slice(0, 8)}…`,
+      courseIdPrefix: `${course.id.slice(0, 8)}…`,
+    });
+    return { ok: false, error: "trial_session_missing" };
+  }
+
   trialBootstrapVerbose("trial_sessions_after_bootstrap", {
     courseIdPrefix: `${course.id.slice(0, 8)}…`,
     courseStatus: course.status,
@@ -456,7 +518,7 @@ export async function getCurrentSessionForTrialApplication(
       accessKind: "trial",
       applicationId,
       courseId: course.id,
-      accessExpiresAt: null,
+      accessExpiresAt: accessExpiresAtIso,
       pendingSubmissionId: pipeline.submission.id,
       mode: "pipeline",
       session: trialSessionDtoFromRow(pipeline.session),
@@ -478,12 +540,12 @@ export async function getCurrentSessionForTrialApplication(
 
   const now = new Date();
   for (const s of sessions) {
-    if (sessionIsTerminalForProgression(s.status)) continue;
+    if (sessionIsTerminalForTrialCourse(s)) continue;
 
     const lower = sessions.filter((x) => x.index < s.index);
-    const prevAllCompleted = lower.every((x) => sessionIsTerminalForProgression(x.status));
+    const prevAllCompleted = lower.every((x) => sessionIsTerminalForTrialCourse(x));
     if (!prevAllCompleted) {
-      const blocker = lower.find((x) => !sessionIsTerminalForProgression(x.status));
+      const blocker = lower.find((x) => !sessionIsTerminalForTrialCourse(x));
       if (blocker) {
         trialBootstrapVerbose("trial_return_blocker", { sessionIndex: blocker.index });
         return {
@@ -491,7 +553,7 @@ export async function getCurrentSessionForTrialApplication(
           accessKind: "trial",
           applicationId,
           courseId: course.id,
-          accessExpiresAt: null,
+          accessExpiresAt: accessExpiresAtIso,
           pendingSubmissionId: null,
           mode: "fresh",
           session: trialSessionDtoFromRow(blocker),
@@ -510,7 +572,7 @@ export async function getCurrentSessionForTrialApplication(
         accessKind: "trial",
         applicationId,
         courseId: course.id,
-        accessExpiresAt: null,
+        accessExpiresAt: accessExpiresAtIso,
         pendingSubmissionId: null,
         mode: "fresh",
         session: trialSessionDtoFromRow(s),
@@ -531,7 +593,7 @@ export async function getCurrentSessionForTrialApplication(
       accessKind: "trial",
       applicationId,
       courseId: course.id,
-      accessExpiresAt: null,
+      accessExpiresAt: accessExpiresAtIso,
       pendingSubmissionId: null,
       mode: "fresh",
       session: trialSessionDtoFromRow(s),
@@ -540,13 +602,22 @@ export async function getCurrentSessionForTrialApplication(
     };
   }
 
+  if (!sessions.every(sessionIsTerminalForTrialCourse)) {
+    trialBootstrapBlocked("trial_all_done_guard_failed", {
+      applicationIdPrefix: `${applicationId.slice(0, 8)}…`,
+      courseIdPrefix: `${course.id.slice(0, 8)}…`,
+      sessionStatuses: sessions.map((s) => ({ index: s.index, status: s.status, runtimeStatus: s.runtimeStatus })),
+    });
+    return { ok: false, error: "trial_session_missing" };
+  }
+
   trialBootstrapVerbose("trial_return_all_done", { sessionCount: sessions.length });
   return {
     ok: true,
     accessKind: "trial",
     applicationId,
     courseId: course.id,
-    accessExpiresAt: null,
+    accessExpiresAt: accessExpiresAtIso,
     pendingSubmissionId: null,
     mode: "all_done",
     session: null,
@@ -806,13 +877,24 @@ export async function saveOrSubmitSubmissionForTrial(
   }
   const session = refreshed.session;
 
+  if (
+    session.trialApplicationId != null &&
+    session.trialApplicationId !== input.trialApplicationId
+  ) {
+    return { ok: false, status: 403, code: "forbidden" };
+  }
+
   const now = new Date();
   const elig = checkSessionEligibleForWriting(session, now);
   if (!elig.ok) {
     return { ok: false, status: 409, code: elig.code };
   }
 
-  const sessions = await repo.listSessionsForCourseOrdered(db, row.course.id);
+  const sessions = await repo.listSessionsForTrialApplicationOrdered(
+    db,
+    row.course.id,
+    input.trialApplicationId
+  );
   const lower = sessions.filter((x) => x.index < session.index);
   if (!lower.every((x) => sessionIsTerminalForProgression(x.status))) {
     return { ok: false, status: 409, code: "complete_previous_sessions_first" };

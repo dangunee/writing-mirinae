@@ -540,17 +540,27 @@ export const writingSessions = writing.table(
     assignmentMasterId: uuid("assignment_master_id").references(() => writingAssignmentMasters.id, {
       onDelete: "set null",
     }),
+    /** Mail-link trial: runtime session rows are per application; NULL = shared course template / student courses. */
+    trialApplicationId: uuid("trial_application_id").references(() => trialApplications.id, {
+      onDelete: "restrict",
+    }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     check("writing_sessions_index_range", sql`index >= 1 AND index <= 10`),
-    unique("writing_sessions_course_index_unique").on(t.courseId, t.index),
+    uniqueIndex("writing_sessions_course_index_unique_non_trial")
+      .on(t.courseId, t.index)
+      .where(sql`trial_application_id IS NULL`),
+    uniqueIndex("writing_sessions_trial_app_index_unique")
+      .on(t.trialApplicationId, t.index)
+      .where(sql`trial_application_id IS NOT NULL`),
     index("idx_writing_sessions_course_id").on(t.courseId),
     index("idx_writing_sessions_course_unlock").on(t.courseId, t.unlockAt),
     index("idx_writing_sessions_status").on(t.courseId, t.status),
     index("idx_writing_sessions_course_runtime").on(t.courseId, t.runtimeStatus),
     index("idx_writing_sessions_due_at").on(t.courseId, t.dueAt),
+    index("idx_writing_sessions_trial_application_id").on(t.trialApplicationId),
   ]
 );
 
@@ -945,6 +955,10 @@ export const writingSessionsRelations = relations(writingSessions, ({ one, many 
   course: one(writingCourses, {
     fields: [writingSessions.courseId],
     references: [writingCourses.id],
+  }),
+  trialApplication: one(trialApplications, {
+    fields: [writingSessions.trialApplicationId],
+    references: [trialApplications.id],
   }),
   term: one(writingTerms, {
     fields: [writingSessions.termId],
