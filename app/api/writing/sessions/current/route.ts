@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getDb } from "../../../../../server/db/client";
+import * as writingStudentRepo from "../../../../../server/repositories/writingStudentRepository";
 import { parseRegularWritingGrantIdFromCookieHeader } from "../../../../../server/lib/regularSessionCookie";
 import { getSessionUserId } from "../../../../../server/lib/supabaseServer";
 import { resolveWritingRoleFromDbOrEnv } from "../../../../../server/lib/writingAuthRoles";
@@ -39,17 +40,50 @@ async function buildTrialWritingSessionJson(
 ): Promise<NextResponse> {
   const trialSession = await getCurrentSessionForTrialApplication(db, applicationId);
   if (trialSession.ok === true && trialSession.accessKind === "trial") {
+    console.info("trial_sessions_current_branch", {
+      outcome: "trial_ok",
+      applicationIdPrefix: applicationId.slice(0, 8),
+      courseIdPrefix: trialSession.courseId.slice(0, 8),
+      mode: trialSession.mode,
+      sessionIndex: trialSession.session?.index ?? null,
+      sessionIdPrefix: trialSession.session?.id ? trialSession.session.id.slice(0, 8) : null,
+      runtimeStatus:
+        trialSession.session && "runtimeStatus" in trialSession.session
+          ? trialSession.session.runtimeStatus
+          : null,
+      canSubmit: trialSession.canSubmit,
+      reasonIfNot: trialSession.reasonIfNot ?? null,
+    });
     return NextResponse.json({
       ...trialSession,
       accessExpiresAt: accessExpiresAt ?? trialSession.accessExpiresAt,
     });
   }
+  const err = trialSession.ok === false ? trialSession.error : "unexpected_shape";
+  console.info("trial_sessions_current_branch", {
+    outcome: "trial_pending_fallback",
+    applicationIdPrefix: applicationId.slice(0, 8),
+    getSessionError: err,
+  });
   const trialCourseIdEnv = process.env.WRITING_TRIAL_COURSE_ID?.trim();
   const courseIdForHint = trialCourseIdEnv ?? (await resolveWritingTrialCourseIdForLearner(db)) ?? undefined;
+  let courseStatus: string | undefined;
+  let courseTermIdPrefix: string | null = null;
+  let sessionCount: number | undefined;
+  if (courseIdForHint) {
+    const course = await writingStudentRepo.getWritingCourseById(db, courseIdForHint);
+    courseStatus = course?.status;
+    courseTermIdPrefix = course?.termId ? `${course.termId.slice(0, 8)}…` : null;
+    const sessions = await writingStudentRepo.listSessionsForCourseOrdered(db, courseIdForHint);
+    sessionCount = sessions.length;
+  }
   trialBootstrapVerbose("sessions_current_trial_pending_fallback", {
     applicationIdPrefix: applicationId.slice(0, 8),
     hasEnvTrialCourseId: Boolean(trialCourseIdEnv),
     hintCourseIdPrefix: courseIdForHint ? `${courseIdForHint.slice(0, 8)}…` : null,
+    courseStatus: courseStatus ?? null,
+    courseTermIdPrefix,
+    sessionCount: sessionCount ?? null,
   });
   /**
    * Cookie is valid; writing course/session may still be resolving. 200 + ok:true keeps EntitlementRouteGuard
@@ -70,8 +104,9 @@ async function buildTrialWritingSessionJson(
 }
 
 /**
- * Trial: resolve applicationId from signed cookie (TRIAL_SESSION_SECRET, same as mirinae-api) or mirinae session/current.
- * Does not require MIRINAE_API_BASE_URL when local verification succeeds (fixes logged-in users → 404 → /writing/intro).
+ * Trial: GET mirinae-api /api/writing/trial/session/current is authoritative (same as pre-067c4da).
+ * Local HMAC only when MIRINAE_API_BASE_URL is missing or upstream fails transiently (5xx/429/network).
+ * Do not use local fallback after upstream 401/403 — avoids bypassing access window / status checks on mirinae.
  */
 async function tryTrialSessionFromCookie(req: Request, db: ReturnType<typeof getDb>) {
   const cookieHeader = req.headers.get("cookie") ?? "";
@@ -79,46 +114,51 @@ async function tryTrialSessionFromCookie(req: Request, db: ReturnType<typeof get
     return null;
   }
 
-  let applicationId = parseWritingTrialAccessApplicationId(cookieHeader);
-  let accessExpiresAt: string | null = null;
-  let resolvedVia: "local_hmac" | "upstream" | null = applicationId ? "local_hmac" : null;
-
   const trialBase = mirinaeApiBase();
-  if (!applicationId && trialBase) {
+  let applicationId: string | null = null;
+  let accessExpiresAt: string | null = null;
+  let resolvedVia: "upstream" | "local_hmac" | null = null;
+  let upstreamHardDeny = false;
+  let upstreamTransientFailure = false;
+
+  if (trialBase) {
     try {
       const upstream = await fetch(`${trialBase}/api/writing/trial/session/current`, {
         headers: { Cookie: cookieHeader },
       });
-      if (upstream.ok) {
-        const j = (await upstream.json()) as {
-          ok?: boolean;
-          application?: { id?: string; accessExpiresAt?: string | null };
-        };
-        if (j?.ok === true && j.application?.id) {
-          applicationId = j.application.id;
-          accessExpiresAt = j.application.accessExpiresAt ?? null;
-          resolvedVia = "upstream";
-        }
+      const text = await upstream.text();
+      let j: { ok?: boolean; application?: { id?: string; accessExpiresAt?: string | null } } = {};
+      try {
+        j = text ? (JSON.parse(text) as typeof j) : {};
+      } catch {
+        j = {};
+      }
+      if (upstream.ok && j?.ok === true && j.application?.id) {
+        applicationId = j.application.id;
+        accessExpiresAt = j.application.accessExpiresAt ?? null;
+        resolvedVia = "upstream";
+      } else if (!upstream.ok && (upstream.status >= 500 || upstream.status === 429)) {
+        upstreamTransientFailure = true;
+      } else if (!upstream.ok) {
+        upstreamHardDeny = true;
+        console.info("trial_access_upstream_denied", { status: upstream.status });
+      } else {
+        upstreamHardDeny = true;
+        console.info("trial_access_upstream_unexpected_body", { status: upstream.status });
       }
     } catch (e) {
       console.warn("sessions_current_trial_upstream", e);
+      upstreamTransientFailure = true;
     }
-  } else if (applicationId && trialBase) {
-    try {
-      const upstream = await fetch(`${trialBase}/api/writing/trial/session/current`, {
-        headers: { Cookie: cookieHeader },
-      });
-      if (upstream.ok) {
-        const j = (await upstream.json()) as {
-          ok?: boolean;
-          application?: { accessExpiresAt?: string | null };
-        };
-        if (j?.ok === true && j.application?.accessExpiresAt != null) {
-          accessExpiresAt = j.application.accessExpiresAt ?? null;
-        }
-      }
-    } catch {
-      /* optional: window hint only */
+  } else {
+    upstreamTransientFailure = true;
+  }
+
+  if (!applicationId && !upstreamHardDeny && upstreamTransientFailure) {
+    const localId = parseWritingTrialAccessApplicationId(cookieHeader);
+    if (localId) {
+      applicationId = localId;
+      resolvedVia = "local_hmac";
     }
   }
 
@@ -126,6 +166,8 @@ async function tryTrialSessionFromCookie(req: Request, db: ReturnType<typeof get
     console.info("trial_access_cookie_unresolved", {
       hasMirinaeApiBase: Boolean(trialBase),
       hasTrialSessionSecret: Boolean(process.env.TRIAL_SESSION_SECRET?.trim()),
+      upstreamHardDeny,
+      upstreamTransientFailure,
     });
     return null;
   }
