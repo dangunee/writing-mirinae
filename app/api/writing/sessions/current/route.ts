@@ -21,6 +21,7 @@ import {
 import type { AuthRole } from "../../../../../server/lib/authMe";
 import { resolveWritingTrialCourseIdForLearner } from "../../../../../server/lib/writingTrialCourseResolve";
 import { trialBootstrapVerbose } from "../../../../../server/lib/trialSessionBootstrapLog";
+import { parseWritingTrialAccessApplicationId } from "../../../../../server/lib/trialWritingSessionCookie";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,62 +32,110 @@ function mirinaeApiBase(): string | null {
   return base.replace(/\/$/, "");
 }
 
+async function buildTrialWritingSessionJson(
+  db: ReturnType<typeof getDb>,
+  applicationId: string,
+  accessExpiresAt: string | null
+): Promise<NextResponse> {
+  const trialSession = await getCurrentSessionForTrialApplication(db, applicationId);
+  if (trialSession.ok === true && trialSession.accessKind === "trial") {
+    return NextResponse.json({
+      ...trialSession,
+      accessExpiresAt: accessExpiresAt ?? trialSession.accessExpiresAt,
+    });
+  }
+  const trialCourseIdEnv = process.env.WRITING_TRIAL_COURSE_ID?.trim();
+  const courseIdForHint = trialCourseIdEnv ?? (await resolveWritingTrialCourseIdForLearner(db)) ?? undefined;
+  trialBootstrapVerbose("sessions_current_trial_pending_fallback", {
+    applicationIdPrefix: applicationId.slice(0, 8),
+    hasEnvTrialCourseId: Boolean(trialCourseIdEnv),
+    hintCourseIdPrefix: courseIdForHint ? `${courseIdForHint.slice(0, 8)}…` : null,
+  });
+  /**
+   * Cookie is valid; writing course/session may still be resolving. 200 + ok:true keeps EntitlementRouteGuard
+   * from sending logged-in users to /writing/intro when /api/auth/me has no student entitlements.
+   */
+  return NextResponse.json({
+    ok: true,
+    accessKind: "trial" as const,
+    applicationId,
+    ...(courseIdForHint ? { courseId: courseIdForHint } : {}),
+    accessExpiresAt,
+    mode: "fresh" as const,
+    session: null,
+    submission: null,
+    canSubmit: false,
+    reasonIfNot: "trial_session_pending",
+  });
+}
+
+/**
+ * Trial: resolve applicationId from signed cookie (TRIAL_SESSION_SECRET, same as mirinae-api) or mirinae session/current.
+ * Does not require MIRINAE_API_BASE_URL when local verification succeeds (fixes logged-in users → 404 → /writing/intro).
+ */
 async function tryTrialSessionFromCookie(req: Request, db: ReturnType<typeof getDb>) {
   const cookieHeader = req.headers.get("cookie") ?? "";
-  const trialBase = mirinaeApiBase();
-  if (!trialBase || !cookieHeader.includes("writing_trial_access=")) {
+  if (!cookieHeader.includes("writing_trial_access=")) {
     return null;
   }
-  try {
-    const upstream = await fetch(`${trialBase}/api/writing/trial/session/current`, {
-      headers: { Cookie: cookieHeader },
-    });
-    if (!upstream.ok) {
-      return null;
-    }
-    const j = (await upstream.json()) as {
-      ok?: boolean;
-      application?: { id?: string; accessExpiresAt?: string | null };
-    };
-    if (j?.ok === true && j.application?.id) {
-      const applicationId = j.application.id;
-      const accessExpiresAt = j.application.accessExpiresAt ?? null;
-      const trialSession = await getCurrentSessionForTrialApplication(db, applicationId);
-      if (trialSession.ok === true && trialSession.accessKind === "trial") {
-        return NextResponse.json({
-          ...trialSession,
-          accessExpiresAt: accessExpiresAt ?? trialSession.accessExpiresAt,
-        });
+
+  let applicationId = parseWritingTrialAccessApplicationId(cookieHeader);
+  let accessExpiresAt: string | null = null;
+  let resolvedVia: "local_hmac" | "upstream" | null = applicationId ? "local_hmac" : null;
+
+  const trialBase = mirinaeApiBase();
+  if (!applicationId && trialBase) {
+    try {
+      const upstream = await fetch(`${trialBase}/api/writing/trial/session/current`, {
+        headers: { Cookie: cookieHeader },
+      });
+      if (upstream.ok) {
+        const j = (await upstream.json()) as {
+          ok?: boolean;
+          application?: { id?: string; accessExpiresAt?: string | null };
+        };
+        if (j?.ok === true && j.application?.id) {
+          applicationId = j.application.id;
+          accessExpiresAt = j.application.accessExpiresAt ?? null;
+          resolvedVia = "upstream";
+        }
       }
-      const trialCourseIdEnv = process.env.WRITING_TRIAL_COURSE_ID?.trim();
-      const courseIdForHint = trialCourseIdEnv ?? (await resolveWritingTrialCourseIdForLearner(db)) ?? undefined;
-      trialBootstrapVerbose("sessions_current_trial_pending_fallback", {
-        applicationIdPrefix: applicationId.slice(0, 8),
-        hasEnvTrialCourseId: Boolean(trialCourseIdEnv),
-        hintCourseIdPrefix: courseIdForHint ? `${courseIdForHint.slice(0, 8)}…` : null,
-      });
-      /**
-       * Upstream validated writing_trial_access; DB course row may lag or env unset.
-       * Still return 200 + ok:true so EntitlementRouteGuard allows /writing/app (WritingPage handles partial trial).
-       * Include `courseId` when resolvable so the client can keep state (theme UI wiring).
-       */
-      return NextResponse.json({
-        ok: true,
-        accessKind: "trial" as const,
-        applicationId,
-        ...(courseIdForHint ? { courseId: courseIdForHint } : {}),
-        accessExpiresAt,
-        mode: "fresh" as const,
-        session: null,
-        submission: null,
-        canSubmit: false,
-        reasonIfNot: "trial_session_pending",
-      });
+    } catch (e) {
+      console.warn("sessions_current_trial_upstream", e);
     }
-  } catch (e) {
-    console.warn("sessions_current_trial_upstream", e);
+  } else if (applicationId && trialBase) {
+    try {
+      const upstream = await fetch(`${trialBase}/api/writing/trial/session/current`, {
+        headers: { Cookie: cookieHeader },
+      });
+      if (upstream.ok) {
+        const j = (await upstream.json()) as {
+          ok?: boolean;
+          application?: { accessExpiresAt?: string | null };
+        };
+        if (j?.ok === true && j.application?.accessExpiresAt != null) {
+          accessExpiresAt = j.application.accessExpiresAt ?? null;
+        }
+      }
+    } catch {
+      /* optional: window hint only */
+    }
   }
-  return null;
+
+  if (!applicationId) {
+    console.info("trial_access_cookie_unresolved", {
+      hasMirinaeApiBase: Boolean(trialBase),
+      hasTrialSessionSecret: Boolean(process.env.TRIAL_SESSION_SECRET?.trim()),
+    });
+    return null;
+  }
+
+  console.info("trial_access_cookie_resolved", {
+    via: resolvedVia,
+    applicationIdPrefix: applicationId.slice(0, 8),
+  });
+
+  return buildTrialWritingSessionJson(db, applicationId, accessExpiresAt);
 }
 
 /**
