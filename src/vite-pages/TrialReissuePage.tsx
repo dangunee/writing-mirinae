@@ -19,13 +19,22 @@ export default function TrialReissuePage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
+
+    const trimmed = email.trim()
+    if (!trimmed || !trimmed.includes('@')) {
+      setError('有効なメールアドレスを入力してください。')
+      return
+    }
+
+    console.log('reissue clicked')
+
     setLoading(true)
     try {
       const res = await fetch(trialPaymentApiUrl('/api/writing/trial/reissue-link'), {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim() }),
+        body: JSON.stringify({ email: trimmed }),
       })
       const json = (await res.json()) as { ok?: boolean; message?: string; code?: string }
       if (json.ok === true && typeof json.message === 'string') {
@@ -75,7 +84,7 @@ export default function TrialReissuePage() {
             </Link>
           </div>
         ) : (
-          <form onSubmit={onSubmit} className="space-y-4">
+          <form noValidate onSubmit={onSubmit} className="space-y-4">
             <div>
               <label htmlFor="trial-reissue-email" className="mb-1 block text-xs font-medium text-[#595c5e]">
                 メールアドレス
