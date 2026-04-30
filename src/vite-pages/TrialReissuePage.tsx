@@ -33,6 +33,14 @@ export default function TrialReissuePage() {
         setDone(true)
         return
       }
+      if (json.ok === false && json.code === 'expired_access') {
+        setError('体験のご利用期限が切れています。お問い合わせください。')
+        return
+      }
+      if (json.ok === false && json.code === 'email_send_failed') {
+        setError('メールの送信に失敗しました。しばらくしてから再度お試しください。')
+        return
+      }
       if (json.ok === false && json.code === 'REQUEST_FAILED') {
         setError('しばらくしてから再度お試しください。')
         return
