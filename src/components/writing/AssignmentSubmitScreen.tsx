@@ -89,14 +89,20 @@ export type AssignmentSubmitScreenProps = {
   /** `/writing/app` 試用: 上部 LandingNav をブランドのみにし、アカウントは mainTopSlot に集約 */
   landingNavVariant?: 'default' | 'minimal'
   /**
-   * Admin sandbox 等: 親が「提出 / 既提出 / 添削完了」を制御し、既提出本文を表示する。
-   * 未指定時は従来どおり「提出」固定・静的タブ（学生フローは変更なし）。
+   * Parent drives 「提出 / 既提出 / 添削完了」 (Admin sandbox, trial, student, regular on /writing/app).
+   * When false, UI stays on 提出 with non-interactive tab styling (legacy).
    */
   controlledAssignmentTab?: boolean
   assignmentTab?: AssignmentTabKind
   onAssignmentTabChange?: (tab: AssignmentTabKind) => void
-  /** 既提出タブで表示する提出済み本文（QA サンドボックスのテスト提出など） */
+  /** 既提出タブで表示する提出済み本文 */
   submittedTabBody?: string | null
+  /** 既提出タブ: ステータス一行（例: 添削中） */
+  submittedTabStatusJa?: string | null
+  /** 添削完了タブ（学習者）: 説明一行 */
+  correctionTabStatusJa?: string | null
+  /** true: 添削完了タブで学習者向け本文表示（Sandbox のプレースホルダーにしない） */
+  showLearnerCorrectionTab?: boolean
   /**
    * Real learner flows (trial / regular mail / logged-in student on /writing/app).
    * When set (e.g. 500): do not truncate input; show count as current/max; disable submit when over.
@@ -135,6 +141,9 @@ export default function AssignmentSubmitScreen({
   assignmentTab = 'submit',
   onAssignmentTabChange,
   submittedTabBody = null,
+  submittedTabStatusJa = null,
+  correctionTabStatusJa = null,
+  showLearnerCorrectionTab = false,
   studentBodyMaxChars,
 }: AssignmentSubmitScreenProps) {
   const navigate = useNavigate()
@@ -201,6 +210,13 @@ export default function AssignmentSubmitScreen({
   const activeTab: AssignmentTabKind = controlledAssignmentTab ? assignmentTab : 'submit'
   const showSubmitColumn = activeTab === 'submit'
   const showSubmittedReadOnly = controlledAssignmentTab && activeTab === 'submitted'
+  const showCorrectionLearner =
+    controlledAssignmentTab && activeTab === 'correction' && showLearnerCorrectionTab
+
+  const submittedBodyDisplay =
+    submittedTabBody != null && String(submittedTabBody).trim().length > 0
+      ? submittedTabBody
+      : null
 
   const desktopTabClass = (t: AssignmentTabKind) =>
     activeTab === t
@@ -490,11 +506,26 @@ export default function AssignmentSubmitScreen({
                     </>
                   ) : showSubmittedReadOnly ? (
                     <div className="pb-20 lg:pb-0">
+                      {submittedTabStatusJa ? (
+                        <p className="text-sm font-bold text-[#000666] mb-2 font-['Manrope',sans-serif]">
+                          {submittedTabStatusJa}
+                        </p>
+                      ) : null}
                       <p className="text-sm font-bold text-[#454652] mb-3 font-['Manrope',sans-serif]">提出済みの本文</p>
                       <div className="w-full min-h-80 bg-white p-8 rounded-xl border border-[#c6c5d4]/10 shadow-[0_10px_40px_rgba(30,27,19,0.04)] text-lg leading-relaxed font-['Plus_Jakarta_Sans',sans-serif] text-[#1e1b13] whitespace-pre-wrap">
-                        {submittedTabBody != null && String(submittedTabBody).trim().length > 0
-                          ? submittedTabBody
-                          : '（提出本文がありません）'}
+                        {submittedBodyDisplay ?? '（提出本文がありません）'}
+                      </div>
+                    </div>
+                  ) : showCorrectionLearner ? (
+                    <div className="pb-20 lg:pb-0">
+                      {correctionTabStatusJa ? (
+                        <p className="text-sm font-bold text-[#000666] mb-3 font-['Manrope',sans-serif]">
+                          {correctionTabStatusJa}
+                        </p>
+                      ) : null}
+                      <p className="text-sm font-bold text-[#454652] mb-3 font-['Manrope',sans-serif]">提出本文</p>
+                      <div className="w-full min-h-80 bg-white p-8 rounded-xl border border-[#c6c5d4]/10 shadow-[0_10px_40px_rgba(30,27,19,0.04)] text-lg leading-relaxed font-['Plus_Jakarta_Sans',sans-serif] text-[#1e1b13] whitespace-pre-wrap">
+                        {submittedBodyDisplay ?? '（本文がありません）'}
                       </div>
                     </div>
                   ) : (
@@ -772,11 +803,22 @@ export default function AssignmentSubmitScreen({
               </>
             ) : showSubmittedReadOnly ? (
               <div className="space-y-3">
+                {submittedTabStatusJa ? (
+                  <p className="text-sm font-bold text-[#000666] px-2 font-['Manrope',sans-serif]">{submittedTabStatusJa}</p>
+                ) : null}
                 <p className="text-sm font-bold text-[#454652] px-2 font-['Manrope',sans-serif]">提出済みの本文</p>
                 <div className="w-full min-h-80 p-8 rounded-2xl bg-white border border-[#c6c5d4]/10 text-lg leading-relaxed shadow-[0_4px_20px_rgba(0,0,0,0.05)] text-[#1e1b13] whitespace-pre-wrap">
-                  {submittedTabBody != null && String(submittedTabBody).trim().length > 0
-                    ? submittedTabBody
-                    : '（提出本文がありません）'}
+                  {submittedBodyDisplay ?? '（提出本文がありません）'}
+                </div>
+              </div>
+            ) : showCorrectionLearner ? (
+              <div className="space-y-3">
+                {correctionTabStatusJa ? (
+                  <p className="text-sm font-bold text-[#000666] px-2 font-['Manrope',sans-serif]">{correctionTabStatusJa}</p>
+                ) : null}
+                <p className="text-sm font-bold text-[#454652] px-2 font-['Manrope',sans-serif]">提出本文</p>
+                <div className="w-full min-h-80 p-8 rounded-2xl bg-white border border-[#c6c5d4]/10 text-lg leading-relaxed shadow-[0_4px_20px_rgba(0,0,0,0.05)] text-[#1e1b13] whitespace-pre-wrap">
+                  {submittedBodyDisplay ?? '（本文がありません）'}
                 </div>
               </div>
             ) : (

@@ -62,6 +62,21 @@ const REQUIREMENT_FALLBACK: { title: string; example?: string }[] = [
   { title: '분량·형식을 지킬 것' },
 ]
 
+function learnerAssignmentTabFromSession(
+  sessionForUi: CurrentSessionOk['session'] | null,
+  submissionForUi: CurrentSessionOk['submission'] | null,
+): AssignmentTabKind {
+  const rt = sessionForUi?.runtimeStatus ?? ''
+  const st = submissionForUi?.status ?? ''
+
+  if (rt === 'missed' || st === 'missed') return 'correction'
+  if (st === 'corrected' || st === 'published') return 'correction'
+  if (rt === 'corrected') return 'correction'
+
+  if (submissionForUi && st && st !== 'draft') return 'submitted'
+  return 'submit'
+}
+
 type AdminSandboxErrorCode =
   | 'sandbox_context_missing_or_expired'
   | 'sandbox_context_invalid_or_stale'
@@ -308,20 +323,6 @@ export default function WritingPage() {
     })
   }, [loadCurrent])
 
-  /** Admin sandbox: sync assignment tabs with GET /sessions/current (admin_sandbox_test_submissions → submission). */
-  useEffect(() => {
-    if (current?.accessKind !== 'admin_sandbox') return
-    const sub = current.submission
-    const st = sub?.status
-    if (st === 'draft') {
-      setAssignmentTab('submit')
-      return
-    }
-    if (sub && st && st !== 'draft') {
-      setAssignmentTab('submitted')
-    }
-  }, [current?.accessKind, current?.submission?.id, current?.submission?.status])
-
   useEffect(() => {
     if (!sandboxSubmitNotice) return
     const t = window.setTimeout(() => setSandboxSubmitNotice(false), 6000)
@@ -400,6 +401,74 @@ export default function WritingPage() {
       : isAdmin && adminPreview
         ? Boolean(adminPreview.sessionId?.trim())
         : (current?.canSubmit ?? false)
+
+  /** Admin sandbox (no error) or real learner session payload — drives 提出 / 既提出 / 添削完了 tabs. */
+  const useControlledAssignmentTabs = useMemo(
+    () =>
+      Boolean(
+        (current?.accessKind === 'admin_sandbox' && !sandboxErrorCode) ||
+          (current?.ok && !(isAdmin && adminPreview && current?.accessKind !== 'admin_sandbox')),
+      ),
+    [current?.accessKind, current?.ok, sandboxErrorCode, isAdmin, adminPreview],
+  )
+
+  const submittedTabStatusJa = useMemo(() => {
+    if (!submission) return null
+    if (submission.status === 'submitted' || submission.status === 'in_review') return '添削中'
+    return null
+  }, [submission])
+
+  const correctionTabStatusJa = useMemo(() => {
+    const rt = session?.runtimeStatus ?? ''
+    const st = submission?.status ?? ''
+    if (rt === 'missed' || st === 'missed') return '提出期限を過ぎたため、この課題は提出できません。'
+    if (st === 'corrected' || rt === 'corrected') return '添削が完了しました。'
+    if (st === 'published') return '添削結果を公開しました。結果をご確認ください。'
+    return null
+  }, [submission, session?.runtimeStatus])
+
+  const showLearnerCorrectionTab = useMemo(() => {
+    if (!useControlledAssignmentTabs) return false
+    if (current?.accessKind === 'admin_sandbox') return false
+    const rt = session?.runtimeStatus ?? ''
+    const st = submission?.status ?? ''
+    return (
+      rt === 'missed' ||
+      st === 'missed' ||
+      st === 'corrected' ||
+      st === 'published' ||
+      rt === 'corrected'
+    )
+  }, [useControlledAssignmentTabs, current?.accessKind, session?.runtimeStatus, submission?.status])
+
+  /** Sync assignment tabs with GET /sessions/current (sandbox + learner pipeline). */
+  useEffect(() => {
+    if (!useControlledAssignmentTabs) return
+
+    if (current?.accessKind === 'admin_sandbox') {
+      const sub = current.submission
+      const st = sub?.status
+      if (st === 'draft') {
+        setAssignmentTab('submit')
+        return
+      }
+      if (sub && st && st !== 'draft') {
+        setAssignmentTab('submitted')
+      }
+      return
+    }
+
+    setAssignmentTab(learnerAssignmentTabFromSession(session, submission))
+  }, [
+    useControlledAssignmentTabs,
+    current?.accessKind,
+    current?.submission?.id,
+    current?.submission?.status,
+    session?.id,
+    session?.runtimeStatus,
+    submission?.id,
+    submission?.status,
+  ])
 
   const studentBodyMaxChars = accessContext.type === 'admin_sandbox' ? undefined : 500
   const bodyOverStudentLimit = studentBodyMaxChars != null && content.length > studentBodyMaxChars
@@ -678,6 +747,25 @@ export default function WritingPage() {
         setAssignmentTab('submitted')
         setSandboxSubmitNotice(true)
       }
+      if (!isAdminSandboxFlow && current?.ok) {
+        setCurrent((prev) => {
+          if (!prev?.ok) return prev
+          return {
+            ...prev,
+            mode: 'pipeline',
+            submission: {
+              id: data.submissionId!,
+              status: data.status ?? 'submitted',
+              bodyText: bodyKeep,
+              imageStorageKey: prev.submission?.imageStorageKey ?? null,
+              imageMimeType: prev.submission?.imageMimeType ?? null,
+              submittedAt: new Date().toISOString(),
+            },
+            canSubmit: false,
+          }
+        })
+        setAssignmentTab('submitted')
+      }
       if (isTrialFlow) {
         setTrialSubmitNotice(null)
         setTrialSubmitError(null)
@@ -900,12 +988,15 @@ export default function WritingPage() {
         desktopSlotBelowTabs={desktopSlotBelowTabs}
         desktopAfterSubmitSlot={desktopAfterSubmitSlot}
         mobileSlotBelowTabs={desktopSlotBelowTabs}
-        {...(current?.accessKind === 'admin_sandbox' && !sandboxErrorCode
+        {...(useControlledAssignmentTabs
           ? {
               controlledAssignmentTab: true as const,
               assignmentTab,
               onAssignmentTabChange: setAssignmentTab,
               submittedTabBody: submission?.bodyText ?? null,
+              submittedTabStatusJa,
+              correctionTabStatusJa,
+              showLearnerCorrectionTab,
             }
           : {})}
       />
