@@ -330,6 +330,9 @@ export default function WritingPage() {
         ? Boolean(adminPreview.sessionId?.trim())
         : (current?.canSubmit ?? false)
 
+  const studentBodyMaxChars = accessContext.type === 'admin_sandbox' ? undefined : 500
+  const bodyOverStudentLimit = studentBodyMaxChars != null && content.length > studentBodyMaxChars
+
   const showSessionTable =
     !(isAdmin && adminPreview) &&
     current?.accessKind !== 'admin_sandbox' &&
@@ -404,6 +407,7 @@ export default function WritingPage() {
 
   const handleSubmit = async () => {
     if (sandboxErrorCode) return
+    if (studentBodyMaxChars != null && content.length > studentBodyMaxChars) return
     if (current?.accessKind !== 'admin_sandbox' && isAdmin && adminPreview && !adminPreview.sessionId?.trim()) return
     const isAdminSandboxFlow = current?.accessKind === 'admin_sandbox'
     const sessionId =
@@ -650,6 +654,7 @@ export default function WritingPage() {
       <AssignmentSubmitScreen
         mainTopSlot={mainTopSlot}
         accessContext={accessContext}
+        studentBodyMaxChars={studentBodyMaxChars}
         text={content}
         onTextChange={setContent}
         onPrimarySubmit={() => void handleSubmit()}
@@ -658,6 +663,7 @@ export default function WritingPage() {
           saving ||
           refetchAfterSubmit ||
           !content.trim() ||
+          bodyOverStudentLimit ||
           !(current?.accessKind === 'admin_sandbox' ? current.session?.id : session?.id) ||
           !canSubmit
         }

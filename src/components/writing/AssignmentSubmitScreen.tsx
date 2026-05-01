@@ -95,6 +95,12 @@ export type AssignmentSubmitScreenProps = {
   onAssignmentTabChange?: (tab: AssignmentTabKind) => void
   /** 既提出タブで表示する提出済み本文（QA サンドボックスのテスト提出など） */
   submittedTabBody?: string | null
+  /**
+   * Real learner flows (trial / regular mail / logged-in student on /writing/app).
+   * When set (e.g. 500): do not truncate input; show count as current/max; disable submit when over.
+   * Omit for admin sandbox (legacy 400 / 1200 + slice behavior).
+   */
+  studentBodyMaxChars?: number
 }
 
 const DEFAULT_ASSIGNMENT_TITLE = '約束'
@@ -126,6 +132,7 @@ export default function AssignmentSubmitScreen({
   assignmentTab = 'submit',
   onAssignmentTabChange,
   submittedTabBody = null,
+  studentBodyMaxChars,
 }: AssignmentSubmitScreenProps) {
   const navigate = useNavigate()
   const goApp = useCallback(() => {
@@ -133,7 +140,13 @@ export default function AssignmentSubmitScreen({
   }, [navigate])
 
   const narrow = useNarrowScreen()
-  const maxChars = narrow ? 1200 : 400
+  const useStudentCharLimit = studentBodyMaxChars != null && studentBodyMaxChars > 0
+  const legacyMaxChars = narrow ? 1200 : 400
+  const maxChars = useStudentCharLimit ? studentBodyMaxChars! : legacyMaxChars
+
+  /** /writing/app 学生提出欄 */
+  const STUDENT_BODY_OVER_MSG =
+    '文字数が500文字を超えています。500文字以内に収めてください。'
 
   /** ページ表示時点の「今日」で右サイドバー暦を固定（マウント時の年月） */
   const [calendarToday] = useState(() => new Date())
@@ -149,11 +162,16 @@ export default function AssignmentSubmitScreen({
   const text = controlledText !== undefined ? controlledText : internalText
   const setText = useCallback(
     (next: string) => {
+      if (useStudentCharLimit) {
+        if (onTextChange) onTextChange(next)
+        else setInternalText(next)
+        return
+      }
       const sliced = next.slice(0, maxChars)
       if (onTextChange) onTextChange(sliced)
       else setInternalText(sliced)
     },
-    [maxChars, onTextChange]
+    [maxChars, onTextChange, useStudentCharLimit]
   )
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
@@ -162,14 +180,15 @@ export default function AssignmentSubmitScreen({
   const fileInputMobileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    if (controlledText === undefined) {
+    if (controlledText === undefined && !useStudentCharLimit) {
       setInternalText((t) => (t.length > maxChars ? t.slice(0, maxChars) : t))
     }
-  }, [maxChars, controlledText])
+  }, [maxChars, controlledText, useStudentCharLimit])
 
   const showDraftButton = showDraftButtonProp ?? accessContext.type === 'trial'
 
   const count = text.length
+  const bodyOverStudentLimit = useStudentCharLimit && count > maxChars
 
   const titleResolved = assignmentTitle ?? DEFAULT_ASSIGNMENT_TITLE
   const bodyResolved = assignmentDescription ?? DEFAULT_ASSIGNMENT_BODY
@@ -223,7 +242,7 @@ export default function AssignmentSubmitScreen({
 
   const mobileSubmit = handleSubmit
 
-  const submitDisabled = primarySubmitDisabled || primarySubmitLoading
+  const submitDisabled = primarySubmitDisabled || primarySubmitLoading || bodyOverStudentLimit
 
   return (
     <>
@@ -388,9 +407,14 @@ export default function AssignmentSubmitScreen({
                           placeholder={phDesktop}
                         />
                         <div className="absolute bottom-4 right-6 text-sm font-['Manrope',sans-serif] tracking-widest text-[#1e1b13]/40">
-                          {Math.min(count, maxChars)} / {maxChars}
+                          {useStudentCharLimit ? count : Math.min(count, maxChars)} / {maxChars}
                         </div>
                       </div>
+                      {useStudentCharLimit && bodyOverStudentLimit ? (
+                        <p className="text-sm text-[#b91c1c] mb-4 font-medium px-1" role="alert">
+                          {STUDENT_BODY_OVER_MSG}
+                        </p>
+                      ) : null}
 
                       <div className="mt-8">
                         <p className="text-sm font-bold text-[#454652] mb-3 font-['Manrope',sans-serif] flex items-center gap-2">
@@ -694,9 +718,14 @@ export default function AssignmentSubmitScreen({
                       Drafting Canvas
                     </label>
                     <span className="text-[10px] font-medium text-[#454652]">
-                      {Math.min(count, maxChars)} / {maxChars} 文字
+                      {useStudentCharLimit ? count : Math.min(count, maxChars)} / {maxChars} 文字
                     </span>
                   </div>
+                  {useStudentCharLimit && bodyOverStudentLimit ? (
+                    <p className="text-sm text-[#b91c1c] mb-2 font-medium px-2" role="alert">
+                      {STUDENT_BODY_OVER_MSG}
+                    </p>
+                  ) : null}
                   <div className="relative group">
                     <textarea
                       value={text}

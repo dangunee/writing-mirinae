@@ -29,6 +29,9 @@ type WritingCourseRow = typeof writingCourses.$inferSelect;
 
 const BUCKET = process.env.WRITING_UPLOADS_BUCKET ?? "writing-submissions";
 
+/** /writing/app 提出欄の上限（UI・サーバで一致）。 */
+const WRITING_APP_SUBMISSION_MAX_CHARS = 500;
+
 /** Security: cap text length to mitigate abuse (configurable). */
 const MAX_BODY_TEXT_CHARS = (() => {
   const raw = process.env.WRITING_MAX_BODY_TEXT_CHARS;
@@ -582,6 +585,27 @@ export async function getCurrentSessionForTrialApplication(
       };
     }
 
+    const eligW = checkSessionEligibleForWriting(s, now);
+    if (!eligW.ok) {
+      trialBootstrapVerbose("trial_return_not_eligible", {
+        sessionIndex: s.index,
+        code: eligW.code,
+      });
+      return {
+        ok: true,
+        accessKind: "trial",
+        applicationId,
+        courseId: course.id,
+        accessExpiresAt: accessExpiresAtIso,
+        pendingSubmissionId: null,
+        mode: "fresh",
+        session: trialSessionDtoFromRow(s),
+        submission: null,
+        canSubmit: false,
+        reasonIfNot: eligW.code,
+      };
+    }
+
     trialBootstrapVerbose("trial_return_can_submit", {
       sessionIndex: s.index,
       sessionIdPrefix: `${s.id.slice(0, 8)}…`,
@@ -674,10 +698,20 @@ function assertBodyTextLength(text: string | null | undefined): SaveSubmissionRe
   return null;
 }
 
+function assertWritingAppSubmissionBodyLength(text: string | null | undefined): SaveSubmissionResult | null {
+  if (text == null || text === "") return null;
+  if (text.length > WRITING_APP_SUBMISSION_MAX_CHARS) {
+    return { ok: false, status: 400, code: "body_text_over_limit" };
+  }
+  return null;
+}
+
 export async function saveOrSubmitSubmission(
   db: Db,
   input: SaveSubmissionInput
 ): Promise<SaveSubmissionResult> {
+  const appLen = assertWritingAppSubmissionBodyLength(input.bodyText);
+  if (appLen) return appLen;
   const lenErr = assertBodyTextLength(input.bodyText);
   if (lenErr) return lenErr;
 
@@ -755,6 +789,8 @@ export async function saveOrSubmitSubmissionForRegular(
   db: Db,
   input: SaveSubmissionRegularInput
 ): Promise<SaveSubmissionResult> {
+  const appLen = assertWritingAppSubmissionBodyLength(input.bodyText);
+  if (appLen) return appLen;
   const lenErr = assertBodyTextLength(input.bodyText);
   if (lenErr) return lenErr;
 
@@ -849,6 +885,8 @@ export async function saveOrSubmitSubmissionForTrial(
   db: Db,
   input: SaveSubmissionTrialInput
 ): Promise<SaveSubmissionResult> {
+  const appLen = assertWritingAppSubmissionBodyLength(input.bodyText);
+  if (appLen) return appLen;
   const lenErr = assertBodyTextLength(input.bodyText);
   if (lenErr) return lenErr;
 
@@ -895,8 +933,11 @@ export async function saveOrSubmitSubmissionForTrial(
     row.course.id,
     input.trialApplicationId
   );
+  if (!sessions.some((x) => x.id === session.id)) {
+    return { ok: false, status: 409, code: "trial_session_stale" };
+  }
   const lower = sessions.filter((x) => x.index < session.index);
-  if (!lower.every((x) => sessionIsTerminalForProgression(x.status))) {
+  if (!lower.every((x) => sessionIsTerminalForTrialCourse(x))) {
     return { ok: false, status: 409, code: "complete_previous_sessions_first" };
   }
 

@@ -32,7 +32,7 @@ export const dynamic = "force-dynamic";
  * Never trust userId / trialApplicationId from body (forbidden keys rejected below).
  */
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
-  console.log("[submission] start");
+  console.info("[submission] route_enter");
   console.time("[submission] POST_total");
   try {
     return await postSubmissionHandler(req, context);
@@ -42,12 +42,16 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
 }
 
 async function postSubmissionHandler(req: Request, context: { params: Promise<{ id: string }> }) {
+  const db = getDb();
+  const { id: sessionId } = await context.params;
+  console.info("[submission] handler_context", {
+    sessionIdPrefix: sessionId.slice(0, 8),
+  });
+
   const cookieHeader = req.headers.get("cookie");
   const trialApplicationId = await fetchTrialApplicationIdFromMirinaeSessionCookie(cookieHeader);
   const grantId = parseRegularWritingGrantIdFromCookieHeader(cookieHeader);
   const userId = await getSessionUserId();
-  const db = getDb();
-  const { id: sessionId } = await context.params;
 
   const parsed = await parseWritingSubmissionPost(req);
   if (!parsed.ok) {
@@ -56,10 +60,27 @@ async function postSubmissionHandler(req: Request, context: { params: Promise<{ 
 
   const { action, bodyText, attachments, submissionMode } = parsed;
 
-  console.log("[submission] path:", {
-    trial: !!trialApplicationId,
-    grant: !!grantId,
-    user: !!userId,
+  const insertPath: "trial" | "regular_grant" | "session_user" = trialApplicationId
+    ? "trial"
+    : grantId
+      ? "regular_grant"
+      : "session_user";
+
+  if (trialApplicationId) {
+    console.info("[submission] trial_enter", {
+      sessionIdPrefix: sessionId.slice(0, 8),
+      trialApplicationIdPrefix: trialApplicationId.slice(0, 8),
+      action,
+      insertPath,
+    });
+  }
+
+  console.info("[submission] identity_resolved", {
+    sessionIdPrefix: sessionId.slice(0, 8),
+    trialApplicationIdPrefix: trialApplicationId ? trialApplicationId.slice(0, 8) : null,
+    insertPath,
+    hasGrantCookie: Boolean(grantId),
+    hasSupabaseSession: Boolean(userId),
   });
 
   if (!trialApplicationId && !grantId && !userId) {
@@ -182,7 +203,23 @@ async function postSubmissionHandler(req: Request, context: { params: Promise<{ 
         });
 
   if (!result.ok) {
+    console.warn("[submission] failed", {
+      insertPath,
+      sessionIdPrefix: sessionId.slice(0, 8),
+      trialApplicationIdPrefix: trialApplicationId ? trialApplicationId.slice(0, 8) : null,
+      status: result.status,
+      code: result.code,
+    });
     return NextResponse.json({ error: result.code }, { status: result.status });
+  }
+
+  if (trialApplicationId) {
+    console.info("[submission] trial_ok", {
+      sessionIdPrefix: sessionId.slice(0, 8),
+      trialApplicationIdPrefix: trialApplicationId.slice(0, 8),
+      submissionIdPrefix: result.submissionId.slice(0, 8),
+      status: result.status,
+    });
   }
 
   return NextResponse.json({
