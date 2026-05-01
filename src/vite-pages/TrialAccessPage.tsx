@@ -8,40 +8,46 @@ type Phase =
   | 'invalid'
   | 'network_error'
   | 'done'
+  | 'resume_submitted'
+  | 'trial_no_submission'
+  | 'needs_reissue'
   | 'consume_expired_link'
   | 'consume_submitted'
   | 'consume_used_other'
   | 'consume_application_expired'
   | 'consume_application_not_ready'
 
-type SessionsCurrentProbe = {
+type SessionsCurrentBody = {
   ok?: boolean
   accessKind?: string
+  submission?: {
+    id?: string
+    status?: string
+  } | null
+  mode?: string
+  error?: string
 }
 
-async function parseJsonSafe(text: string): Promise<SessionsCurrentProbe | null> {
+async function parseSessionsCurrent(text: string): Promise<SessionsCurrentBody | null> {
   if (!text.trim()) return null
   try {
-    return JSON.parse(text) as SessionsCurrentProbe
+    return JSON.parse(text) as SessionsCurrentBody
   } catch {
     return null
   }
 }
 
-/** Cookie or logged-in trial_application.user_id — server decides (GET /sessions/current). */
-async function redirectIfTrialSessionAvailable(): Promise<boolean> {
-  try {
-    const res = await fetch(apiUrl('/api/writing/sessions/current'), { credentials: 'include' })
-    const text = await res.text()
-    const j = await parseJsonSafe(text)
-    if (res.ok && j?.ok === true && j.accessKind === 'trial') {
-      window.location.assign(new URL('/writing/app', window.location.origin).href)
-      return true
-    }
-  } catch {
-    /* ignore */
-  }
-  return false
+async function fetchSessionsCurrent(): Promise<{ res: Response; body: SessionsCurrentBody | null }> {
+  const res = await fetch(apiUrl('/api/writing/sessions/current'), { credentials: 'include' })
+  const text = await res.text()
+  const body = await parseSessionsCurrent(text)
+  return { res, body }
+}
+
+/** 提出済み相当（draft 以外に submission がある） */
+function submissionIndicatesSubmitted(sub: SessionsCurrentBody['submission']): boolean {
+  if (!sub || typeof sub.status !== 'string') return false
+  return sub.status !== 'draft'
 }
 
 function phaseFromConsumeError(error: string | undefined, alreadySubmitted: boolean): Phase {
@@ -61,7 +67,7 @@ function phaseFromConsumeError(error: string | undefined, alreadySubmitted: bool
 
 /**
  * 体験メールのリンク — /writing/trial/access?token=…
- * POST /api/writing/trial/access/consume → Cookie → /writing/app
+ * Cookie / ログイン済みならトークンなしでも続行。POST consume は必要時のみ。
  */
 export default function TrialAccessPage() {
   const navigate = useNavigate()
@@ -71,18 +77,33 @@ export default function TrialAccessPage() {
   const lock = useRef(false)
 
   useEffect(() => {
-    if (!token) {
-      setPhase('invalid')
-      return
-    }
-
     if (lock.current) return
     lock.current = true
 
     ;(async () => {
       setPhase('loading')
-      if (await redirectIfTrialSessionAvailable()) {
-        setPhase('done')
+
+      let initial: { res: Response; body: SessionsCurrentBody | null };
+      try {
+        initial = await fetchSessionsCurrent()
+      } catch {
+        initial = { res: new Response(null, { status: 0 }), body: null }
+      }
+
+      const trialOk = initial.res.ok && initial.body?.ok === true && initial.body.accessKind === 'trial'
+
+      if (trialOk && submissionIndicatesSubmitted(initial.body!.submission)) {
+        setPhase('resume_submitted')
+        return
+      }
+
+      if (trialOk) {
+        setPhase('trial_no_submission')
+        return
+      }
+
+      if (!token) {
+        setPhase('needs_reissue')
         return
       }
 
@@ -96,8 +117,8 @@ export default function TrialAccessPage() {
           body: JSON.stringify({ token }),
         })
         const text = await res.text()
-        const json = (await parseJsonSafe(text)) as
-          | (SessionsCurrentProbe & {
+        const json = (await parseSessionsCurrent(text)) as
+          | (SessionsCurrentBody & {
               redirectTo?: string
               error?: string
               alreadySubmitted?: boolean
@@ -122,28 +143,45 @@ export default function TrialAccessPage() {
           return
         }
 
-        if (await redirectIfTrialSessionAvailable()) {
-          setPhase('done')
+        let after: { res: Response; body: SessionsCurrentBody | null };
+        try {
+          after = await fetchSessionsCurrent()
+        } catch {
+          after = { res: new Response(null, { status: 0 }), body: null }
+        }
+
+        const trialAfter =
+          after.res.ok && after.body?.ok === true && after.body.accessKind === 'trial'
+
+        if (trialAfter && submissionIndicatesSubmitted(after.body!.submission)) {
+          setPhase('resume_submitted')
           return
         }
 
-        setPhase(
-          phaseFromConsumeError(json.error, json.alreadySubmitted === true)
-        )
+        if (trialAfter) {
+          setPhase('trial_no_submission')
+          return
+        }
+
+        setPhase(phaseFromConsumeError(json.error, json.alreadySubmitted === true))
       } catch {
         setPhase('network_error')
       }
     })()
   }, [token])
 
+  const submittedMessage =
+    '提出済みです。結果はマイページまたは作成アプリで確認できます。'
+
   const message = (() => {
     if (phase === 'loading' || phase === 'consuming') return 'アクセスを確認しています…'
-    if (phase === 'invalid')
-      return 'リンクが無効です。新しいリンクが必要な場合は下のボタンから再発行ページへお進みください。'
+    if (phase === 'resume_submitted' || phase === 'consume_submitted') return submittedMessage
+    if (phase === 'trial_no_submission')
+      return 'リンクの有効期限が切れているか、既に別の環境で開いています。体験を続けるにはログインするか、新しいリンクを発行してください。続きから作成する場合は作成アプリを開いてください。'
+    if (phase === 'needs_reissue' || phase === 'invalid')
+      return 'リンクが無効か、トークンがありません。新しいリンクが必要な場合は再発行ページへお進みください。'
     if (phase === 'network_error') return '通信に失敗しました。しばらくしてから再度お試しください。'
     if (phase === 'done') return 'リダイレクト中…'
-    if (phase === 'consume_submitted')
-      return 'この体験課題はすでに提出済みです。提出内容はマイページから確認できます。'
     if (phase === 'consume_expired_link')
       return 'リンクの有効期限が切れています。提出済みの内容を確認する場合はログインしてください。新しいリンクが必要な場合は再発行してください。'
     if (phase === 'consume_used_other')
@@ -155,26 +193,50 @@ export default function TrialAccessPage() {
     return ''
   })()
 
+  const showSubmittedActions = phase === 'resume_submitted' || phase === 'consume_submitted'
+
+  const showTrialContinueActions = phase === 'trial_no_submission'
+
   const showReissue =
-    phase === 'invalid' || phase === 'consume_expired_link' || phase === 'consume_used_other'
+    phase === 'needs_reissue' ||
+    phase === 'invalid' ||
+    phase === 'consume_expired_link' ||
+    phase === 'consume_used_other'
 
   return (
     <div className="writing-page min-h-[60vh] flex flex-col items-center justify-center px-6 text-center">
       <p className="text-on-surface font-body leading-relaxed max-w-md">{message}</p>
 
-      {phase === 'consume_submitted' ? (
+      {showSubmittedActions ? (
         <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:flex-wrap sm:justify-center">
           <Link
             to="/writing/app"
             className="inline-flex min-h-[44px] items-center justify-center rounded-full bg-[#4052b6] px-6 py-2.5 text-sm font-bold text-white"
           >
-            作文アプリを開く
+            作成アプリへ
           </Link>
           <Link
             to="/writing/app/mypage"
             className="inline-flex min-h-[44px] items-center justify-center rounded-full border border-[#4052b6] px-6 py-2.5 text-sm font-bold text-[#4052b6]"
           >
             マイページへ
+          </Link>
+        </div>
+      ) : null}
+
+      {showTrialContinueActions ? (
+        <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:flex-wrap sm:justify-center">
+          <Link
+            to="/writing/app"
+            className="inline-flex min-h-[44px] items-center justify-center rounded-full bg-[#4052b6] px-6 py-2.5 text-sm font-bold text-white"
+          >
+            作成アプリへ
+          </Link>
+          <Link
+            to="/writing/login"
+            className="inline-flex min-h-[44px] items-center justify-center rounded-full border border-[#4052b6] px-6 py-2.5 text-sm font-bold text-[#4052b6]"
+          >
+            ログインする
           </Link>
         </div>
       ) : null}
@@ -190,8 +252,10 @@ export default function TrialAccessPage() {
         </div>
       ) : null}
 
-      {showReissue ? (
-        <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
+      {(showReissue || showTrialContinueActions) ? (
+        <div
+          className={`mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center ${showTrialContinueActions && !showReissue ? 'mt-6' : ''}`}
+        >
           <Link
             to="/writing/trial/reissue"
             className="inline-flex min-h-[44px] items-center justify-center rounded-full bg-[#4052b6] px-6 py-2.5 text-sm font-bold text-white"
