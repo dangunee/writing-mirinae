@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 
 import {
   regularAccessGrants,
@@ -235,7 +235,7 @@ export async function getSubmissionBySessionIdForGrant(db: Db, sessionId: string
   return rows[0] ?? null;
 }
 
-/** Trial: at most one in-flight submission per trial_application_id (draft..corrected). */
+/** Trial: pipeline row scoped to this application's runtime session row (not template rows). */
 export async function findActivePipelineSubmissionForTrial(db: Db, applicationId: string) {
   const rows = await db
     .select({
@@ -247,9 +247,38 @@ export async function findActivePipelineSubmissionForTrial(db: Db, applicationId
     .where(
       and(
         eq(writingSubmissions.trialApplicationId, applicationId),
-        inArray(writingSubmissions.status, ["draft", "submitted", "in_review", "corrected"])
+        eq(writingSessions.trialApplicationId, applicationId),
+        inArray(writingSubmissions.status, ["draft", "submitted", "in_review", "corrected", "published"])
       )
     )
+    .orderBy(desc(writingSubmissions.updatedAt))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/**
+ * Fallback when strict pipeline join misses (e.g. legacy session_id → template row): newest non-draft on course.
+ */
+export async function findLatestNonDraftTrialSubmissionForCourseApplicationLoose(
+  db: Db,
+  applicationId: string,
+  courseId: string
+) {
+  const rows = await db
+    .select({
+      submission: writingSubmissions,
+      session: writingSessions,
+    })
+    .from(writingSubmissions)
+    .innerJoin(writingSessions, eq(writingSubmissions.sessionId, writingSessions.id))
+    .where(
+      and(
+        eq(writingSubmissions.trialApplicationId, applicationId),
+        eq(writingSessions.courseId, courseId),
+        inArray(writingSubmissions.status, ["submitted", "in_review", "corrected", "published"])
+      )
+    )
+    .orderBy(desc(writingSubmissions.updatedAt))
     .limit(1);
   return rows[0] ?? null;
 }

@@ -32,7 +32,7 @@ type CurrentSessionOk = {
   accessExpiresAt?: string | null
   pendingSubmissionId?: string | null
   courseId: string
-  mode: 'pipeline' | 'fresh' | 'all_done'
+  mode: 'pipeline' | 'fresh' | 'all_done' | 'submitted'
   session: {
     id: string
     courseId: string

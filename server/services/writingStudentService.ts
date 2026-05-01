@@ -81,6 +81,17 @@ function trialSessionDtoFromRow(s: typeof writingSessions.$inferSelect) {
   };
 }
 
+function trialSubmissionDtoFromRow(row: typeof writingSubmissions.$inferSelect) {
+  return {
+    id: row.id,
+    status: row.status,
+    bodyText: row.bodyText,
+    imageStorageKey: row.imageStorageKey,
+    imageMimeType: row.imageMimeType,
+    submittedAt: row.submittedAt?.toISOString() ?? null,
+  };
+}
+
 export type CurrentSessionResponse =
   | {
       ok: true;
@@ -146,7 +157,7 @@ export type CurrentSessionResponse =
       courseId: string;
       accessExpiresAt: string | null;
       pendingSubmissionId: string | null;
-      mode: "pipeline" | "fresh" | "all_done";
+      mode: "pipeline" | "fresh" | "all_done" | "submitted";
       session: {
         id: string;
         courseId: string;
@@ -515,23 +526,50 @@ export async function getCurrentSessionForTrialApplication(
   const now = new Date();
 
   const pipeline = await repo.findActivePipelineSubmissionForTrial(db, applicationId);
-  if (pipeline) {
+  const rescueSubmitted =
+    pipeline == null
+      ? await repo.findLatestNonDraftTrialSubmissionForCourseApplicationLoose(db, applicationId, course.id)
+      : null;
+  const activeRow = pipeline ?? rescueSubmitted;
+
+  if (activeRow) {
+    if (activeRow.submission.status !== "draft") {
+      trialBootstrapVerbose("trial_return_submitted", {
+        sessionIndex: activeRow.session.index,
+        sessionIdPrefix: `${activeRow.session.id.slice(0, 8)}…`,
+        submissionStatus: activeRow.submission.status,
+        viaRescue: pipeline == null,
+      });
+      return {
+        ok: true,
+        accessKind: "trial",
+        applicationId,
+        courseId: course.id,
+        accessExpiresAt: accessExpiresAtIso,
+        pendingSubmissionId: activeRow.submission.id,
+        mode: "submitted",
+        session: trialSessionDtoFromRow(activeRow.session),
+        submission: trialSubmissionDtoFromRow(activeRow.submission),
+        canSubmit: false,
+      };
+    }
+
     trialBootstrapVerbose("trial_return_pipeline", {
-      sessionIndex: pipeline.session.index,
-      sessionIdPrefix: `${pipeline.session.id.slice(0, 8)}…`,
+      sessionIndex: activeRow.session.index,
+      sessionIdPrefix: `${activeRow.session.id.slice(0, 8)}…`,
     });
     const elig = evaluateTrialSubmitEligibility({
       trialApplicationId: applicationId,
-      session: pipeline.session,
+      session: activeRow.session,
       sessionsOrdered: sessions,
-      pipeline,
-      existingSubmission: pipeline.submission,
+      pipeline: activeRow,
+      existingSubmission: activeRow.submission,
       now,
     });
-    const canSubmit = elig.ok && pipeline.submission.status === "draft";
+    const canSubmit = elig.ok && activeRow.submission.status === "draft";
     const reasonIfNot = !elig.ok
       ? elig.code
-      : pipeline.submission.status === "draft"
+      : activeRow.submission.status === "draft"
         ? undefined
         : "submission_not_editable";
 
@@ -541,17 +579,10 @@ export async function getCurrentSessionForTrialApplication(
       applicationId,
       courseId: course.id,
       accessExpiresAt: accessExpiresAtIso,
-      pendingSubmissionId: pipeline.submission.id,
+      pendingSubmissionId: activeRow.submission.id,
       mode: "pipeline",
-      session: trialSessionDtoFromRow(pipeline.session),
-      submission: {
-        id: pipeline.submission.id,
-        status: pipeline.submission.status,
-        bodyText: pipeline.submission.bodyText,
-        imageStorageKey: pipeline.submission.imageStorageKey,
-        imageMimeType: pipeline.submission.imageMimeType,
-        submittedAt: pipeline.submission.submittedAt?.toISOString() ?? null,
-      },
+      session: trialSessionDtoFromRow(activeRow.session),
+      submission: trialSubmissionDtoFromRow(activeRow.submission),
       canSubmit,
       reasonIfNot,
     };
@@ -583,6 +614,26 @@ export async function getCurrentSessionForTrialApplication(
     }
 
     const existingSub = await repo.getSubmissionBySessionIdForTrial(db, s.id, applicationId);
+    if (existingSub && existingSub.status !== "draft") {
+      trialBootstrapVerbose("trial_return_submitted_loop", {
+        sessionIndex: s.index,
+        sessionIdPrefix: `${s.id.slice(0, 8)}…`,
+        submissionStatus: existingSub.status,
+      });
+      return {
+        ok: true,
+        accessKind: "trial",
+        applicationId,
+        courseId: course.id,
+        accessExpiresAt: accessExpiresAtIso,
+        pendingSubmissionId: existingSub.id,
+        mode: "submitted",
+        session: trialSessionDtoFromRow(s),
+        submission: trialSubmissionDtoFromRow(existingSub),
+        canSubmit: false,
+      };
+    }
+
     const elig = evaluateTrialSubmitEligibility({
       trialApplicationId: applicationId,
       session: s,
