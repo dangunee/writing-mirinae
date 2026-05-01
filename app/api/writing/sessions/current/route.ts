@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 
 import { getDb } from "../../../../../server/db/client";
-import * as writingStudentRepo from "../../../../../server/repositories/writingStudentRepository";
 import { parseRegularWritingGrantIdFromCookieHeader } from "../../../../../server/lib/regularSessionCookie";
 import { getSessionUserId } from "../../../../../server/lib/supabaseServer";
 import { resolveWritingRoleFromDbOrEnv } from "../../../../../server/lib/writingAuthRoles";
@@ -20,8 +19,10 @@ import {
   getCurrentSessionForTrialApplication,
 } from "../../../../../server/services/writingStudentService";
 import type { AuthRole } from "../../../../../server/lib/authMe";
-import { resolveWritingTrialCourseIdForLearner } from "../../../../../server/lib/writingTrialCourseResolve";
-import { trialBootstrapVerbose } from "../../../../../server/lib/trialSessionBootstrapLog";
+import {
+  mapTrialWritingErrorToPublic,
+  type TrialWritingPublicErrorCode,
+} from "../../../../../server/lib/trialWritingPublicErrors";
 import { parseWritingTrialAccessApplicationId } from "../../../../../server/lib/trialWritingSessionCookie";
 
 export const runtime = "nodejs";
@@ -39,20 +40,31 @@ async function buildTrialWritingSessionJson(
   accessExpiresAt: string | null
 ): Promise<NextResponse> {
   const trialSession = await getCurrentSessionForTrialApplication(db, applicationId);
-  if (trialSession.ok === false && trialSession.error === "trial_session_missing") {
+
+  if (trialSession.ok === false) {
+    const publicError: TrialWritingPublicErrorCode =
+      trialSession.error === "trial_session_missing"
+        ? "trial_session_missing"
+        : mapTrialWritingErrorToPublic(trialSession.error);
     console.warn("trial_sessions_current_branch", {
-      outcome: "trial_session_missing",
+      outcome: trialSession.error === "trial_session_missing" ? "trial_session_missing" : "trial_error",
       applicationIdPrefix: applicationId.slice(0, 8),
+      internalError: trialSession.error,
+      publicError,
     });
     return NextResponse.json({
       ok: false as const,
       accessKind: "trial" as const,
       applicationId,
-      error: "trial_session_missing" as const,
+      error: publicError,
       accessExpiresAt,
     });
   }
+
   if (trialSession.ok === true && trialSession.accessKind === "trial") {
+    const reasonIfNotNorm: TrialWritingPublicErrorCode | undefined = trialSession.reasonIfNot
+      ? mapTrialWritingErrorToPublic(trialSession.reasonIfNot)
+      : undefined;
     console.info("trial_sessions_current_branch", {
       outcome: "trial_ok",
       applicationIdPrefix: applicationId.slice(0, 8),
@@ -65,54 +77,26 @@ async function buildTrialWritingSessionJson(
           ? trialSession.session.runtimeStatus
           : null,
       canSubmit: trialSession.canSubmit,
-      reasonIfNot: trialSession.reasonIfNot ?? null,
+      reasonIfNot: reasonIfNotNorm ?? null,
+      reasonIfNotInternal: trialSession.reasonIfNot ?? null,
     });
     return NextResponse.json({
       ...trialSession,
+      reasonIfNot: trialSession.reasonIfNot ? reasonIfNotNorm : undefined,
       accessExpiresAt: accessExpiresAt ?? trialSession.accessExpiresAt,
     });
   }
-  const err = trialSession.ok === false ? trialSession.error : "unexpected_shape";
-  console.info("trial_sessions_current_branch", {
-    outcome: "trial_pending_fallback",
+
+  console.error("trial_sessions_current_unexpected_shape", {
     applicationIdPrefix: applicationId.slice(0, 8),
-    getSessionError: err,
+    trialSessionOk: trialSession.ok,
   });
-  const trialCourseIdEnv = process.env.WRITING_TRIAL_COURSE_ID?.trim();
-  const courseIdForHint = trialCourseIdEnv ?? (await resolveWritingTrialCourseIdForLearner(db)) ?? undefined;
-  let courseStatus: string | undefined;
-  let courseTermIdPrefix: string | null = null;
-  let sessionCount: number | undefined;
-  if (courseIdForHint) {
-    const course = await writingStudentRepo.getWritingCourseById(db, courseIdForHint);
-    courseStatus = course?.status;
-    courseTermIdPrefix = course?.termId ? `${course.termId.slice(0, 8)}…` : null;
-    const sessions = await writingStudentRepo.listSessionsForCourseOrdered(db, courseIdForHint);
-    sessionCount = sessions.length;
-  }
-  trialBootstrapVerbose("sessions_current_trial_pending_fallback", {
-    applicationIdPrefix: applicationId.slice(0, 8),
-    hasEnvTrialCourseId: Boolean(trialCourseIdEnv),
-    hintCourseIdPrefix: courseIdForHint ? `${courseIdForHint.slice(0, 8)}…` : null,
-    courseStatus: courseStatus ?? null,
-    courseTermIdPrefix,
-    sessionCount: sessionCount ?? null,
-  });
-  /**
-   * Cookie is valid; writing course/session may still be resolving. 200 + ok:true keeps EntitlementRouteGuard
-   * from sending logged-in users to /writing/intro when /api/auth/me has no student entitlements.
-   */
   return NextResponse.json({
-    ok: true,
+    ok: false as const,
     accessKind: "trial" as const,
     applicationId,
-    ...(courseIdForHint ? { courseId: courseIdForHint } : {}),
+    error: "internal_error" as const,
     accessExpiresAt,
-    mode: "fresh" as const,
-    session: null,
-    submission: null,
-    canSubmit: false,
-    reasonIfNot: "trial_session_pending",
   });
 }
 

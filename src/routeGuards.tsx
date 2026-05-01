@@ -45,7 +45,13 @@ async function fetchWritingSessionGate(): Promise<{
     setWritingSessionCurrentBootstrap(parsed)
   }
   const bodyOk = parsed?.ok === true
-  const allowed = curRes.status === 200 && bodyOk
+  const trialShellOk =
+    parsed != null &&
+    typeof parsed === "object" &&
+    (parsed as { accessKind?: string }).accessKind === "trial" &&
+    typeof (parsed as { applicationId?: string }).applicationId === "string" &&
+    (parsed as { applicationId: string }).applicationId.length > 0
+  const allowed = curRes.status === 200 && (bodyOk || trialShellOk)
   return { allowed, httpStatus: curRes.status, bodyOk }
 }
 

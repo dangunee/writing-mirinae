@@ -22,9 +22,19 @@ import {
   saveOrSubmitSubmissionForRegular,
   saveOrSubmitSubmissionForTrial,
 } from "../../../../../../server/services/writingStudentService";
+import { mapTrialWritingErrorToPublic } from "../../../../../../server/lib/trialWritingPublicErrors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+function trialParseErrorToPublic(internal: string): string {
+  switch (internal) {
+    case "body_text_over_limit":
+      return "body_text_over_limit";
+    default:
+      return "internal_error";
+  }
+}
 
 /**
  * POST /api/writing/sessions/:id/submission
@@ -36,6 +46,12 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   console.time("[submission] POST_total");
   try {
     return await postSubmissionHandler(req, context);
+  } catch (e) {
+    console.error("[submission] unhandled_exception", {
+      message: e instanceof Error ? e.message : String(e),
+      stack: e instanceof Error ? e.stack : undefined,
+    });
+    return NextResponse.json({ ok: false as const, error: "internal_error" as const }, { status: 500 });
   } finally {
     console.timeEnd("[submission] POST_total");
   }
@@ -55,6 +71,15 @@ async function postSubmissionHandler(req: Request, context: { params: Promise<{ 
 
   const parsed = await parseWritingSubmissionPost(req);
   if (!parsed.ok) {
+    if (trialApplicationId) {
+      const pub = trialParseErrorToPublic(parsed.error);
+      console.warn("[submission] parse_failed_trial", {
+        internal: parsed.error,
+        public: pub,
+        status: parsed.status,
+      });
+      return NextResponse.json({ ok: false as const, error: pub }, { status: parsed.status });
+    }
     return NextResponse.json({ error: parsed.error }, { status: parsed.status });
   }
 
@@ -208,8 +233,16 @@ async function postSubmissionHandler(req: Request, context: { params: Promise<{ 
       sessionIdPrefix: sessionId.slice(0, 8),
       trialApplicationIdPrefix: trialApplicationId ? trialApplicationId.slice(0, 8) : null,
       status: result.status,
-      code: result.code,
+      codeInternal: result.code,
     });
+    if (trialApplicationId) {
+      const pub = mapTrialWritingErrorToPublic(result.code);
+      console.warn("[submission] failed_trial_public_code", {
+        sessionIdPrefix: sessionId.slice(0, 8),
+        codePublic: pub,
+      });
+      return NextResponse.json({ ok: false as const, error: pub }, { status: result.status });
+    }
     return NextResponse.json({ error: result.code }, { status: result.status });
   }
 
@@ -223,6 +256,7 @@ async function postSubmissionHandler(req: Request, context: { params: Promise<{ 
   }
 
   return NextResponse.json({
+    ok: true as const,
     submissionId: result.submissionId,
     status: result.status,
   });

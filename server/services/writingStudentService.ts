@@ -11,6 +11,10 @@ import type { Db } from "../db/client";
 import { eq } from "drizzle-orm";
 import { resolveWritingRoleFromDbOrEnv } from "../lib/writingAuthRoles";
 import { checkSessionEligibleForWriting } from "../lib/writingSubmissionEligibility";
+import {
+  evaluateTrialSubmitEligibility,
+  sessionIsTerminalForTrialCourse,
+} from "../lib/writingTrialSubmitEligibility";
 import { validateSubmissionFileUpload } from "../lib/writingUploads";
 import { getServiceRoleClient } from "../lib/supabaseServiceRole";
 import {
@@ -43,13 +47,6 @@ const MAX_BODY_TEXT_CHARS = (() => {
 /** Prior sessions are "done" for progression when corrected or missed (deadline). */
 function sessionIsTerminalForProgression(status: string): boolean {
   return status === "completed" || status === "missed";
-}
-
-/** Trial: same progression rule as status, plus runtime rows reconciled to corrected/missed. */
-function sessionIsTerminalForTrialCourse(s: typeof writingSessions.$inferSelect): boolean {
-  if (sessionIsTerminalForProgression(s.status)) return true;
-  const rt = s.runtimeStatus;
-  return rt === "corrected" || rt === "missed";
 }
 
 function sessionDtoFromRow(
@@ -458,7 +455,10 @@ export async function getCurrentSessionForTrialApplication(
   }
   const accessExpiresAtIso = trialApp.accessExpiresAt?.toISOString() ?? null;
 
-  const bootstrapAndListSessions = async (attempt: 1 | 2) => {
+  /** Zero sessions is never "completed"; retry bootstrap before declaring missing. */
+  let sessions: Awaited<ReturnType<typeof repo.listSessionsForTrialApplicationOrdered>> = [];
+  const maxBootstrapAttempts = 3;
+  for (let attempt = 1; attempt <= maxBootstrapAttempts; attempt++) {
     trialBootstrapInfo("bootstrap_called", {
       applicationIdPrefix: `${applicationId.slice(0, 8)}…`,
       courseIdPrefix: `${course.id.slice(0, 8)}…`,
@@ -480,24 +480,23 @@ export async function getCurrentSessionForTrialApplication(
       });
     }
     await repo.lazyUnlockDueSessions(db, course.id);
-    const list = await repo.listSessionsForTrialApplicationOrdered(db, course.id, applicationId);
-    trialBootstrapInfo("sessions_after_bootstrap_count", {
+    sessions = await repo.listSessionsForTrialApplicationOrdered(db, course.id, applicationId);
+    trialBootstrapInfo("sessions_count", {
       applicationIdPrefix: `${applicationId.slice(0, 8)}…`,
       courseIdPrefix: `${course.id.slice(0, 8)}…`,
-      count: list.length,
+      sessions_count: sessions.length,
       attempt,
     });
-    return list;
-  };
-
-  let sessions = await bootstrapAndListSessions(1);
-  if (sessions.length === 0) {
-    sessions = await bootstrapAndListSessions(2);
+    if (sessions.length > 0) {
+      break;
+    }
   }
+
   if (sessions.length === 0) {
     trialBootstrapBlocked("trial_session_missing_after_bootstrap", {
       applicationIdPrefix: `${applicationId.slice(0, 8)}…`,
       courseIdPrefix: `${course.id.slice(0, 8)}…`,
+      sessions_count: 0,
     });
     return { ok: false, error: "trial_session_missing" };
   }
@@ -510,12 +509,29 @@ export async function getCurrentSessionForTrialApplication(
     sessionIndexes: sessions.map((s) => s.index),
   });
 
+  const now = new Date();
+
   const pipeline = await repo.findActivePipelineSubmissionForTrial(db, applicationId);
   if (pipeline) {
     trialBootstrapVerbose("trial_return_pipeline", {
       sessionIndex: pipeline.session.index,
       sessionIdPrefix: `${pipeline.session.id.slice(0, 8)}…`,
     });
+    const elig = evaluateTrialSubmitEligibility({
+      trialApplicationId: applicationId,
+      session: pipeline.session,
+      sessionsOrdered: sessions,
+      pipeline,
+      existingSubmission: pipeline.submission,
+      now,
+    });
+    const canSubmit = elig.ok && pipeline.submission.status === "draft";
+    const reasonIfNot = !elig.ok
+      ? elig.code
+      : pipeline.submission.status === "draft"
+        ? undefined
+        : "submission_not_editable";
+
     return {
       ok: true,
       accessKind: "trial",
@@ -533,15 +549,11 @@ export async function getCurrentSessionForTrialApplication(
         imageMimeType: pipeline.submission.imageMimeType,
         submittedAt: pipeline.submission.submittedAt?.toISOString() ?? null,
       },
-      canSubmit: pipeline.submission.status === "draft",
-      reasonIfNot:
-        pipeline.submission.status === "draft"
-          ? undefined
-          : "pipeline_in_review_wait_for_result",
+      canSubmit,
+      reasonIfNot,
     };
   }
 
-  const now = new Date();
   for (const s of sessions) {
     if (sessionIsTerminalForTrialCourse(s)) continue;
 
@@ -567,50 +579,21 @@ export async function getCurrentSessionForTrialApplication(
       }
     }
 
-    const timeOk = s.unlockAt <= now;
-    if (!timeOk) {
-      trialBootstrapVerbose("trial_return_not_unlocked_time", { sessionIndex: s.index });
-      return {
-        ok: true,
-        accessKind: "trial",
-        applicationId,
-        courseId: course.id,
-        accessExpiresAt: accessExpiresAtIso,
-        pendingSubmissionId: null,
-        mode: "fresh",
-        session: trialSessionDtoFromRow(s),
-        submission: null,
-        canSubmit: false,
-        reasonIfNot: "session_not_unlocked_yet",
-      };
-    }
-
-    const eligW = checkSessionEligibleForWriting(s, now);
-    if (!eligW.ok) {
-      trialBootstrapVerbose("trial_return_not_eligible", {
-        sessionIndex: s.index,
-        code: eligW.code,
-      });
-      return {
-        ok: true,
-        accessKind: "trial",
-        applicationId,
-        courseId: course.id,
-        accessExpiresAt: accessExpiresAtIso,
-        pendingSubmissionId: null,
-        mode: "fresh",
-        session: trialSessionDtoFromRow(s),
-        submission: null,
-        canSubmit: false,
-        reasonIfNot: eligW.code,
-      };
-    }
-
-    trialBootstrapVerbose("trial_return_can_submit", {
+    const existingSub = await repo.getSubmissionBySessionIdForTrial(db, s.id, applicationId);
+    const elig = evaluateTrialSubmitEligibility({
+      trialApplicationId: applicationId,
+      session: s,
+      sessionsOrdered: sessions,
+      pipeline: null,
+      existingSubmission: existingSub,
+      now,
+    });
+    trialBootstrapVerbose(elig.ok ? "trial_return_can_submit" : "trial_return_not_eligible", {
       sessionIndex: s.index,
       sessionIdPrefix: `${s.id.slice(0, 8)}…`,
       status: s.status,
       runtimeStatus: s.runtimeStatus,
+      ...(elig.ok ? {} : { code: elig.code }),
     });
     return {
       ok: true,
@@ -622,20 +605,37 @@ export async function getCurrentSessionForTrialApplication(
       mode: "fresh",
       session: trialSessionDtoFromRow(s),
       submission: null,
-      canSubmit: true,
+      canSubmit: elig.ok,
+      ...(elig.ok ? {} : { reasonIfNot: elig.code }),
     };
   }
 
-  if (!sessions.every(sessionIsTerminalForTrialCourse)) {
-    trialBootstrapBlocked("trial_all_done_guard_failed", {
-      applicationIdPrefix: `${applicationId.slice(0, 8)}…`,
-      courseIdPrefix: `${course.id.slice(0, 8)}…`,
-      sessionStatuses: sessions.map((s) => ({ index: s.index, status: s.status, runtimeStatus: s.runtimeStatus })),
-    });
+  /** all_done only if ≥1 session and all terminal ([] makes .every trivially true). */
+  if (sessions.length === 0 || !sessions.every(sessionIsTerminalForTrialCourse)) {
+    trialBootstrapBlocked(
+      sessions.length === 0 ? "trial_zero_sessions_not_all_done" : "trial_all_done_guard_failed",
+      sessions.length === 0
+        ? {
+            applicationIdPrefix: `${applicationId.slice(0, 8)}…`,
+            courseIdPrefix: `${course.id.slice(0, 8)}…`,
+          }
+        : {
+            applicationIdPrefix: `${applicationId.slice(0, 8)}…`,
+            courseIdPrefix: `${course.id.slice(0, 8)}…`,
+            sessionStatuses: sessions.map((s) => ({
+              index: s.index,
+              status: s.status,
+              runtimeStatus: s.runtimeStatus,
+            })),
+          }
+    );
     return { ok: false, error: "trial_session_missing" };
   }
 
-  trialBootstrapVerbose("trial_return_all_done", { sessionCount: sessions.length });
+  trialBootstrapVerbose("trial_return_all_done", {
+    sessions_count: sessions.length,
+    sessionCount: sessions.length,
+  });
   return {
     ok: true,
     accessKind: "trial",
@@ -915,48 +915,28 @@ export async function saveOrSubmitSubmissionForTrial(
   }
   const session = refreshed.session;
 
-  if (
-    session.trialApplicationId != null &&
-    session.trialApplicationId !== input.trialApplicationId
-  ) {
-    return { ok: false, status: 403, code: "forbidden" };
-  }
-
-  const now = new Date();
-  const elig = checkSessionEligibleForWriting(session, now);
-  if (!elig.ok) {
-    return { ok: false, status: 409, code: elig.code };
-  }
-
   const sessions = await repo.listSessionsForTrialApplicationOrdered(
     db,
     row.course.id,
     input.trialApplicationId
   );
-  if (!sessions.some((x) => x.id === session.id)) {
-    return { ok: false, status: 409, code: "trial_session_stale" };
-  }
-  const lower = sessions.filter((x) => x.index < session.index);
-  if (!lower.every((x) => sessionIsTerminalForTrialCourse(x))) {
-    return { ok: false, status: 409, code: "complete_previous_sessions_first" };
-  }
-
   const pipeline = await repo.findActivePipelineSubmissionForTrial(db, input.trialApplicationId);
-  if (pipeline && pipeline.session.id !== input.sessionId) {
-    return { ok: false, status: 409, code: "active_submission_on_other_session" };
-  }
-
   let existing = await repo.getSubmissionBySessionIdForTrial(db, input.sessionId, input.trialApplicationId);
   if (!existing && pipeline && pipeline.session.id === input.sessionId) {
     existing = pipeline.submission;
   }
 
-  if (existing && existing.trialApplicationId !== input.trialApplicationId) {
-    return { ok: false, status: 403, code: "forbidden" };
-  }
-
-  if (existing && existing.status !== "draft") {
-    return { ok: false, status: 409, code: "submission_not_editable" };
+  const now = new Date();
+  const elig = evaluateTrialSubmitEligibility({
+    trialApplicationId: input.trialApplicationId,
+    session,
+    sessionsOrdered: sessions,
+    pipeline,
+    existingSubmission: existing,
+    now,
+  });
+  if (!elig.ok) {
+    return { ok: false, status: 409, code: elig.code };
   }
 
   for (const a of input.attachments) {

@@ -18,6 +18,7 @@ import {
   parseThemeSnapshotForUi,
 } from '../lib/writingThemeSnapshot'
 import type { AccessContext } from '../types/writingAccess'
+import { trialWritingErrorMessageJa, TRIAL_SESSION_REFRESH_NOTICE_JA } from '../lib/trialWritingErrorsJa'
 
 /** GET /api/writing/sessions/current — student / regular / trial course session (unified) */
 type CurrentSessionOk = {
@@ -99,6 +100,11 @@ export default function WritingPage() {
   const [sandboxErrorCode, setSandboxErrorCode] = useState<AdminSandboxErrorCode | null>(null)
   /** Last POST /submission error (admin sandbox only); surfaced under tabs, not silent. */
   const [sandboxSubmitFieldError, setSandboxSubmitFieldError] = useState<string | null>(null)
+  /** Trial: GET /sessions/current failure (public error code → JA). */
+  const [trialSessionLoadError, setTrialSessionLoadError] = useState<string | null>(null)
+  /** Trial: stale session recovery notice / POST error messages (Japanese). */
+  const [trialSubmitNotice, setTrialSubmitNotice] = useState<string | null>(null)
+  const [trialSubmitError, setTrialSubmitError] = useState<string | null>(null)
 
   const loadCurrent = useCallback(async () => {
     const t0 =
@@ -111,7 +117,7 @@ export default function WritingPage() {
       let data:
         | CurrentSessionOk
         | { ok: true; accessKind: 'trial'; applicationId: string; canSubmit: boolean; expiresAt: string | null }
-        | { ok: false; accessKind?: string; code?: string }
+        | { ok: false; accessKind?: string; code?: string; error?: string; applicationId?: string }
 
       const fromBootstrap = takeWritingSessionCurrentBootstrap()
       if (fromBootstrap != null && typeof fromBootstrap === 'object') {
@@ -125,12 +131,52 @@ export default function WritingPage() {
         })
       } else {
         const res = await fetch(apiUrl('/api/writing/sessions/current'), { credentials: 'include' })
-        if (!res.ok) {
-          setCurrent(null)
+        let parsed: unknown = null
+        try {
+          parsed = await res.json()
+        } catch {
+          parsed = null
+        }
+        data = parsed as typeof data
+        if (
+          data &&
+          typeof data === 'object' &&
+          'ok' in data &&
+          data.ok === false &&
+          'accessKind' in data &&
+          (data as { accessKind?: string }).accessKind === 'trial'
+        ) {
+          const errRaw =
+            typeof (data as { error?: string }).error === 'string' && (data as { error: string }).error.trim()
+              ? (data as { error: string }).error.trim()
+              : 'internal_error'
           setSandboxErrorCode(null)
+          setTrialSessionLoadError(trialWritingErrorMessageJa(errRaw))
+          setTrialSubmitNotice(null)
+          setTrialSubmitError(null)
+          setCurrent(null)
+          setAccessContext({ type: 'trial' })
+          const t2 =
+            typeof performance !== 'undefined' && typeof performance.now === 'function'
+              ? performance.now()
+              : Date.now()
+          console.debug('[WritingPage] loadCurrent() fetch complete', {
+            ms: Math.round(t2 - t0),
+            httpOk: res.ok,
+            trialError: errRaw,
+          })
           return
         }
-        data = (await res.json()) as typeof data
+        if (!res.ok) {
+          console.warn('[WritingPage] loadCurrent HTTP error', {
+            status: res.status,
+            body: parsed,
+          })
+          setCurrent(null)
+          setSandboxErrorCode(null)
+          setTrialSessionLoadError(null)
+          return
+        }
         const t2 =
           typeof performance !== 'undefined' && typeof performance.now === 'function'
             ? performance.now()
@@ -163,6 +209,25 @@ export default function WritingPage() {
       if (
         data &&
         'ok' in data &&
+        data.ok === false &&
+        'accessKind' in data &&
+        (data as { accessKind?: string }).accessKind === 'trial'
+      ) {
+        const errRaw =
+          typeof (data as { error?: string }).error === 'string' && (data as { error: string }).error.trim()
+            ? (data as { error: string }).error.trim()
+            : 'internal_error'
+        setSandboxErrorCode(null)
+        setTrialSessionLoadError(trialWritingErrorMessageJa(errRaw))
+        setTrialSubmitNotice(null)
+        setTrialSubmitError(null)
+        setCurrent(null)
+        setAccessContext({ type: 'trial' })
+        return
+      }
+      if (
+        data &&
+        'ok' in data &&
         data.ok === true &&
         'accessKind' in data &&
         (data as { accessKind?: string }).accessKind === 'admin_sandbox'
@@ -188,18 +253,21 @@ export default function WritingPage() {
         }
         if (typeof td.courseId === 'string' && td.courseId.length > 0) {
           setSandboxErrorCode(null)
+          setTrialSessionLoadError(null)
           setCurrent(td as CurrentSessionOk)
           setAccessContext({ type: 'trial' })
           return
         }
         setCurrent(null)
         setSandboxErrorCode(null)
+        setTrialSessionLoadError(trialWritingErrorMessageJa('internal_error'))
         setAccessContext({ type: 'trial' })
         return
       }
       if (data && 'ok' in data && data.ok === true && 'courseId' in data && data.courseId) {
         const d = data as CurrentSessionOk
         setSandboxErrorCode(null)
+        setTrialSessionLoadError(null)
         setCurrent(d)
         if (d.accessKind === 'regular') {
           setAccessContext({ type: 'regular' })
@@ -379,7 +447,7 @@ export default function WritingPage() {
       current.mode === 'fresh' &&
       current.session == null &&
       current.accessKind === 'trial' &&
-      current.reasonIfNot === 'trial_session_pending'
+      current.reasonIfNot === 'internal_error'
     ) {
       return '체험 코스 세션을 불러오지 못했습니다. Vercel 환경변수 WRITING_TRIAL_COURSE_ID가 관리 화면에서 과제를 넣은 코스 UUID와 같은지, 그 코스가 active 상태인지 확인해 주세요.'
     }
@@ -410,6 +478,7 @@ export default function WritingPage() {
     if (studentBodyMaxChars != null && content.length > studentBodyMaxChars) return
     if (current?.accessKind !== 'admin_sandbox' && isAdmin && adminPreview && !adminPreview.sessionId?.trim()) return
     const isAdminSandboxFlow = current?.accessKind === 'admin_sandbox'
+    const isTrialFlow = current?.accessKind === 'trial' && !isAdminSandboxFlow
     const sessionId =
       isAdminSandboxFlow && current?.session?.id
         ? current.session.id
@@ -417,6 +486,10 @@ export default function WritingPage() {
     if (!sessionId || !content.trim() || !canSubmit || saving || submitLockRef.current) return
     if (isAdminSandboxFlow) {
       setSandboxSubmitFieldError(null)
+    }
+    if (isTrialFlow) {
+      setTrialSubmitNotice(null)
+      setTrialSubmitError(null)
     }
     submitLockRef.current = true
     setSaving(true)
@@ -429,6 +502,7 @@ export default function WritingPage() {
         body: JSON.stringify({ action: 'submit', bodyText: bodyKeep }),
       })
       let data: {
+        ok?: boolean
         submissionId?: string
         status?: string
         error?: string
@@ -445,13 +519,30 @@ export default function WritingPage() {
             `サーバー応答を読み取れませんでした (HTTP ${res.status})。`
           )
         }
+        if (isTrialFlow) {
+          setTrialSubmitError('サーバー応答を読み取れませんでした。もう一度お試しください。')
+        }
         return
       }
       if (!res.ok) {
-        const msg =
-          (typeof data.message === 'string' && data.message.trim()) ||
+        const errCodeRaw =
           (typeof data.error === 'string' && data.error.trim()) ||
           (typeof data.code === 'string' && data.code.trim()) ||
+          ''
+        if (isTrialFlow) {
+          if (errCodeRaw === 'trial_session_stale') {
+            setTrialSubmitError(null)
+            setTrialSubmitNotice(TRIAL_SESSION_REFRESH_NOTICE_JA)
+            await loadCurrent()
+            return
+          }
+          setTrialSubmitNotice(null)
+          setTrialSubmitError(trialWritingErrorMessageJa(errCodeRaw))
+          return
+        }
+        const msg =
+          (typeof data.message === 'string' && data.message.trim()) ||
+          errCodeRaw ||
           `提出に失敗しました (HTTP ${res.status})`
         if (isAdminSandboxFlow) {
           setSandboxSubmitFieldError(msg)
@@ -459,6 +550,17 @@ export default function WritingPage() {
         return
       }
       if (data.error && !data.submissionId) {
+        const errRaw =
+          typeof data.error === 'string'
+            ? data.error.trim()
+            : typeof data.code === 'string'
+              ? data.code.trim()
+              : ''
+        if (isTrialFlow) {
+          setTrialSubmitNotice(null)
+          setTrialSubmitError(trialWritingErrorMessageJa(errRaw))
+          return
+        }
         if (isAdminSandboxFlow) {
           setSandboxSubmitFieldError(
             typeof data.message === 'string' ? data.message : String(data.error)
@@ -466,7 +568,12 @@ export default function WritingPage() {
         }
         return
       }
-      if (!data.submissionId) {
+      if (!data.submissionId || data.ok === false) {
+        if (isTrialFlow) {
+          setTrialSubmitNotice(null)
+          setTrialSubmitError(trialWritingErrorMessageJa(typeof data.error === 'string' ? data.error : 'internal_error'))
+          return
+        }
         if (isAdminSandboxFlow) {
           setSandboxSubmitFieldError('提出応答に submissionId がありません。')
         }
@@ -493,6 +600,10 @@ export default function WritingPage() {
         setAssignmentTab('submitted')
         setSandboxSubmitNotice(true)
       }
+      if (isTrialFlow) {
+        setTrialSubmitNotice(null)
+        setTrialSubmitError(null)
+      }
       setContent('')
       setRefetchAfterSubmit(true)
       clearWritingSessionCurrentBootstrap()
@@ -502,6 +613,14 @@ export default function WritingPage() {
         setSandboxSubmitNotice(true)
       }
     } catch (e) {
+      if (isTrialFlow) {
+        console.warn('[WritingPage] trial submit network/unhandled', {
+          message: e instanceof Error ? e.message : String(e),
+          stack: e instanceof Error ? e.stack : undefined,
+        })
+        setTrialSubmitNotice(null)
+        setTrialSubmitError(trialWritingErrorMessageJa('internal_error'))
+      }
       if (isAdminSandboxFlow) {
         setSandboxSubmitFieldError(
           e instanceof Error ? e.message : 'ネットワークエラーが発生しました。'
@@ -519,6 +638,21 @@ export default function WritingPage() {
       {loading ? (
         <p className="text-sm text-[#454652] mb-4 px-1" role="status">
           불러오는 중…
+        </p>
+      ) : null}
+      {trialSubmitNotice ? (
+        <p className="text-sm text-[#166534] mb-3 px-1 font-medium" role="status">
+          {trialSubmitNotice}
+        </p>
+      ) : null}
+      {trialSubmitError ? (
+        <p className="text-sm text-[#b91c1c] mb-3 px-1 font-medium" role="alert">
+          {trialSubmitError}
+        </p>
+      ) : null}
+      {trialSessionLoadError ? (
+        <p className="text-sm text-[#9a3412] mb-3 px-1 font-medium" role="alert">
+          {trialSessionLoadError}
         </p>
       ) : null}
       {current?.accessKind === 'admin_sandbox' && sandboxSubmitFieldError ? (
