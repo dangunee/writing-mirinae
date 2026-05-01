@@ -64,6 +64,7 @@ export async function handleAccessConsume(req: IncomingMessage, res: ServerRespo
       sessionCookie?: string;
       sessionCookieMaxAgeSec?: number;
       error?: string;
+      alreadySubmitted?: boolean;
     } = {};
     try {
       json = text ? (JSON.parse(text) as typeof json) : {};
@@ -93,7 +94,9 @@ export async function handleAccessConsume(req: IncomingMessage, res: ServerRespo
       });
       res.statusCode = upstream.status >= 400 ? upstream.status : 400;
       res.setHeader("Content-Type", "application/json; charset=utf-8");
-      res.end(JSON.stringify({ ok: false, error: json.error ?? "invalid_or_expired_access" }));
+      const payload: Record<string, unknown> = { ok: false, error: json.error ?? "invalid_or_expired_access" };
+      if (json.alreadySubmitted === true) payload.alreadySubmitted = true;
+      res.end(JSON.stringify(payload));
       return;
     }
 
