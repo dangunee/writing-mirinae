@@ -75,6 +75,7 @@ function trialSessionDtoFromRow(s: typeof writingSessions.$inferSelect) {
     status: s.status,
     themeSnapshot: s.themeSnapshot ?? null,
     runtimeStatus: s.runtimeStatus ?? null,
+    dueAt: s.dueAt ? s.dueAt.toISOString() : null,
     requiredExpressionsSnapshot: s.requiredExpressionsSnapshot ?? null,
     modelAnswerSnapshot: s.modelAnswerSnapshot ?? null,
   };
@@ -154,6 +155,7 @@ export type CurrentSessionResponse =
         status: string;
         themeSnapshot: string | null;
         runtimeStatus: string | null;
+        dueAt: string | null;
         requiredExpressionsSnapshot: unknown;
         modelAnswerSnapshot: string | null;
       } | null;

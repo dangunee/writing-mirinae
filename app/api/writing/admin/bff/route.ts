@@ -23,7 +23,7 @@ export async function POST(req: Request) {
       fromQuery ??
       u.pathname.match(/\/trial-applications\/([^/]+)\/(?:activate|extend-access|resend-access)/)?.[1]?.trim() ??
       "";
-    return proxyTrialAdminMutation(req, applicationId);
+    return proxyTrialAdminMutation(req, applicationId, { actorUserId: admin.userId });
   } catch (e) {
     console.error("trial_admin_bff_route_error", e);
     return NextResponse.json({ ok: false, error: "internal_error" }, { status: 500 });

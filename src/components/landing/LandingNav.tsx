@@ -7,6 +7,8 @@ import { primaryAccountNav } from '../../lib/primaryAccountNav'
 
 type Props = {
   goApp: () => void
+  /** `minimal`: logo only — account actions live in StudentAccountPanel (/writing/app). */
+  variant?: 'default' | 'minimal'
 }
 
 function AccountDropdown({ onClose }: { onClose: () => void }) {
@@ -24,7 +26,7 @@ function AccountDropdown({ onClose }: { onClose: () => void }) {
   )
 }
 
-export default function LandingNav({ goApp }: Props) {
+export default function LandingNav({ goApp, variant = 'default' }: Props) {
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const [accountMenuOpen, setAccountMenuOpen] = useState(false)
@@ -73,6 +75,8 @@ export default function LandingNav({ goApp }: Props) {
     setAccountMenuOpen((v) => !v)
   }
 
+  const minimal = variant === 'minimal'
+
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-[#F5F5F5]/80 backdrop-blur-md shadow-[0_4px_20px_rgba(0,0,0,0.05)] border-b-[0.5px] border-[#1e1b13]/10">
       <div className="flex justify-between items-center max-w-7xl mx-auto px-6 md:px-8 h-16 md:h-20">
@@ -85,105 +89,115 @@ export default function LandingNav({ goApp }: Props) {
           </Link>
         </div>
 
-        <div className="hidden md:flex items-center gap-8">
-          {me?.user && !loading ? (
-            <>
-              <Link
-                to={primaryNav!.to}
-                className="rounded-lg border border-[#000666] bg-white px-5 py-2 font-['Manrope'] text-sm font-bold text-[#000666] hover:bg-[#000666]/5 transition-colors"
-              >
-                {primaryNav!.label}
-              </Link>
-              <button
-                type="button"
-                onClick={() => void handleLogout()}
-                className="font-['Manrope'] text-sm font-semibold text-[#1e1b13]/70 hover:text-[#000666] transition-colors"
-              >
-                ログアウト
-              </button>
-              <button
-                type="button"
-                onClick={goApp}
-                className="bg-[#000666] px-6 py-2 font-['Manrope'] text-sm font-bold uppercase tracking-widest text-white hover:opacity-90 active:scale-[0.99] transition-all rounded-lg"
-              >
-                お申し込み
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={goApp}
-                className="bg-[#000666] px-6 py-2 font-['Manrope'] text-sm font-bold uppercase tracking-widest text-white hover:opacity-90 active:scale-[0.99] transition-all rounded-lg"
-              >
-                お申し込み
-              </button>
-              <div className="relative" ref={accountDesktopRef}>
-                <button
-                  type="button"
-                  onClick={handleAccountClick}
-                  disabled={loading}
-                  aria-busy={loading}
-                  aria-expanded={accountMenuOpen && !me?.user}
-                  aria-haspopup={me?.user ? undefined : 'menu'}
-                  className="material-symbols-outlined text-[#000666] cursor-pointer bg-transparent border-0 p-0 disabled:cursor-wait disabled:opacity-50"
-                  aria-label="アカウント"
-                >
-                  account_circle
-                </button>
-                {accountMenuOpen && !me?.user && !loading ? <AccountDropdown onClose={() => setAccountMenuOpen(false)} /> : null}
-              </div>
-            </>
-          )}
-        </div>
-
-        <div className="flex md:hidden items-center gap-2">
-          {me?.user && !loading ? (
-            <>
-              <Link
-                to={primaryNav!.to}
-                className="font-['Manrope'] text-xs font-bold text-[#000666] px-1"
-              >
-                {primaryNav!.label}
-              </Link>
-              <button
-                type="button"
-                onClick={() => void handleLogout()}
-                className="font-['Manrope'] text-xs font-semibold text-[#1e1b13]/70 px-1"
-              >
-                ログアウト
-              </button>
-            </>
-          ) : (
-            <div className="relative" ref={accountMobileRef}>
-              <button
-                type="button"
-                onClick={handleAccountClick}
-                disabled={loading}
-                aria-busy={loading}
-                aria-expanded={accountMenuOpen && !me?.user}
-                aria-haspopup={me?.user ? undefined : 'menu'}
-                className="material-symbols-outlined text-[#000666] bg-transparent border-0 p-0 disabled:cursor-wait disabled:opacity-50"
-                aria-label="アカウント"
-              >
-                account_circle
-              </button>
-              {accountMenuOpen && !me?.user && !loading ? <AccountDropdown onClose={() => setAccountMenuOpen(false)} /> : null}
+        {minimal ? (
+          <div className="flex-1" aria-hidden="true" />
+        ) : (
+          <>
+            <div className="hidden md:flex items-center gap-8">
+              {me?.user && !loading ? (
+                <>
+                  <Link
+                    to={primaryNav!.to}
+                    className="rounded-lg border border-[#000666] bg-white px-5 py-2 font-['Manrope'] text-sm font-bold text-[#000666] hover:bg-[#000666]/5 transition-colors"
+                  >
+                    {primaryNav!.label}
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => void handleLogout()}
+                    className="font-['Manrope'] text-sm font-semibold text-[#1e1b13]/70 hover:text-[#000666] transition-colors"
+                  >
+                    ログアウト
+                  </button>
+                  <button
+                    type="button"
+                    onClick={goApp}
+                    className="bg-[#000666] px-6 py-2 font-['Manrope'] text-sm font-bold uppercase tracking-widest text-white hover:opacity-90 active:scale-[0.99] transition-all rounded-lg"
+                  >
+                    お申し込み
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={goApp}
+                    className="bg-[#000666] px-6 py-2 font-['Manrope'] text-sm font-bold uppercase tracking-widest text-white hover:opacity-90 active:scale-[0.99] transition-all rounded-lg"
+                  >
+                    お申し込み
+                  </button>
+                  <div className="relative" ref={accountDesktopRef}>
+                    <button
+                      type="button"
+                      onClick={handleAccountClick}
+                      disabled={loading}
+                      aria-busy={loading}
+                      aria-expanded={accountMenuOpen && !me?.user}
+                      aria-haspopup={me?.user ? undefined : 'menu'}
+                      className="material-symbols-outlined text-[#000666] cursor-pointer bg-transparent border-0 p-0 disabled:cursor-wait disabled:opacity-50"
+                      aria-label="アカウント"
+                    >
+                      account_circle
+                    </button>
+                    {accountMenuOpen && !me?.user && !loading ? (
+                      <AccountDropdown onClose={() => setAccountMenuOpen(false)} />
+                    ) : null}
+                  </div>
+                </>
+              )}
             </div>
-          )}
-          <button
-            type="button"
-            className="material-symbols-outlined text-[#000666] bg-transparent border-0 p-0"
-            aria-expanded={open}
-            aria-label="メニュー"
-            onClick={() => setOpen((v) => !v)}
-          >
-            menu
-          </button>
-        </div>
+
+            <div className="flex md:hidden items-center gap-2">
+              {me?.user && !loading ? (
+                <>
+                  <Link
+                    to={primaryNav!.to}
+                    className="font-['Manrope'] text-xs font-bold text-[#000666] px-1"
+                  >
+                    {primaryNav!.label}
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => void handleLogout()}
+                    className="font-['Manrope'] text-xs font-semibold text-[#1e1b13]/70 px-1"
+                  >
+                    ログアウト
+                  </button>
+                </>
+              ) : (
+                <div className="relative" ref={accountMobileRef}>
+                  <button
+                    type="button"
+                    onClick={handleAccountClick}
+                    disabled={loading}
+                    aria-busy={loading}
+                    aria-expanded={accountMenuOpen && !me?.user}
+                    aria-haspopup={me?.user ? undefined : 'menu'}
+                    className="material-symbols-outlined text-[#000666] bg-transparent border-0 p-0 disabled:cursor-wait disabled:opacity-50"
+                    aria-label="アカウント"
+                  >
+                    account_circle
+                  </button>
+                  {accountMenuOpen && !me?.user && !loading ? (
+                    <AccountDropdown onClose={() => setAccountMenuOpen(false)} />
+                  ) : null}
+                </div>
+              )}
+              <button
+                type="button"
+                className="material-symbols-outlined text-[#000666] bg-transparent border-0 p-0"
+                aria-expanded={open}
+                aria-label="メニュー"
+                onClick={() => setOpen((v) => !v)}
+              >
+                menu
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
-      {open ? (
+      {open && !minimal ? (
         <div className="md:hidden border-t border-[#1e1b13]/10 bg-[#F5F5F5]/95 px-6 py-4 flex flex-col gap-3">
           <button
             type="button"

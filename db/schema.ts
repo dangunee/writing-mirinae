@@ -518,6 +518,27 @@ export const trialApplicationAdminAudit = writing.table(
   ]
 );
 
+/** Missed trial runtime sessions reopened after admin extend-access (see trialExtendSessionReopenService). */
+export const trialExtendSessionReopenLog = writing.table(
+  "trial_extend_session_reopen_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    applicationId: uuid("application_id").notNull(),
+    actorUserId: uuid("actor_user_id")
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "restrict" }),
+    sessionId: uuid("session_id").notNull(),
+    previousStatus: text("previous_status").notNull(),
+    previousRuntimeStatus: text("previous_runtime_status"),
+    newDueAt: timestamp("new_due_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("trial_extend_session_reopen_log_app_idx").on(t.applicationId),
+    index("trial_extend_session_reopen_log_created_idx").on(t.createdAt),
+  ]
+);
+
 export const writingSessions = writing.table(
   "sessions",
   {

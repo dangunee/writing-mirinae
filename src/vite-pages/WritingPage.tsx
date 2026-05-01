@@ -19,6 +19,7 @@ import {
 } from '../lib/writingThemeSnapshot'
 import type { AccessContext } from '../types/writingAccess'
 import { trialWritingErrorMessageJa, TRIAL_SESSION_REFRESH_NOTICE_JA } from '../lib/trialWritingErrorsJa'
+import { writingSessionReasonIfNotJa } from '../lib/writingSessionReasonIfNotJa'
 
 /** GET /api/writing/sessions/current — student / regular / trial course session (unified) */
 type CurrentSessionOk = {
@@ -41,6 +42,8 @@ type CurrentSessionOk = {
     themeSnapshot?: string | null
     /** When present: only navigate to result for corrected | missed */
     runtimeStatus?: string | null
+    /** Trial (and future) session deadline — ISO string */
+    dueAt?: string | null
   } | null
   submission: {
     id: string
@@ -431,14 +434,89 @@ export default function WritingPage() {
       : promptBody
 
   const hasSession = session != null
-  const canUseForm =
-    sandboxErrorCode != null
-      ? false
-      : current?.accessKind === 'admin_sandbox'
-        ? Boolean(canSubmit && session?.id && !refetchAfterSubmit)
-        : isAdmin && adminPreview
-          ? Boolean(adminPreview.sessionId?.trim() && !refetchAfterSubmit)
-          : Boolean(canSubmit && session?.id && !refetchAfterSubmit)
+
+  const learnerSubmitGate = useMemo(() => {
+    if (sandboxErrorCode != null) {
+      return { ok: false as const, reasonCode: null as string | null }
+    }
+    if (isAdmin && adminPreview && current?.accessKind !== 'admin_sandbox') {
+      const ok = Boolean(adminPreview.sessionId?.trim() && !refetchAfterSubmit && !bodyOverStudentLimit)
+      return { ok, reasonCode: ok ? null : 'no_session' }
+    }
+    if (current?.accessKind === 'admin_sandbox') {
+      const ok = Boolean(canSubmit && session?.id && !refetchAfterSubmit && !bodyOverStudentLimit)
+      return { ok, reasonCode: ok ? null : 'session_locked' }
+    }
+
+    if (!current?.ok) {
+      return { ok: false as const, reasonCode: null as string | null }
+    }
+
+    if (current.mode === 'all_done') {
+      return { ok: false as const, reasonCode: current.reasonIfNot ?? 'all_sessions_completed' }
+    }
+
+    if (!session?.id) {
+      return { ok: false as const, reasonCode: current.reasonIfNot ?? 'trial_session_missing' }
+    }
+
+    if (refetchAfterSubmit) {
+      return { ok: false as const, reasonCode: null as string | null }
+    }
+
+    if (bodyOverStudentLimit) {
+      return { ok: false as const, reasonCode: 'body_text_over_limit' }
+    }
+
+    const pipelineDraft =
+      current.mode === 'pipeline' && current.submission?.status === 'draft'
+
+    if (
+      submission &&
+      submission.status !== 'draft' &&
+      !pipelineDraft
+    ) {
+      return { ok: false as const, reasonCode: 'session_already_submitted' }
+    }
+
+    if (!current.canSubmit) {
+      return { ok: false as const, reasonCode: current.reasonIfNot ?? 'session_locked' }
+    }
+
+    if (current.accessKind === 'trial' && current.mode === 'fresh') {
+      const rt = session.runtimeStatus
+      if (rt != null && rt !== '' && rt !== 'available') {
+        return { ok: false as const, reasonCode: 'fresh_runtime_not_available' }
+      }
+      const dueRaw = session.dueAt
+      if (dueRaw && Date.now() >= new Date(dueRaw).getTime()) {
+        return { ok: false as const, reasonCode: 'session_expired' }
+      }
+    }
+
+    return { ok: true as const, reasonCode: null as string | null }
+  }, [
+    sandboxErrorCode,
+    current,
+    canSubmit,
+    session,
+    refetchAfterSubmit,
+    bodyOverStudentLimit,
+    isAdmin,
+    adminPreview,
+    submission,
+  ])
+
+  const canUseForm = learnerSubmitGate.ok
+
+  const submissionBlockedJa =
+    !loading &&
+    learnerSubmitGate.reasonCode &&
+    sandboxErrorCode == null &&
+    (current?.accessKind ?? '') !== 'admin_sandbox' &&
+    !(isAdmin && adminPreview)
+      ? writingSessionReasonIfNotJa(learnerSubmitGate.reasonCode)
+      : null
 
   const emptyAssignmentsText = (() => {
     if (current?.ok && current.mode === 'all_done') return '모든 과제를 완료했습니다.'
@@ -483,7 +561,7 @@ export default function WritingPage() {
       isAdminSandboxFlow && current?.session?.id
         ? current.session.id
         : (session?.id ?? null)
-    if (!sessionId || !content.trim() || !canSubmit || saving || submitLockRef.current) return
+    if (!sessionId || !content.trim() || !learnerSubmitGate.ok || saving || submitLockRef.current) return
     if (isAdminSandboxFlow) {
       setSandboxSubmitFieldError(null)
     }
@@ -655,6 +733,11 @@ export default function WritingPage() {
           {trialSessionLoadError}
         </p>
       ) : null}
+      {submissionBlockedJa ? (
+        <p className="text-sm text-[#9a3412] mb-3 px-1 font-medium" role="status">
+          {submissionBlockedJa}
+        </p>
+      ) : null}
       {current?.accessKind === 'admin_sandbox' && sandboxSubmitFieldError ? (
         <p className="text-sm text-[#b91c1c] mb-3 px-1 font-medium" role="alert">
           {sandboxSubmitFieldError}
@@ -725,9 +808,9 @@ export default function WritingPage() {
           QAサンドボックス: 提出は管理者テスト用のDBテーブルのみに保存され、教師キューや本番集計には含まれません。
         </p>
       ) : null}
-      {hasSession && session && !canSubmit ? (
+      {hasSession && session && !learnerSubmitGate.ok && current?.accessKind === 'admin_sandbox' && !submissionBlockedJa ? (
         <p className="text-sm text-[#ba1a1a] mt-6" role="status">
-          이 세션에서는 제출할 수 없습니다.
+          QAサンドボックス: この状態では提出できません。
         </p>
       ) : null}
       <p className="text-center text-[10px] text-[#454652] mt-6 mb-8 font-medium tracking-wide">
@@ -761,7 +844,7 @@ export default function WritingPage() {
           {adminSandboxErrorBannerText(sandboxErrorCode)}
         </div>
       ) : null}
-      <StudentAccountPanel compact showAccountActions={!isAdmin} />
+      <StudentAccountPanel compact showAccountActions={!isAdmin} writingAppAccess={accessContext.type} />
       {isAdmin ? (
         <>
           <details className="mb-3 rounded-lg border border-amber-600/25 bg-amber-50/50 shadow-sm open:bg-amber-50/80">
@@ -787,20 +870,13 @@ export default function WritingPage() {
     <div className="writing-submit-page writing-stitch-root">
       <AssignmentSubmitScreen
         mainTopSlot={mainTopSlot}
+        landingNavVariant={accessContext.type === 'trial' && !isAdmin ? 'minimal' : 'default'}
         accessContext={accessContext}
         studentBodyMaxChars={studentBodyMaxChars}
         text={content}
         onTextChange={setContent}
         onPrimarySubmit={() => void handleSubmit()}
-        primarySubmitDisabled={
-          Boolean(sandboxErrorCode) ||
-          saving ||
-          refetchAfterSubmit ||
-          !content.trim() ||
-          bodyOverStudentLimit ||
-          !(current?.accessKind === 'admin_sandbox' ? current.session?.id : session?.id) ||
-          !canSubmit
-        }
+        primarySubmitDisabled={saving || !content.trim() || !learnerSubmitGate.ok}
         primarySubmitLoading={saving || refetchAfterSubmit}
         textareaDisabled={!canUseForm}
         showDraftButton={false}
@@ -810,15 +886,15 @@ export default function WritingPage() {
           canUseForm
             ? '여기에 작문을 입력해 주세요...'
             : isAdmin && adminPreview && !adminPreview.sessionId?.trim()
-              ? '이 회차에 세션이 없어 입력·제출할 수 없습니다. 관리 화면에서 과제를 등록했는지 확인해 주세요.'
-              : '제출 가능한 과제가 없을 때는 입력할 수 없습니다.'
+              ? 'この回にはセッションがありません。管理画面で課題を登録してください。'
+              : submissionBlockedJa ?? '現在は入力・提出できません。ページを更新してお試しください。'
         }
         mobileTextareaPlaceholder={
           canUseForm
             ? '여기에 작문을 입력해 주세요...'
             : isAdmin && adminPreview && !adminPreview.sessionId?.trim()
-              ? '이 회차에 세션이 없어 입력·제출할 수 없습니다. 관리 화면에서 과제를 등록했는지 확인해 주세요.'
-              : '제출 가능한 과제가 없을 때는 입력할 수 없습니다.'
+              ? 'この回にはセッションがありません。管理画面で課題を登録してください。'
+              : submissionBlockedJa ?? '現在は入力・提出できません。ページを更新してお試しください。'
         }
         requirementBlockDesktop={requirementBlockDesktop}
         desktopSlotBelowTabs={desktopSlotBelowTabs}

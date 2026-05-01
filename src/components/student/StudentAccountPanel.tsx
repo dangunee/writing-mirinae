@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuthMe } from '../../hooks/useAuthMe'
 import { apiUrl } from '../../lib/apiUrl'
 import type { AuthMePayload } from '../../types/authMe'
+import type { AccessContext } from '../../types/writingAccess'
 
 function roleLabelJa(role: AuthMePayload['role']): string {
   if (role === 'admin') return '管理者'
@@ -11,28 +12,20 @@ function roleLabelJa(role: AuthMePayload['role']): string {
   return '—'
 }
 
-function EntitlementBadges({ e }: { e: AuthMePayload['entitlements'] }) {
-  const items: { key: string; label: string; on: boolean }[] = [
-    { key: 'trial', label: '体験', on: e.hasTrial },
-    { key: 'course', label: 'コース', on: e.hasActiveCourse },
-    { key: 'academy', label: 'アカデミー', on: e.isAcademyUnlimited },
-  ]
+const badgeActive =
+  'shrink-0 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold leading-tight border-[#000666]/35 bg-[#e8eef8] text-[#000666] shadow-sm'
+
+/** Only entitlements that are actually active (omit gray placeholders). */
+function ActiveEntitlementBadges({ e }: { e: AuthMePayload['entitlements'] }) {
+  const items: { key: string; label: string }[] = []
+  if (e.hasActiveCourse) items.push({ key: 'course', label: 'コース · 利用可' })
+  if (e.isAcademyUnlimited) items.push({ key: 'academy', label: 'アカデミー · 利用可' })
+  if (items.length === 0) return null
   return (
-    <div
-      className="flex flex-wrap items-center gap-2"
-      aria-label="利用権限（体験・コース・アカデミー）"
-    >
+    <div className="flex flex-wrap items-center gap-2" aria-label="利用中の権限">
       {items.map((x) => (
-        <span
-          key={x.key}
-          className={`shrink-0 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold leading-tight ${
-            x.on
-              ? 'border-[#000666]/35 bg-[#e8eef8] text-[#000666] shadow-sm'
-              : 'border-[#c5c8cc] bg-[#f3f4f6] text-[#4a5056]'
-          }`}
-        >
+        <span key={x.key} className={badgeActive}>
           {x.label}
-          {x.on ? ' · 利用可' : ''}
         </span>
       ))}
     </div>
@@ -47,14 +40,23 @@ type Props = {
    * 管理者が /writing/app にいるときはヘッダに 管理コンソール / ログアウト があるため重複を避ける。
    */
   showAccountActions?: boolean
+  /** GET /sessions/current と整合したアクセス種別（試用メールリンクのみ等の表示切替） */
+  writingAppAccess?: AccessContext['type'] | null
 }
 
 /**
  * Stitch トーン — GET /api/auth/me のみ（モック・クライアント userId なし）
  */
-export default function StudentAccountPanel({ compact = false, showAccountActions = true }: Props) {
+export default function StudentAccountPanel({
+  compact = false,
+  showAccountActions = true,
+  writingAppAccess = null,
+}: Props) {
   const { me, loading, error, refetch } = useAuthMe()
   const navigate = useNavigate()
+
+  const trialMailLinkContext = writingAppAccess === 'trial'
+  const hideSettingsLink = trialMailLinkContext
 
   const onLogout = async () => {
     try {
@@ -98,13 +100,29 @@ export default function StudentAccountPanel({ compact = false, showAccountAction
   }
 
   if (!me?.user) {
+    const anonBadge =
+      writingAppAccess === 'trial'
+        ? '体験 · 利用中'
+        : writingAppAccess === 'regular'
+          ? 'メールリンク · 利用中'
+          : 'アクセス中'
+    const anonTitle =
+      writingAppAccess === 'trial'
+        ? '体験リンクでアクセス中'
+        : writingAppAccess === 'regular'
+          ? 'メールリンクでアクセス中'
+          : 'アクセス中'
+
     return (
       <div
         className={`rounded-xl border border-[#1e1b13]/10 bg-[#F5F5F5] px-4 py-3 font-['Manrope',sans-serif] text-sm text-[#1e1b13]/80 shadow-sm ${
           compact ? 'mb-3' : 'mb-6'
         }`}
       >
-        <p className="font-semibold text-[#000666]">体験・メールリンクでアクセス中</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={badgeActive}>{anonBadge}</span>
+        </div>
+        <p className="mt-2 font-semibold text-[#000666]">{anonTitle}</p>
         <p className="mt-1 text-xs text-[#595c5e]">
           ログインするとマイページで学習サマリーを確認できます。
         </p>
@@ -122,6 +140,8 @@ export default function StudentAccountPanel({ compact = false, showAccountAction
       </div>
     )
   }
+
+  const showMypageLink = me.role === 'student'
 
   return (
     <div
@@ -146,7 +166,18 @@ export default function StudentAccountPanel({ compact = false, showAccountAction
           <p className="truncate text-sm font-semibold text-[#1e1b13]" title={me.user.email ?? ''}>
             {me.user.email ?? me.user.id}
           </p>
-          <EntitlementBadges e={me.entitlements} />
+          <div className="flex flex-wrap items-center gap-2" aria-label="利用権限">
+            {trialMailLinkContext ? (
+              <span className={badgeActive}>体験 · 利用中</span>
+            ) : (
+              <>
+                {me.entitlements.hasTrial ? (
+                  <span className={badgeActive}>体験 · 利用可</span>
+                ) : null}
+              </>
+            )}
+            <ActiveEntitlementBadges e={me.entitlements} />
+          </div>
         </div>
         {showAccountActions ? (
           <div className="flex flex-shrink-0 flex-wrap items-center gap-2 sm:justify-end">
@@ -158,18 +189,22 @@ export default function StudentAccountPanel({ compact = false, showAccountAction
                 管理コンソール
               </Link>
             ) : null}
-            <Link
-              to="/writing/app/settings"
-              className="rounded-lg border border-[#1e1b13]/15 bg-white px-3 py-1.5 text-xs font-bold text-[#000666] hover:bg-[#fafafa]"
-            >
-              設定
-            </Link>
-            <Link
-              to="/writing/app/mypage"
-              className="rounded-lg border border-[#1e1b13]/15 bg-[#F5F5F5] px-3 py-1.5 text-xs font-bold text-[#000666] hover:bg-[#ebebeb]"
-            >
-              マイページ
-            </Link>
+            {!hideSettingsLink ? (
+              <Link
+                to="/writing/app/settings"
+                className="rounded-lg border border-[#1e1b13]/15 bg-white px-3 py-1.5 text-xs font-bold text-[#000666] hover:bg-[#fafafa]"
+              >
+                設定
+              </Link>
+            ) : null}
+            {showMypageLink ? (
+              <Link
+                to="/writing/app/mypage"
+                className="rounded-lg border border-[#1e1b13]/15 bg-[#F5F5F5] px-3 py-1.5 text-xs font-bold text-[#000666] hover:bg-[#ebebeb]"
+              >
+                マイページ
+              </Link>
+            ) : null}
             <button
               type="button"
               onClick={() => void onLogout()}

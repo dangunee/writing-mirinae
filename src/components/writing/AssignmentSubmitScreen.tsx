@@ -86,6 +86,8 @@ export type AssignmentSubmitScreenProps = {
   requirementBlockDesktop?: ReactNode
   /** メインカラム先頭（課題UIより上）。/writing/app のアカウント帯・管理者プレビュー等 */
   mainTopSlot?: ReactNode
+  /** `/writing/app` 試用: 上部 LandingNav をブランドのみにし、アカウントは mainTopSlot に集約 */
+  landingNavVariant?: 'default' | 'minimal'
   /**
    * Admin sandbox 等: 親が「提出 / 既提出 / 添削完了」を制御し、既提出本文を表示する。
    * 未指定時は従来どおり「提出」固定・静的タブ（学生フローは変更なし）。
@@ -128,6 +130,7 @@ export default function AssignmentSubmitScreen({
   mobileTextareaPlaceholder,
   requirementBlockDesktop,
   mainTopSlot,
+  landingNavVariant = 'default',
   controlledAssignmentTab = false,
   assignmentTab = 'submit',
   onAssignmentTabChange,
@@ -255,7 +258,7 @@ export default function AssignmentSubmitScreen({
 
       {/* /writing ランディングと同一ヘッダー */}
       <div className="landing-stitch-root">
-        <LandingNav goApp={goApp} />
+        <LandingNav goApp={goApp} variant={landingNavVariant} />
       </div>
 
       {/* ——— Desktop (md+) ——— */}

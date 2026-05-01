@@ -4,6 +4,7 @@
 
 import { getDb } from "../db/client";
 import { assertTrialResendAllowed } from "../services/trialApplicationsAdminService";
+import { reopenMissedTrialSessionsAfterExtend } from "../services/trialExtendSessionReopenService";
 
 function json(data: unknown, status: number): Response {
   return new Response(JSON.stringify(data), {
@@ -192,7 +193,11 @@ async function handleResendUpstream(_req: Request, applicationId: string): Promi
   }
 }
 
-async function handleExtendUpstream(req: Request, applicationId: string): Promise<Response> {
+async function handleExtendUpstream(
+  req: Request,
+  applicationId: string,
+  opts?: { actorUserId?: string }
+): Promise<Response> {
   const cfg = mirinaeTrialAdminBaseAndSecret();
   if (!cfg) {
     return json({ ok: false, error: "server_misconfigured" }, 500);
@@ -203,6 +208,25 @@ async function handleExtendUpstream(req: Request, applicationId: string): Promis
     bodyText = await req.text();
   } catch {
     bodyText = "{}";
+  }
+
+  let requestedExpiry: Date | null = null;
+  try {
+    const jb = JSON.parse(bodyText || "{}") as Record<string, unknown>;
+    const iso =
+      typeof jb.accessExpiresAt === "string"
+        ? jb.accessExpiresAt
+        : typeof jb.access_expires_at === "string"
+          ? jb.access_expires_at
+          : typeof jb.newAccessExpiresAt === "string"
+            ? jb.newAccessExpiresAt
+            : null;
+    if (iso?.trim()) {
+      const d = new Date(iso.trim());
+      if (!Number.isNaN(d.getTime())) requestedExpiry = d;
+    }
+  } catch {
+    /* ignore */
   }
 
   const upstreamUrl = `${cfg.base}/api/admin/trial-applications/${encodeURIComponent(applicationId)}/extend-access`;
@@ -218,6 +242,25 @@ async function handleExtendUpstream(req: Request, applicationId: string): Promis
       body: bodyText || "{}",
     });
     const text = await res.text();
+
+    if (res.ok && opts?.actorUserId) {
+      try {
+        const db = getDb();
+        await reopenMissedTrialSessionsAfterExtend(db, {
+          applicationId,
+          actorUserId: opts.actorUserId,
+          accessExpiresAt: requestedExpiry,
+          upstreamExtendResponseBody: text,
+        });
+      } catch (e) {
+        console.error("trial_extend_reopen_failed", {
+          applicationIdPrefix: applicationId.slice(0, 8),
+          message: e instanceof Error ? e.message : String(e),
+          stack: e instanceof Error ? e.stack : undefined,
+        });
+      }
+    }
+
     return new Response(text, {
       status: res.status,
       headers: { "Content-Type": "application/json; charset=utf-8" },
@@ -229,7 +272,11 @@ async function handleExtendUpstream(req: Request, applicationId: string): Promis
 }
 
 /** POST mutations (activate / extend / resend) — caller must enforce requireAdminSessionUserId. */
-export async function proxyTrialAdminMutation(req: Request, applicationId: string): Promise<Response> {
+export async function proxyTrialAdminMutation(
+  req: Request,
+  applicationId: string,
+  opts?: { actorUserId?: string }
+): Promise<Response> {
   const id = applicationId.trim();
   if (!id) {
     return json({ ok: false, error: "invalid_request" }, 400);
@@ -238,7 +285,7 @@ export async function proxyTrialAdminMutation(req: Request, applicationId: strin
   const op = trialAdminOpFromRequest(req);
   switch (op) {
     case "extend":
-      return handleExtendUpstream(req, id);
+      return handleExtendUpstream(req, id, opts);
     case "resend": {
       const db = getDb();
       const gate = await assertTrialResendAllowed(db, id);
