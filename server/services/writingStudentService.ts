@@ -14,6 +14,7 @@ import { checkSessionEligibleForWriting } from "../lib/writingSubmissionEligibil
 import {
   evaluateTrialSubmitEligibility,
   sessionIsTerminalForTrialCourse,
+  trialSessionCountsTowardSuccessfulAllDone,
 } from "../lib/writingTrialSubmitEligibility";
 import { validateSubmissionFileUpload } from "../lib/writingUploads";
 import { getServiceRoleClient } from "../lib/supabaseServiceRole";
@@ -555,7 +556,7 @@ export async function getCurrentSessionForTrialApplication(
   }
 
   for (const s of sessions) {
-    if (sessionIsTerminalForTrialCourse(s)) continue;
+    if (trialSessionCountsTowardSuccessfulAllDone(s)) continue;
 
     const lower = sessions.filter((x) => x.index < s.index);
     const prevAllCompleted = lower.every((x) => sessionIsTerminalForTrialCourse(x));
@@ -610,8 +611,27 @@ export async function getCurrentSessionForTrialApplication(
     };
   }
 
-  /** all_done only if ≥1 session and all terminal ([] makes .every trivially true). */
-  if (sessions.length === 0 || !sessions.every(sessionIsTerminalForTrialCourse)) {
+  /** all_done only if ≥1 session and every row reflects successful completion (not missed-without-submit). */
+  const allDoneReturnAllowed =
+    sessions.length > 0 && sessions.every((s) => trialSessionCountsTowardSuccessfulAllDone(s));
+  if (!allDoneReturnAllowed) {
+    console.warn("trial_all_done_gate", {
+      allowed: false,
+      all_done_return_allowed: false,
+      sessions_count: sessions.length,
+      reasonIfNot: null,
+      applicationIdPrefix: `${applicationId.slice(0, 8)}…`,
+      courseIdPrefix: `${course.id.slice(0, 8)}…`,
+      ...(sessions.length === 0
+        ? {}
+        : {
+            sessionStatuses: sessions.map((s) => ({
+              index: s.index,
+              status: s.status,
+              runtimeStatus: s.runtimeStatus,
+            })),
+          }),
+    });
     trialBootstrapBlocked(
       sessions.length === 0 ? "trial_zero_sessions_not_all_done" : "trial_all_done_guard_failed",
       sessions.length === 0
@@ -632,6 +652,14 @@ export async function getCurrentSessionForTrialApplication(
     return { ok: false, error: "trial_session_missing" };
   }
 
+  console.info("trial_all_done_gate", {
+    allowed: true,
+    all_done_return_allowed: true,
+    sessions_count: sessions.length,
+    reasonIfNot: "all_sessions_completed",
+    applicationIdPrefix: `${applicationId.slice(0, 8)}…`,
+    courseIdPrefix: `${course.id.slice(0, 8)}…`,
+  });
   trialBootstrapVerbose("trial_return_all_done", {
     sessions_count: sessions.length,
     sessionCount: sessions.length,

@@ -10,6 +10,8 @@ export const TRIAL_WRITING_PUBLIC_ERROR_CODES = [
   "session_missed",
   "body_text_over_limit",
   "complete_previous_sessions_first",
+  /** Trial/student completion state for mode `all_done` (not a failure). */
+  "all_sessions_completed",
   "internal_error",
 ] as const;
 
@@ -29,6 +31,7 @@ export function mapTrialWritingErrorToPublic(internal: string): TrialWritingPubl
     case "session_missed":
     case "body_text_over_limit":
     case "complete_previous_sessions_first":
+    case "all_sessions_completed":
     case "internal_error":
       return internal;
     case "session_completed":

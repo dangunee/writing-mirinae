@@ -8,6 +8,16 @@ export function sessionIsTerminalForTrialCourse(s: typeof writingSessions.$infer
   return rt === "corrected" || rt === "missed";
 }
 
+/**
+ * True only when the learner successfully finished this session (counts toward trial `all_done`).
+ * `missed` is terminal for progression ({@link sessionIsTerminalForTrialCourse}) but must NOT skip the
+ * current-session loop or satisfy `all_done` — otherwise past-due reconciliation marks the row missed with
+ * no `submitted_at`, admin shows 未提出, while GET returns `mode: "all_done"`.
+ */
+export function trialSessionCountsTowardSuccessfulAllDone(s: typeof writingSessions.$inferSelect): boolean {
+  return s.status === "completed" || s.runtimeStatus === "corrected";
+}
+
 export type TrialSubmitEligibilityPipeline = {
   session: typeof writingSessions.$inferSelect;
   submission: typeof writingSubmissions.$inferSelect;
