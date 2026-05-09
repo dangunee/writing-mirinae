@@ -9,7 +9,7 @@ import { tryAcceptPendingInviteAfterAuth } from '../lib/academyInviteFlow'
 import { apiUrl } from '../lib/apiUrl'
 import { startLineOAuth } from '../lib/startLineOAuth'
 import { readJsonBody } from '../lib/readJsonBody'
-import { postLoginRedirect } from '../lib/postLoginRedirect'
+import { postLoginRedirectAsync } from '../lib/postLoginRedirect'
 import type { AuthMePayload } from '../types/authMe'
 
 const GOOGLE_G_IMG =
@@ -105,7 +105,7 @@ export default function SignupPage() {
         setError('セッションの確認に失敗しました。ログイン画面からお試しください。')
         return
       }
-      postLoginRedirect(navigate, me)
+      await postLoginRedirectAsync(navigate, me)
     } catch {
       setError('通信に失敗しました。')
     } finally {

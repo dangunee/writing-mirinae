@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 
 import { useAuthMe } from '../hooks/useAuthMe'
 import { apiUrl } from '../lib/apiUrl'
-import { postLoginRedirect } from '../lib/postLoginRedirect'
+import { postLoginRedirectAsync } from '../lib/postLoginRedirect'
 import { readJsonBody } from '../lib/readJsonBody'
 import type { AuthMePayload } from '../types/authMe'
 
@@ -28,7 +28,7 @@ export default function LineOnboardingPage() {
   useEffect(() => {
     if (!me?.ok || !me.user) return
     if (!me.needsEmailOnboarding) {
-      postLoginRedirect(navigate, me)
+      void postLoginRedirectAsync(navigate, me)
     }
   }, [me, navigate])
 
@@ -95,7 +95,7 @@ export default function LineOnboardingPage() {
       const meRes = await fetch(apiUrl('/api/auth/me'), { credentials: 'include' })
       const fresh = await readJsonBody<AuthMePayload>(meRes)
       if (fresh?.ok && fresh.user) {
-        postLoginRedirect(navigate, fresh)
+        await postLoginRedirectAsync(navigate, fresh)
       } else {
         navigate('/writing/app', { replace: true })
       }

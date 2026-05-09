@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react'
 import { Outlet, Navigate, useLocation } from 'react-router-dom'
 
 import { apiUrl } from './lib/apiUrl'
-import { setWritingSessionCurrentBootstrap } from './lib/writingSessionCurrentBootstrap'
 import { canAccessWritingStudentApp } from './lib/authEntitlements'
+import { setWritingSessionCurrentBootstrap } from './lib/writingSessionCurrentBootstrap'
+import { writingSessionCurrentAllowsStudentApp } from './lib/writingSessionCurrentGate'
 import type { AuthMePayload } from './types/authMe'
 
 type AuthGuardState = 'loading' | 'ok' | 'unauthorized' | 'error'
@@ -44,14 +45,8 @@ async function fetchWritingSessionGate(): Promise<{
   if (curRes.status === 200 && parsed != null) {
     setWritingSessionCurrentBootstrap(parsed)
   }
+  const allowed = curRes.status === 200 && writingSessionCurrentAllowsStudentApp(parsed)
   const bodyOk = parsed?.ok === true
-  const trialShellOk =
-    parsed != null &&
-    typeof parsed === "object" &&
-    (parsed as { accessKind?: string }).accessKind === "trial" &&
-    typeof (parsed as { applicationId?: string }).applicationId === "string" &&
-    (parsed as { applicationId: string }).applicationId.length > 0
-  const allowed = curRes.status === 200 && (bodyOk || trialShellOk)
   return { allowed, httpStatus: curRes.status, bodyOk }
 }
 

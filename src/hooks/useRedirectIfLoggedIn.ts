@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { apiUrl } from '../lib/apiUrl'
-import { postLoginRedirect } from '../lib/postLoginRedirect'
+import { postLoginRedirectAsync } from '../lib/postLoginRedirect'
 import type { AuthMePayload } from '../types/authMe'
 
 /**
@@ -28,7 +28,7 @@ export function useRedirectIfLoggedIn(enabled = true): boolean {
         if (cancelled || res.status === 401 || !res.ok) return
         const me = (await res.json()) as AuthMePayload
         if (me.ok && me.user) {
-          postLoginRedirect(navigate, me)
+          await postLoginRedirectAsync(navigate, me)
           redirected = true
           /* Keep checking=true until route unmounts — avoids flashing signup while navigating. */
           return

@@ -148,7 +148,7 @@ export default function LoginPage() {
           navigate('/writing/login', { replace: true })
           return
         }
-        /* postLoginRedirect navigates away; avoid setState after unmount */
+        /* postLoginRedirectAsync navigates away; avoid setState after unmount */
       } catch {
         if (cancelled) return
         setError(GENERIC_LOGIN_ERROR)

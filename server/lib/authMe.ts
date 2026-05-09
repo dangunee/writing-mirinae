@@ -9,6 +9,7 @@ import { and, eq } from "drizzle-orm";
 import { academyUnlimitedGrants, entitlements, products } from "../../db/schema";
 import type { Db } from "../db/client";
 import { findActiveWritingCourseForUser } from "../repositories/writingStudentRepository";
+import { resolveLinkedTrialApplicationForWritingSession } from "../services/trialLinkedUserWritingSession";
 
 export type AuthRole = "student" | "teacher" | "admin";
 
@@ -172,6 +173,16 @@ export async function computeEntitlementsForUser(db: Db, userId: string): Promis
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.warn("entitlement_course_query_failed", { userId, error: msg });
+  }
+
+  try {
+    const linkedTrial = await resolveLinkedTrialApplicationForWritingSession(db, userId);
+    if (linkedTrial) {
+      hasTrial = true;
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn("entitlement_linked_trial_failed", { userId, error: msg });
   }
 
   const out = { hasTrial, hasActiveCourse, isAcademyUnlimited };

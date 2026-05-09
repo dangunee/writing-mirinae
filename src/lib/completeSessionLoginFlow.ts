@@ -4,7 +4,7 @@ import type { AuthMePayload } from '../types/authMe'
 
 import { tryAcceptPendingInviteAfterAuth } from './academyInviteFlow'
 import { apiUrl } from './apiUrl'
-import { postLoginRedirect } from './postLoginRedirect'
+import { postLoginRedirectAsync } from './postLoginRedirect'
 import { readJsonBody } from './readJsonBody'
 
 /**
@@ -22,6 +22,6 @@ export async function completeSessionLoginFlow(navigate: NavigateFunction): Prom
   if (!me?.ok || !me.user || !me.entitlements || !me.loginMethods || typeof me.needsEmailOnboarding !== 'boolean') {
     return { ok: false }
   }
-  postLoginRedirect(navigate, me)
+  await postLoginRedirectAsync(navigate, me)
   return { ok: true }
 }

@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 
 import { tryAcceptPendingInviteAfterAuth } from '../lib/academyInviteFlow'
 import { apiUrl } from '../lib/apiUrl'
-import { postLoginRedirect } from '../lib/postLoginRedirect'
+import { postLoginRedirectAsync } from '../lib/postLoginRedirect'
 import type { AuthMePayload } from '../types/authMe'
 
 /**
@@ -40,7 +40,7 @@ export default function OAuthCompletePage() {
             me = parsed
           }
         }
-        postLoginRedirect(navigate, me)
+        await postLoginRedirectAsync(navigate, me)
       } catch {
         if (!cancelled) setError('通信に失敗しました。')
       }
