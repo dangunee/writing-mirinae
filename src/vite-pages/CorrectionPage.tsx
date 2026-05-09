@@ -388,11 +388,15 @@ export default function CorrectionPage() {
         ? editor.getHtml()
         : (editor?.getDocumentJson()?.html ?? "");
     const plain = extractComparisonPlainText(sourceHtml);
+    const sourceHtmlLen = sourceHtml.length;
+    const outputTextLen = plain.length;
+    const head50 = plain.slice(0, 50);
+    const tail50 = plain.slice(Math.max(0, plain.length - 50));
     console.info("[copy-clean-comparison]", {
-      sourceHtmlLen: sourceHtml.length,
-      outputTextLen: plain.length,
-      head50: plain.slice(0, 50),
-      tail50: plain.slice(Math.max(0, plain.length - 50)),
+      sourceHtmlLen,
+      outputTextLen,
+      head50,
+      tail50,
     });
     setImprovedText(plain);
     let copied = false;
