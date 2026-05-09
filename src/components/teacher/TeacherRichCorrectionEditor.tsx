@@ -9,6 +9,8 @@ import { buildTeacherRichJson, type TeacherRichDocumentHtmlV1 } from "../../lib/
 import { sanitizeTeacherCorrectionHtml } from "../../lib/teacherCorrectionSanitize";
 
 export type TeacherRichCorrectionEditorHandle = {
+  /** Full contenteditable HTML (for comparison-text extraction — not selection-scoped). */
+  getHtml: () => string;
   getDocumentJson: () => TeacherRichDocumentHtmlV1;
   focus: () => void;
 };
@@ -37,6 +39,7 @@ const TeacherRichCorrectionEditor = forwardRef<TeacherRichCorrectionEditorHandle
     useImperativeHandle(
       ref,
       () => ({
+        getHtml: () => editableRef.current?.innerHTML ?? "",
         getDocumentJson: () => buildTeacherRichJson(editableRef.current?.innerHTML ?? ""),
         focus: () => {
           editableRef.current?.focus();

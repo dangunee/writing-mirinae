@@ -381,8 +381,16 @@ export default function CorrectionPage() {
   };
 
   const handleCopyCorrected = async () => {
-    const doc = richEditorRef.current?.getDocumentJson();
-    const plain = extractComparisonPlainText(doc?.html ?? "");
+    const sourceHtml = richEditorRef.current?.getHtml?.() ?? "";
+    const plain = extractComparisonPlainText(sourceHtml);
+    if (import.meta.env.DEV) {
+      console.info("[writing teacher copy comparison]", {
+        sourceHtmlLen: sourceHtml.length,
+        outputTextLen: plain.length,
+        head50: plain.slice(0, 50),
+        tail50: plain.slice(Math.max(0, plain.length - 50)),
+      });
+    }
     setImprovedText(plain);
     let copied = false;
     try {

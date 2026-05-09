@@ -102,15 +102,20 @@ function colorLooksRedish(cssColor: string): boolean {
   return false;
 }
 
-/** Yellow / highlighter backgrounds — original/problem text dropped from comparison plain. */
-function styleIsYellowHighlight(style: string | null): boolean {
-  if (style == null || style === "") return false;
-  const s = style.toLowerCase();
-  if (!s.includes("background") && !s.includes("highlight")) return false;
-  if (/#fff59d|#ffff00|#ffeb3b|#ff0\b|#feff|yellow|lemonchiffon|lightyellow|lightgoldenrodyellow|khaki/i.test(s)) {
-    return true;
-  }
-  const m = s.match(/rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/i);
+/**
+ * Yellow / highlighter backgrounds — only inspect real background declarations.
+ * Avoids false positives from `-webkit-tap-highlight-color`, `linear-gradient(... yellow ...)`, etc.
+ */
+function styleDeclarationLooksYellowBackground(propRaw: string, valRaw: string): boolean {
+  const prop = propRaw.trim().toLowerCase();
+  if (prop !== "background-color" && prop !== "background") return false;
+  const v = valRaw.trim().toLowerCase();
+  if (!v) return false;
+  if (/url\s*\(|expression\s*\(|javascript:/i.test(v)) return false;
+  if (/linear-gradient|radial-gradient|repeating-linear-gradient/i.test(v)) return false;
+  if (/#fff59d|#ffff00|#ffeb3b|#ff0\b|#fef9c3|#fff9c4/i.test(v)) return true;
+  if (/\byellow\b|\blemonchiffon\b|\blightyellow\b|\blightgoldenrodyellow\b|\bkhaki\b/i.test(v)) return true;
+  const m = v.match(/rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/i);
   if (m) {
     const r = Number(m[1]);
     const g = Number(m[2]);
@@ -119,6 +124,19 @@ function styleIsYellowHighlight(style: string | null): boolean {
       if (r > 235 && g > 215 && b < 130 && r + g > b + 200) return true;
       if (r > 250 && g > 240 && b < 120) return true;
     }
+  }
+  return false;
+}
+
+function styleIsYellowHighlight(style: string | null): boolean {
+  if (style == null || style === "") return false;
+  const parts = style.split(";");
+  for (const part of parts) {
+    const idx = part.indexOf(":");
+    if (idx === -1) continue;
+    const prop = part.slice(0, idx);
+    const val = part.slice(idx + 1);
+    if (styleDeclarationLooksYellowBackground(prop, val)) return true;
   }
   return false;
 }
@@ -244,10 +262,12 @@ function collectComparisonSegments(root: HTMLElement): ComparisonSeg[] {
 
 function segmentsToComparisonPlain(segments: ComparisonSeg[]): string {
   let acc = "";
+  let lastKind: "plain" | "red" | null = null;
   for (const seg of segments) {
     const text = seg.text.replace(/\u00a0/g, " ");
     if (seg.kind === "red") {
       const glued =
+        lastKind === "plain" &&
         acc.length > 0 &&
         /\S$/.test(acc) &&
         text.length > 0 &&
@@ -256,8 +276,10 @@ function segmentsToComparisonPlain(segments: ComparisonSeg[]): string {
         acc = stripAdjacentWrongSuffixForRichCorrection(acc);
       }
       acc += text;
+      lastKind = "red";
     } else {
       acc += text;
+      lastKind = "plain";
     }
   }
   return normalizeComparisonPlainOutput(acc);
