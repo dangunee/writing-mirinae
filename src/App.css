@@ -920,6 +920,34 @@ a.status-badge.status.corrected {
   margin: 0 0 0.5rem;
 }
 
+.teacher-rich-editable ul,
+.teacher-rich-editable ol {
+  margin: 0 0 0.5rem 1.25rem;
+  padding: 0;
+}
+
+.teacher-rich-editable blockquote {
+  margin: 0 0 0.5rem;
+  padding-left: 0.75rem;
+  border-left: 3px solid var(--color-border);
+}
+
+.teacher-rich-content ul,
+.teacher-rich-content ol {
+  margin: 0 0 0.5rem 1.25rem;
+  padding: 0;
+}
+
+.teacher-rich-content blockquote {
+  margin: 0 0 0.5rem;
+  padding-left: 0.75rem;
+  border-left: 3px solid var(--color-border);
+}
+
+.teacher-rich-content mark {
+  background-color: rgba(255, 245, 157, 0.95);
+}
+
 .copy-toast {
   font-size: 0.85rem;
   color: var(--color-primary);

@@ -4,6 +4,7 @@ import WritingLayout from '../components/WritingLayout'
 import StudentAccountPanel from '../components/student/StudentAccountPanel'
 import { apiUrl } from '../lib/apiUrl'
 import { isHtmlVisiblyNonEmpty, parseTeacherHtmlV1 } from '../lib/teacherRichDocument'
+import { sanitizeTeacherCorrectionHtml } from '../lib/teacherCorrectionSanitize'
 
 function ViewCorrectionShell({ children }: { children: ReactNode }) {
   return (
@@ -97,7 +98,8 @@ function textNonEmpty(s: string | null | undefined): boolean {
 function hasPublishedCorrectionContent(correction: PublishedCorrection | null): boolean {
   if (!correction) return false
   const rawHtml = parseTeacherHtmlV1(correction.richDocumentJson)
-  if (rawHtml != null && isHtmlVisiblyNonEmpty(rawHtml)) return true
+  const safeHtml = rawHtml != null ? sanitizeTeacherCorrectionHtml(rawHtml) : ''
+  if (safeHtml !== '' && isHtmlVisiblyNonEmpty(safeHtml)) return true
   if (textNonEmpty(correction.polishedSentence)) return true
   if (textNonEmpty(correction.improvedText)) return true
   if (textNonEmpty(correction.teacherComment)) return true
@@ -313,13 +315,14 @@ export default function ViewCorrectionPage() {
             <div className="published-correction-blocks">
               {(() => {
                 const rawHtml = parseTeacherHtmlV1(correction.richDocumentJson)
-                const hasRich = rawHtml != null && isHtmlVisiblyNonEmpty(rawHtml)
+                const safeHtml = rawHtml != null ? sanitizeTeacherCorrectionHtml(rawHtml) : ''
+                const hasRich = safeHtml !== '' && isHtmlVisiblyNonEmpty(safeHtml)
                 return (
                   <>
                     {hasRich && (
                       <div
                         className="corrected-content teacher-rich-content"
-                        dangerouslySetInnerHTML={{ __html: rawHtml }}
+                        dangerouslySetInnerHTML={{ __html: safeHtml }}
                       />
                     )}
                     {!hasRich && textNonEmpty(correction.polishedSentence) && (

@@ -2,7 +2,10 @@
  * Rich correction payload for writing.corrections.rich_document_json (jsonb).
  * No DB schema change: stored as a small JSON object.
  */
-export const TEACHER_RICH_FORMAT_HTML_V1 = "html-v1" as const;
+import { TEACHER_RICH_FORMAT_HTML_V1 } from "./teacherRichDocumentFormat";
+import { sanitizeTeacherCorrectionHtml } from "./teacherCorrectionSanitize";
+
+export { TEACHER_RICH_FORMAT_HTML_V1 } from "./teacherRichDocumentFormat";
 
 export type TeacherRichDocumentHtmlV1 = {
   format: typeof TEACHER_RICH_FORMAT_HTML_V1;
@@ -19,7 +22,7 @@ export function parseTeacherHtmlV1(json: unknown): string | null {
 }
 
 export function buildTeacherRichJson(html: string): TeacherRichDocumentHtmlV1 {
-  return { format: TEACHER_RICH_FORMAT_HTML_V1, html };
+  return { format: TEACHER_RICH_FORMAT_HTML_V1, html: sanitizeTeacherCorrectionHtml(html) };
 }
 
 function escapeHtml(s: string): string {
@@ -39,15 +42,15 @@ export function buildInitialEditorHtml(
 ): string {
   const fromRich = parseTeacherHtmlV1(richJson);
   if (fromRich != null && fromRich.replace(/<[^>]*>/g, "").trim() !== "") {
-    return fromRich;
+    return sanitizeTeacherCorrectionHtml(fromRich);
   }
   const plain = (polishedSentence != null && polishedSentence !== ""
     ? polishedSentence
     : bodyText) ?? "";
   if (plain === "") {
-    return "<p><br></p>";
+    return sanitizeTeacherCorrectionHtml("<p><br></p>");
   }
-  return `<p>${escapeHtml(plain).replace(/\n/g, "<br>")}</p>`;
+  return sanitizeTeacherCorrectionHtml(`<p>${escapeHtml(plain).replace(/\n/g, "<br>")}</p>`);
 }
 
 /** True if the HTML has visible text (ignores tags). */

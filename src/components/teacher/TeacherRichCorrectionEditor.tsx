@@ -6,6 +6,7 @@ import {
   type RefObject,
 } from "react";
 import { buildTeacherRichJson, type TeacherRichDocumentHtmlV1 } from "../../lib/teacherRichDocument";
+import { sanitizeTeacherCorrectionHtml } from "../../lib/teacherCorrectionSanitize";
 
 export type TeacherRichCorrectionEditorHandle = {
   getDocumentJson: () => TeacherRichDocumentHtmlV1;
@@ -109,8 +110,21 @@ const TeacherRichCorrectionEditor = forwardRef<TeacherRichCorrectionEditorHandle
           suppressContentEditableWarning
           onPaste={(e) => {
             e.preventDefault();
-            const t = e.clipboardData.getData("text/plain");
-            document.execCommand("insertText", false, t);
+            const cd = e.clipboardData;
+            const html = cd.getData("text/html");
+            const plain = cd.getData("text/plain") ?? "";
+            runOnEditable(editableRef, () => {
+              if (typeof html === "string" && html.trim()) {
+                const clean = sanitizeTeacherCorrectionHtml(html);
+                if (clean.trim()) {
+                  document.execCommand("insertHTML", false, clean);
+                  return;
+                }
+              }
+              if (plain) {
+                document.execCommand("insertText", false, plain);
+              }
+            });
           }}
         />
       </div>

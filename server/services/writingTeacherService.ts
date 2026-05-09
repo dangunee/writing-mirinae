@@ -12,6 +12,7 @@
  */
 
 import type { Db } from "../db/client";
+import { sanitizePersistedRichDocumentJson } from "../lib/teacherCorrectionSanitize";
 import { parseThemeSnapshot } from "../lib/themeSnapshotParse";
 import { isPostgresErrorLike, isPostgresUniqueViolation } from "../lib/postgresErrorGuards";
 import * as repo from "../repositories/writingTeacherRepository";
@@ -522,7 +523,7 @@ export async function saveCorrectionDraft(
   if ("richDocumentJson" in body) {
     const vr = validateRichDocumentJson(body.richDocumentJson);
     if (!vr.ok) return { ok: false, status: 400, code: vr.code };
-    patch.richDocumentJson = vr.value;
+    patch.richDocumentJson = sanitizePersistedRichDocumentJson(vr.value);
   }
 
   if (Object.keys(patch).length === 0) {
