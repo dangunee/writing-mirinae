@@ -6,7 +6,7 @@ import TeacherRichCorrectionEditor, {
   type TeacherRichCorrectionEditorHandle,
 } from "../components/teacher/TeacherRichCorrectionEditor";
 import { TeacherPageNav } from "../components/teacher/TeacherPageNav";
-import { buildInitialEditorHtml, extractComparisonPlainText } from "../lib/teacherRichDocument";
+import { buildInitialEditorHtml, extractComparisonPlainTextWithDebug } from "../lib/teacherRichDocument";
 
 /** GET /api/teacher/writing/submissions/:id 응답 (TeacherSubmissionDetail 요약) */
 type TeacherAssignmentSnapshot = {
@@ -387,7 +387,7 @@ export default function CorrectionPage() {
       typeof editor?.getHtml === "function"
         ? editor.getHtml()
         : (editor?.getDocumentJson()?.html ?? "");
-    const plain = extractComparisonPlainText(sourceHtml);
+    const { plain, debug } = extractComparisonPlainTextWithDebug(sourceHtml);
     const sourceHtmlLen = sourceHtml.length;
     const outputTextLen = plain.length;
     const head50 = plain.slice(0, 50);
@@ -397,6 +397,16 @@ export default function CorrectionPage() {
       outputTextLen,
       head50,
       tail50,
+      extractDebug: {
+        totalTextNodes: debug.totalTextNodes,
+        keptTextNodes: debug.keptTextNodes,
+        skippedYellowTextNodes: debug.skippedYellowTextNodes,
+        skippedStrikeTextNodes: debug.skippedStrikeTextNodes,
+        skippedScriptStyleNodes: debug.skippedScriptStyleNodes,
+        keptPreviewFirst5: debug.keptPreviewFirst5,
+        skippedYellowPreviewFirst5: debug.skippedYellowPreviewFirst5,
+        skippedStrikePreviewFirst5: debug.skippedStrikePreviewFirst5,
+      },
     });
     setImprovedText(plain);
     let copied = false;

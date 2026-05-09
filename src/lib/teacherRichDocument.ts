@@ -123,10 +123,16 @@ export function stripAdjacentWrongSuffixForRichCorrection(buffer: string): strin
 
 function styleHasLineThrough(style: string | null): boolean {
   if (style == null || style === "") return false;
-  const s = style.toLowerCase();
-  if (!s.includes("line-through")) return false;
-  if (/text-decoration-line\s*:\s*[^;]*line-through/.test(s)) return true;
-  if (/text-decoration\s*:\s*[^;]*line-through/.test(s)) return true;
+  const low = style.toLowerCase();
+  if (!low.includes("line-through")) return false;
+  for (const part of style.split(";")) {
+    const idx = part.indexOf(":");
+    if (idx === -1) continue;
+    const prop = part.slice(0, idx).trim().toLowerCase();
+    if (prop !== "text-decoration" && prop !== "text-decoration-line") continue;
+    const val = part.slice(idx + 1).trim().toLowerCase();
+    if (val.includes("line-through")) return true;
+  }
   return false;
 }
 
@@ -144,28 +150,24 @@ function textNodeUnderStrike(textNode: Text): boolean {
   return false;
 }
 
-/** Highlighter yellows — only real background declarations (no gradients / tap-highlight noise). */
-function backgroundValueLooksYellowHighlight(valRaw: string): boolean {
-  const v = valRaw.trim().toLowerCase();
+function cssBackgroundIsExplicitHighlightYellow(valRaw: string): boolean {
+  const v = valRaw.trim().toLowerCase().replace(/\s*!\s*important\s*/gi, " ").trim();
   if (!v || /linear-gradient|radial-gradient|repeating-linear-gradient|url\s*\(/i.test(v)) return false;
-  if (/#fff59d|#ffff00|#ffeb3b|#ff0\b|#fef9c3|#fff9c4|#fef08a/i.test(v)) return true;
-  if (/\byellow\b|\blemonchiffon\b|\blightyellow\b|\blightgoldenrodyellow\b|\bkhaki\b/i.test(v)) return true;
-  const m = v.match(/^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/);
-  if (m) {
-    const r = Number(m[1]);
-    const g = Number(m[2]);
-    const b = Number(m[3]);
-    if (Number.isFinite(r) && Number.isFinite(g) && Number.isFinite(b)) {
-      if (r > 235 && g > 215 && b < 130 && r + g > b + 200) return true;
-      if (r > 250 && g > 240 && b < 120) return true;
-    }
+  if (/^rgba?\(\s*255\s*,\s*255\s*,\s*0\b/i.test(v)) return true;
+  const tokens = v.split(/[\s,/]+/).filter(Boolean);
+  const allowedHex = new Set(["#ffff00", "#ff0", "#fff59d", "#ffeb3b"]);
+  const allowedHex6 = new Set(["ffff00", "fff59d", "ffeb3b"]);
+  for (const tok of tokens) {
+    if (tok === "yellow") return true;
+    if (allowedHex.has(tok)) return true;
+    if (/^#[0-9a-f]{6}$/.test(tok) && allowedHex6.has(tok.slice(1))) return true;
   }
   return false;
 }
 
 function elementHasYellowHighlightBackground(el: Element): boolean {
   const bgAttr = el.getAttribute("bgcolor");
-  if (bgAttr != null && bgAttr !== "" && backgroundValueLooksYellowHighlight(bgAttr)) return true;
+  if (bgAttr != null && bgAttr !== "" && cssBackgroundIsExplicitHighlightYellow(bgAttr)) return true;
 
   const style = el.getAttribute("style");
   if (style == null || style === "") return false;
@@ -175,7 +177,7 @@ function elementHasYellowHighlightBackground(el: Element): boolean {
     const prop = part.slice(0, idx).trim().toLowerCase();
     const val = part.slice(idx + 1).trim();
     if (prop !== "background-color" && prop !== "background") continue;
-    if (backgroundValueLooksYellowHighlight(val)) return true;
+    if (cssBackgroundIsExplicitHighlightYellow(val)) return true;
   }
   return false;
 }
@@ -293,6 +295,71 @@ type ComparisonSegKind = "plain" | "red" | "blue";
 
 type ComparisonSeg = { kind: ComparisonSegKind; text: string };
 
+/** Temporary diagnostics for 「修正文をコピー」 — strip logs once extractor stabilizes. */
+export type ComparisonExtractDebug = {
+  totalTextNodes: number;
+  keptTextNodes: number;
+  skippedYellowTextNodes: number;
+  skippedStrikeTextNodes: number;
+  skippedScriptStyleNodes: number;
+  keptPreviewFirst5: string[];
+  skippedYellowPreviewFirst5: Array<{ preview: string; ancestorHint: string }>;
+  skippedStrikePreviewFirst5: Array<{ preview: string; ancestorHint: string }>;
+};
+
+function emptyComparisonExtractDebug(): ComparisonExtractDebug {
+  return {
+    totalTextNodes: 0,
+    keptTextNodes: 0,
+    skippedYellowTextNodes: 0,
+    skippedStrikeTextNodes: 0,
+    skippedScriptStyleNodes: 0,
+    keptPreviewFirst5: [],
+    skippedYellowPreviewFirst5: [],
+    skippedStrikePreviewFirst5: [],
+  };
+}
+
+function truncatePreview(s: string, max: number): string {
+  const t = s.replace(/\s+/g, " ").trim();
+  if (t.length <= max) return t;
+  return `${t.slice(0, max - 1)}…`;
+}
+
+function strikeSkipAncestorHint(textNode: Text): string {
+  let cur: Node | null = textNode.parentNode;
+  while (cur != null) {
+    if (cur.nodeType === Node.ELEMENT_NODE) {
+      const el = cur as Element;
+      const tag = el.tagName.toLowerCase();
+      if (tag === "s" || tag === "strike" || tag === "del") return `<${tag}>`;
+      const st = el.getAttribute("style");
+      if (styleHasLineThrough(st)) {
+        return `${tag} style="${truncatePreview(st ?? "", 100)}"`;
+      }
+    }
+    cur = cur.parentNode;
+  }
+  return "?";
+}
+
+function yellowSkipAncestorHint(textNode: Text): string {
+  let cur: Node | null = textNode.parentNode;
+  while (cur != null) {
+    if (cur.nodeType === Node.ELEMENT_NODE) {
+      const el = cur as Element;
+      const tag = el.tagName.toLowerCase();
+      if (tag === "mark") return "<mark>";
+      if (elementHasYellowHighlightBackground(el)) {
+        const st = el.getAttribute("style") ?? "";
+        return `${tag} style="${truncatePreview(st, 120)}"`;
+      }
+    }
+    cur = cur.parentNode;
+  }
+  return "?";
+}
+
 function mergeAdjacentComparisonSegs(segs: ComparisonSeg[]): ComparisonSeg[] {
   const out: ComparisonSeg[] = [];
   for (const s of segs) {
@@ -342,23 +409,50 @@ function pushComparisonSegment(segments: ComparisonSeg[], kind: ComparisonSegKin
   segments.push({ kind, text: t });
 }
 
-function emitComparisonTextNode(textNode: Text, segments: ComparisonSeg[]): void {
-  if (textNodeUnderStrike(textNode)) return;
-  if (textNodeUnderYellowHighlight(textNode)) return;
+function emitComparisonTextNode(textNode: Text, segments: ComparisonSeg[], debug: ComparisonExtractDebug): void {
+  debug.totalTextNodes++;
+  const rawFull = textNode.textContent ?? "";
+  const previewSource = truncatePreview(rawFull, 56);
+
+  if (textNodeUnderStrike(textNode)) {
+    debug.skippedStrikeTextNodes++;
+    if (debug.skippedStrikePreviewFirst5.length < 5) {
+      debug.skippedStrikePreviewFirst5.push({
+        preview: previewSource,
+        ancestorHint: strikeSkipAncestorHint(textNode),
+      });
+    }
+    return;
+  }
+  if (textNodeUnderYellowHighlight(textNode)) {
+    debug.skippedYellowTextNodes++;
+    if (debug.skippedYellowPreviewFirst5.length < 5) {
+      debug.skippedYellowPreviewFirst5.push({
+        preview: previewSource,
+        ancestorHint: yellowSkipAncestorHint(textNode),
+      });
+    }
+    return;
+  }
+
   const kind = classifyComparisonColorKind(textNode);
-  const raw = textNode.textContent ?? "";
-  if (raw === "") return;
-  pushComparisonSegment(segments, kind, raw);
+  if (rawFull === "") return;
+  const lenBefore = segments.length;
+  pushComparisonSegment(segments, kind, rawFull);
+  if (segments.length > lenBefore) {
+    debug.keptTextNodes++;
+    if (debug.keptPreviewFirst5.length < 5) debug.keptPreviewFirst5.push(previewSource);
+  }
 }
 
-function walkComparisonSegments(parent: Node, segments: ComparisonSeg[]): void {
+function walkComparisonSegments(parent: Node, segments: ComparisonSeg[], debug: ComparisonExtractDebug): void {
   const children = parent.childNodes;
   let prevSiblingWasBlock = false;
 
   for (let i = 0; i < children.length; i++) {
     const child = children[i];
     if (child.nodeType === Node.TEXT_NODE) {
-      emitComparisonTextNode(child as Text, segments);
+      emitComparisonTextNode(child as Text, segments, debug);
       prevSiblingWasBlock = false;
       continue;
     }
@@ -366,7 +460,10 @@ function walkComparisonSegments(parent: Node, segments: ComparisonSeg[]): void {
 
     const el = child as Element;
     const tag = el.tagName.toLowerCase();
-    if (tag === "script" || tag === "style") continue;
+    if (tag === "script" || tag === "style") {
+      debug.skippedScriptStyleNodes++;
+      continue;
+    }
 
     if (tag === "br") {
       pushComparisonSegment(segments, "plain", "\n");
@@ -379,7 +476,7 @@ function walkComparisonSegments(parent: Node, segments: ComparisonSeg[]): void {
       pushComparisonSegment(segments, "plain", "\n\n");
     }
 
-    walkComparisonSegments(el, segments);
+    walkComparisonSegments(el, segments, debug);
 
     prevSiblingWasBlock = blockHere;
   }
@@ -393,29 +490,40 @@ function normalizeComparisonPlainOutput(s: string): string {
     .trim();
 }
 
-/**
- * 「整理した比較文」: discard strike + yellow highlights; keep plain / red / blue;
- * peel glued plain suffix before red; preserve paragraph breaks (`\\n\\n` between blocks).
- */
-export function richCorrectionHtmlToComparisonPlainText(html: string): string {
-  if (typeof html !== "string" || html.trim() === "") return "";
+export function extractComparisonPlainTextWithDebug(html: string): {
+  plain: string;
+  debug: ComparisonExtractDebug;
+} {
+  const debug = emptyComparisonExtractDebug();
+  if (typeof html !== "string" || html.trim() === "") {
+    return { plain: "", debug };
+  }
   if (typeof document === "undefined") {
-    return htmlToPlainText(html);
+    return { plain: htmlToPlainText(html), debug };
   }
   try {
     const div = document.createElement("div");
     div.innerHTML = html;
     const segments: ComparisonSeg[] = [];
-    walkComparisonSegments(div, segments);
-    return segmentsToComparisonPlain(mergeAdjacentComparisonSegs(segments));
+    walkComparisonSegments(div, segments, debug);
+    const plain = segmentsToComparisonPlain(mergeAdjacentComparisonSegs(segments));
+    return { plain, debug };
   } catch {
-    return htmlToPlainText(html);
+    return { plain: htmlToPlainText(html), debug };
   }
+}
+
+/**
+ * 「整理した比較文」: discard strike + yellow highlights; keep plain / red / blue;
+ * peel glued plain suffix before red; preserve paragraph breaks (`\\n\\n` between blocks).
+ */
+export function richCorrectionHtmlToComparisonPlainText(html: string): string {
+  return extractComparisonPlainTextWithDebug(html).plain;
 }
 
 /** Plain text for 「整理した比較文」(정서문) — thin alias for {@link richCorrectionHtmlToComparisonPlainText}. */
 export function extractComparisonPlainText(html: string): string {
-  return richCorrectionHtmlToComparisonPlainText(html);
+  return extractComparisonPlainTextWithDebug(html).plain;
 }
 
 /** Strip tags for clipboard; prefer DOM innerText in the browser. */
