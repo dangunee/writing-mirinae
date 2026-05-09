@@ -847,6 +847,16 @@ a.status-badge.status.corrected {
   border-color: var(--color-primary);
 }
 
+.correction-textarea--comparison {
+  min-height: 260px;
+}
+
+@media (min-width: 768px) {
+  .correction-textarea--comparison {
+    min-height: 320px;
+  }
+}
+
 .teacher-rich-wrap {
   border: 2px solid var(--color-border);
   border-radius: 10px;

@@ -565,8 +565,8 @@ export default function CorrectionPage() {
                   <textarea
                     value={improvedText}
                     onChange={(e) => setImprovedText(e.target.value)}
-                    className="correction-textarea"
-                    rows={6}
+                    className="correction-textarea correction-textarea--comparison"
+                    rows={10}
                     placeholder="比較用の清書テキストを入力"
                   />
                   <div className="editor-actions" style={{ marginTop: "0.75rem" }}>
