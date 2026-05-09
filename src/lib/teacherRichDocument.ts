@@ -100,28 +100,72 @@ function isComparisonBlockTag(tagName: string): boolean {
   return COMPARISON_BLOCK_TAGS.has(tagName.toLowerCase());
 }
 
-/**
- * Only «canonical» yellow used for strippable highlights (problem/old text).
- * Does not treat pastel/toolbar creams as yellow — avoids wiping most of the document.
- */
-function cssBackgroundValueIsStripYellow(valRaw: string): boolean {
-  const v = valRaw.trim().toLowerCase();
-  if (!v || /linear-gradient|radial-gradient|repeating-linear-gradient|url\s*\(/i.test(v)) return false;
-  if (v === "yellow") return true;
-  if (v === "#ffff00" || v === "#ff0") return true;
-  const m = v.match(/^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/);
-  if (m) {
-    const r = Math.round(Number(m[1]));
-    const g = Math.round(Number(m[2]));
-    const b = Math.round(Number(m[3]));
-    return r === 255 && g === 255 && b === 0;
+/** Peels glued wrong-original suffix before a red correction segment (bounded cost). */
+export function stripAdjacentWrongSuffixForRichCorrection(buffer: string): string {
+  const MAX_PEELS = 24;
+  const MAX_CHARS = 200;
+  let out = buffer;
+  let removedSum = 0;
+  let peels = 0;
+  while (peels < MAX_PEELS && removedSum < MAX_CHARS) {
+    const trimmed = out.replace(/\s+$/, "");
+    if (!/\S/.test(trimmed)) break;
+    const m = trimmed.match(/\S+$/);
+    if (!m || !m[0].length) break;
+    const word = m[0];
+    if (removedSum + word.length > MAX_CHARS) break;
+    out = trimmed.slice(0, trimmed.length - word.length).replace(/\s+$/, "");
+    removedSum += word.length;
+    peels++;
+  }
+  return out;
+}
+
+function styleHasLineThrough(style: string | null): boolean {
+  if (style == null || style === "") return false;
+  const s = style.toLowerCase();
+  if (!s.includes("line-through")) return false;
+  if (/text-decoration-line\s*:\s*[^;]*line-through/.test(s)) return true;
+  if (/text-decoration\s*:\s*[^;]*line-through/.test(s)) return true;
+  return false;
+}
+
+function textNodeUnderStrike(textNode: Text): boolean {
+  let cur: Node | null = textNode.parentNode;
+  while (cur != null) {
+    if (cur.nodeType === Node.ELEMENT_NODE) {
+      const el = cur as Element;
+      const tag = el.tagName.toLowerCase();
+      if (tag === "s" || tag === "strike" || tag === "del") return true;
+      if (styleHasLineThrough(el.getAttribute("style"))) return true;
+    }
+    cur = cur.parentNode;
   }
   return false;
 }
 
-function elementDeclaresStripYellowBackground(el: Element): boolean {
+/** Highlighter yellows — only real background declarations (no gradients / tap-highlight noise). */
+function backgroundValueLooksYellowHighlight(valRaw: string): boolean {
+  const v = valRaw.trim().toLowerCase();
+  if (!v || /linear-gradient|radial-gradient|repeating-linear-gradient|url\s*\(/i.test(v)) return false;
+  if (/#fff59d|#ffff00|#ffeb3b|#ff0\b|#fef9c3|#fff9c4|#fef08a/i.test(v)) return true;
+  if (/\byellow\b|\blemonchiffon\b|\blightyellow\b|\blightgoldenrodyellow\b|\bkhaki\b/i.test(v)) return true;
+  const m = v.match(/^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/);
+  if (m) {
+    const r = Number(m[1]);
+    const g = Number(m[2]);
+    const b = Number(m[3]);
+    if (Number.isFinite(r) && Number.isFinite(g) && Number.isFinite(b)) {
+      if (r > 235 && g > 215 && b < 130 && r + g > b + 200) return true;
+      if (r > 250 && g > 240 && b < 120) return true;
+    }
+  }
+  return false;
+}
+
+function elementHasYellowHighlightBackground(el: Element): boolean {
   const bgAttr = el.getAttribute("bgcolor");
-  if (bgAttr != null && bgAttr !== "" && cssBackgroundValueIsStripYellow(bgAttr)) return true;
+  if (bgAttr != null && bgAttr !== "" && backgroundValueLooksYellowHighlight(bgAttr)) return true;
 
   const style = el.getAttribute("style");
   if (style == null || style === "") return false;
@@ -131,39 +175,190 @@ function elementDeclaresStripYellowBackground(el: Element): boolean {
     const prop = part.slice(0, idx).trim().toLowerCase();
     const val = part.slice(idx + 1).trim();
     if (prop !== "background-color" && prop !== "background") continue;
-    if (cssBackgroundValueIsStripYellow(val)) return true;
+    if (backgroundValueLooksYellowHighlight(val)) return true;
   }
   return false;
 }
 
-/** Skip text under any ancestor that declares strip-yellow background. */
-function comparisonTextNodeUnderStripYellow(textNode: Text): boolean {
+function textNodeUnderYellowHighlight(textNode: Text): boolean {
   let cur: Node | null = textNode.parentNode;
   while (cur != null) {
-    if (cur.nodeType === Node.ELEMENT_NODE && elementDeclaresStripYellowBackground(cur as Element)) {
-      return true;
+    if (cur.nodeType === Node.ELEMENT_NODE) {
+      const el = cur as Element;
+      const tag = el.tagName.toLowerCase();
+      if (tag === "mark") return true;
+      if (elementHasYellowHighlightBackground(el)) return true;
     }
     cur = cur.parentNode;
   }
   return false;
 }
 
-function emitComparisonTextNode(textNode: Text, parts: string[]): void {
-  if (comparisonTextNodeUnderStripYellow(textNode)) return;
-  let t = textNode.textContent ?? "";
-  if (t === "") return;
-  t = t.replace(/\u00a0/g, " ").replace(/[ \t\f\v]+/g, " ");
-  parts.push(t);
+function colorLooksRedish(cssColor: string): boolean {
+  const v = cssColor.trim().toLowerCase();
+  if (!v || v.length > 120) return false;
+  if (/(url|expression|behavior|javascript|@import)/i.test(v)) return false;
+  if (v === "red" || v === "crimson" || v === "darkred" || v === "firebrick" || v === "tomato") return true;
+  if (v === "orange" || v === "gold" || v === "amber") return false;
+
+  const hex = v.match(/^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i);
+  if (hex) {
+    let h = hex[1];
+    if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+    const r = parseInt(h.slice(0, 2), 16);
+    const g = parseInt(h.slice(2, 4), 16);
+    const b = parseInt(h.slice(4, 6), 16);
+    return Number.isFinite(r) && Number.isFinite(g) && Number.isFinite(b) && r > 130 && r > g + 85 && r > b + 35;
+  }
+
+  const rgb = v.match(/^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/i);
+  if (rgb) {
+    const r = Number(rgb[1]);
+    const g = Number(rgb[2]);
+    const b = Number(rgb[3]);
+    return (
+      Number.isFinite(r) &&
+      Number.isFinite(g) &&
+      Number.isFinite(b) &&
+      r > 130 &&
+      r > g + 85 &&
+      r > b + 35
+    );
+  }
+
+  return false;
 }
 
-function walkComparisonDom(parent: Node, parts: string[]): void {
+function colorLooksBlueish(cssColor: string): boolean {
+  const v = cssColor.trim().toLowerCase();
+  if (!v || v.length > 120) return false;
+  if (/(url|expression|behavior|javascript|@import)/i.test(v)) return false;
+  if (v === "blue" || v === "navy" || v === "dodgerblue" || v === "royalblue" || v === "steelblue") return true;
+
+  const hex = v.match(/^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i);
+  if (hex) {
+    let h = hex[1];
+    if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+    const r = parseInt(h.slice(0, 2), 16);
+    const g = parseInt(h.slice(2, 4), 16);
+    const b = parseInt(h.slice(4, 6), 16);
+    return Number.isFinite(r) && Number.isFinite(g) && Number.isFinite(b) && b > r + 35 && b > g + 15 && b > 90;
+  }
+
+  const rgb = v.match(/^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/i);
+  if (rgb) {
+    const r = Number(rgb[1]);
+    const g = Number(rgb[2]);
+    const b = Number(rgb[3]);
+    return Number.isFinite(r) && Number.isFinite(g) && Number.isFinite(b) && b > r + 35 && b > g + 15 && b > 90;
+  }
+
+  return false;
+}
+
+function styleIsRedForeground(style: string | null): boolean {
+  if (style == null || style === "") return false;
+  const fill = style.match(/(?:^|;)\s*-webkit-text-fill-color\s*:\s*([^;]+)/i);
+  if (fill && colorLooksRedish(fill[1])) return true;
+  const col = style.match(/(?:^|;)\s*color\s*:\s*([^;]+)/i);
+  return Boolean(col && colorLooksRedish(col[1]));
+}
+
+function styleIsBlueForeground(style: string | null): boolean {
+  if (style == null || style === "") return false;
+  if (styleIsRedForeground(style)) return false;
+  const col = style.match(/(?:^|;)\s*color\s*:\s*([^;]+)/i);
+  return Boolean(col && colorLooksBlueish(col[1]));
+}
+
+/** Innermost ancestor wins — closest element with explicit red / blue / plain default. */
+function classifyComparisonColorKind(textNode: Text): "plain" | "red" | "blue" {
+  let el: Element | null = textNode.parentElement;
+  while (el != null) {
+    const tag = el.tagName.toLowerCase();
+    if (tag === "font") {
+      const c = el.getAttribute("color");
+      if (c && colorLooksRedish(c)) return "red";
+      if (c && colorLooksBlueish(c)) return "blue";
+    }
+    const st = el.getAttribute("style");
+    if (styleIsRedForeground(st)) return "red";
+    if (styleIsBlueForeground(st)) return "blue";
+    el = el.parentElement;
+  }
+  return "plain";
+}
+
+type ComparisonSegKind = "plain" | "red" | "blue";
+
+type ComparisonSeg = { kind: ComparisonSegKind; text: string };
+
+function mergeAdjacentComparisonSegs(segs: ComparisonSeg[]): ComparisonSeg[] {
+  const out: ComparisonSeg[] = [];
+  for (const s of segs) {
+    const prev = out[out.length - 1];
+    if (prev && prev.kind === s.kind) {
+      prev.text += s.text;
+    } else {
+      out.push({ kind: s.kind, text: s.text });
+    }
+  }
+  return out;
+}
+
+function segmentsToComparisonPlain(segments: ComparisonSeg[]): string {
+  let acc = "";
+  let lastKind: ComparisonSegKind | null = null;
+  for (const seg of segments) {
+    const text = seg.text.replace(/\u00a0/g, " ");
+    if (seg.kind === "red") {
+      const glued =
+        lastKind === "plain" &&
+        acc.length > 0 &&
+        /\S$/.test(acc) &&
+        text.length > 0 &&
+        /^\S/.test(text);
+      if (glued) {
+        acc = stripAdjacentWrongSuffixForRichCorrection(acc);
+      }
+      acc += text;
+      lastKind = "red";
+    } else {
+      acc += text;
+      lastKind = seg.kind;
+    }
+  }
+  return normalizeComparisonPlainOutput(acc);
+}
+
+function normalizeEmitText(raw: string): string {
+  if (raw === "") return "";
+  return raw.replace(/\u00a0/g, " ").replace(/[ \t\f\v]+/g, " ");
+}
+
+function pushComparisonSegment(segments: ComparisonSeg[], kind: ComparisonSegKind, text: string): void {
+  const t = normalizeEmitText(text);
+  if (t === "") return;
+  segments.push({ kind, text: t });
+}
+
+function emitComparisonTextNode(textNode: Text, segments: ComparisonSeg[]): void {
+  if (textNodeUnderStrike(textNode)) return;
+  if (textNodeUnderYellowHighlight(textNode)) return;
+  const kind = classifyComparisonColorKind(textNode);
+  const raw = textNode.textContent ?? "";
+  if (raw === "") return;
+  pushComparisonSegment(segments, kind, raw);
+}
+
+function walkComparisonSegments(parent: Node, segments: ComparisonSeg[]): void {
   const children = parent.childNodes;
   let prevSiblingWasBlock = false;
 
   for (let i = 0; i < children.length; i++) {
     const child = children[i];
     if (child.nodeType === Node.TEXT_NODE) {
-      emitComparisonTextNode(child as Text, parts);
+      emitComparisonTextNode(child as Text, segments);
       prevSiblingWasBlock = false;
       continue;
     }
@@ -174,15 +369,17 @@ function walkComparisonDom(parent: Node, parts: string[]): void {
     if (tag === "script" || tag === "style") continue;
 
     if (tag === "br") {
-      parts.push("\n");
+      pushComparisonSegment(segments, "plain", "\n");
       prevSiblingWasBlock = false;
       continue;
     }
 
     const blockHere = isComparisonBlockTag(tag);
-    if (blockHere && prevSiblingWasBlock) parts.push("\n\n");
+    if (blockHere && prevSiblingWasBlock) {
+      pushComparisonSegment(segments, "plain", "\n\n");
+    }
 
-    walkComparisonDom(el, parts);
+    walkComparisonSegments(el, segments);
 
     prevSiblingWasBlock = blockHere;
   }
@@ -197,8 +394,8 @@ function normalizeComparisonPlainOutput(s: string): string {
 }
 
 /**
- * 「整理した比較文」 plain text: depth-first text nodes; omit only canonical yellow backgrounds
- * (#ffff00 / rgb(255,255,0) / yellow); keep normal / red / blue text and line breaks.
+ * 「整理した比較文」: discard strike + yellow highlights; keep plain / red / blue;
+ * peel glued plain suffix before red; preserve paragraph breaks (`\\n\\n` between blocks).
  */
 export function richCorrectionHtmlToComparisonPlainText(html: string): string {
   if (typeof html !== "string" || html.trim() === "") return "";
@@ -208,9 +405,9 @@ export function richCorrectionHtmlToComparisonPlainText(html: string): string {
   try {
     const div = document.createElement("div");
     div.innerHTML = html;
-    const parts: string[] = [];
-    walkComparisonDom(div, parts);
-    return normalizeComparisonPlainOutput(parts.join(""));
+    const segments: ComparisonSeg[] = [];
+    walkComparisonSegments(div, segments);
+    return segmentsToComparisonPlain(mergeAdjacentComparisonSegs(segments));
   } catch {
     return htmlToPlainText(html);
   }
