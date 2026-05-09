@@ -381,16 +381,19 @@ export default function CorrectionPage() {
   };
 
   const handleCopyCorrected = async () => {
-    const sourceHtml = richEditorRef.current?.getHtml?.() ?? "";
+    console.info("[copy-clean-comparison] clicked");
+    const editor = richEditorRef.current;
+    const sourceHtml =
+      typeof editor?.getHtml === "function"
+        ? editor.getHtml()
+        : (editor?.getDocumentJson()?.html ?? "");
     const plain = extractComparisonPlainText(sourceHtml);
-    if (import.meta.env.DEV) {
-      console.info("[writing teacher copy comparison]", {
-        sourceHtmlLen: sourceHtml.length,
-        outputTextLen: plain.length,
-        head50: plain.slice(0, 50),
-        tail50: plain.slice(Math.max(0, plain.length - 50)),
-      });
-    }
+    console.info("[copy-clean-comparison]", {
+      sourceHtmlLen: sourceHtml.length,
+      outputTextLen: plain.length,
+      head50: plain.slice(0, 50),
+      tail50: plain.slice(Math.max(0, plain.length - 50)),
+    });
     setImprovedText(plain);
     let copied = false;
     try {
