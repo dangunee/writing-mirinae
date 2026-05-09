@@ -406,6 +406,10 @@ export default function CorrectionPage() {
         keptPreviewFirst5: debug.keptPreviewFirst5,
         skippedYellowPreviewFirst5: debug.skippedYellowPreviewFirst5,
         skippedStrikePreviewFirst5: debug.skippedStrikePreviewFirst5,
+        mergedSegmentCount: debug.mergedSegmentCount,
+        mergeFirst10: debug.mergeFirst10,
+        mergeLast10: debug.mergeLast10,
+        accCheckpointLens: debug.accCheckpointLens,
       },
     });
     setImprovedText(plain);

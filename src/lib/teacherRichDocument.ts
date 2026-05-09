@@ -305,6 +305,12 @@ export type ComparisonExtractDebug = {
   keptPreviewFirst5: string[];
   skippedYellowPreviewFirst5: Array<{ preview: string; ancestorHint: string }>;
   skippedStrikePreviewFirst5: Array<{ preview: string; ancestorHint: string }>;
+  /** After mergeAdjacentComparisonSegs */
+  mergedSegmentCount: number;
+  mergeFirst10: Array<{ kind: ComparisonSegKind; textLen: number; textPreview: string }>;
+  mergeLast10: Array<{ kind: ComparisonSegKind; textLen: number; textPreview: string }>;
+  /** acc.length after each merged segment applied (before final normalize/trim) */
+  accCheckpointLens: number[];
 };
 
 function emptyComparisonExtractDebug(): ComparisonExtractDebug {
@@ -317,6 +323,10 @@ function emptyComparisonExtractDebug(): ComparisonExtractDebug {
     keptPreviewFirst5: [],
     skippedYellowPreviewFirst5: [],
     skippedStrikePreviewFirst5: [],
+    mergedSegmentCount: 0,
+    mergeFirst10: [],
+    mergeLast10: [],
+    accCheckpointLens: [],
   };
 }
 
@@ -373,28 +383,58 @@ function mergeAdjacentComparisonSegs(segs: ComparisonSeg[]): ComparisonSeg[] {
   return out;
 }
 
-function segmentsToComparisonPlain(segments: ComparisonSeg[]): string {
+/**
+ * Builds comparison plain from merged segments. Red overlap peel applies ONLY to the
+ * immediately preceding plain segment (`lastPlainSegmentText`), never the whole accumulator —
+ * otherwise stripAdjacentWrongSuffixForRichCorrection peels \\S+ from the entire essay and
+ * wipes everything before the last red correction.
+ */
+function buildComparisonPlainFromMergedSegments(
+  segments: ComparisonSeg[],
+  debug: ComparisonExtractDebug
+): string {
+  debug.mergedSegmentCount = segments.length;
+  const previewEntry = (s: ComparisonSeg) => ({
+    kind: s.kind,
+    textLen: s.text.length,
+    textPreview: truncatePreview(s.text.replace(/\u00a0/g, " "), 48),
+  });
+  debug.mergeFirst10 = segments.slice(0, 10).map(previewEntry);
+  debug.mergeLast10 = segments.slice(Math.max(0, segments.length - 10)).map(previewEntry);
+
   let acc = "";
   let lastKind: ComparisonSegKind | null = null;
+  /** Text of the last merged plain segment only — sole region peel may modify before glued red. */
+  let lastPlainSegmentText = "";
+  const checkpoints: number[] = [];
+
   for (const seg of segments) {
     const text = seg.text.replace(/\u00a0/g, " ");
     if (seg.kind === "red") {
       const glued =
         lastKind === "plain" &&
-        acc.length > 0 &&
-        /\S$/.test(acc) &&
+        lastPlainSegmentText.length > 0 &&
+        acc.length >= lastPlainSegmentText.length &&
+        acc.endsWith(lastPlainSegmentText) &&
+        /\S$/.test(lastPlainSegmentText) &&
         text.length > 0 &&
         /^\S/.test(text);
       if (glued) {
-        acc = stripAdjacentWrongSuffixForRichCorrection(acc);
+        const peeled = stripAdjacentWrongSuffixForRichCorrection(lastPlainSegmentText);
+        acc = acc.slice(0, acc.length - lastPlainSegmentText.length) + peeled;
       }
       acc += text;
       lastKind = "red";
+      lastPlainSegmentText = "";
     } else {
       acc += text;
       lastKind = seg.kind;
+      lastPlainSegmentText = seg.kind === "plain" ? text : "";
     }
+    checkpoints.push(acc.length);
   }
+
+  debug.accCheckpointLens = checkpoints;
   return normalizeComparisonPlainOutput(acc);
 }
 
@@ -506,7 +546,8 @@ export function extractComparisonPlainTextWithDebug(html: string): {
     div.innerHTML = html;
     const segments: ComparisonSeg[] = [];
     walkComparisonSegments(div, segments, debug);
-    const plain = segmentsToComparisonPlain(mergeAdjacentComparisonSegs(segments));
+    const merged = mergeAdjacentComparisonSegs(segments);
+    const plain = buildComparisonPlainFromMergedSegments(merged, debug);
     return { plain, debug };
   } catch {
     return { plain: htmlToPlainText(html), debug };
