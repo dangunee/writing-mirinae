@@ -104,6 +104,11 @@ export type AssignmentSubmitScreenProps = {
   /** true: 添削完了タブで学習者向け本文表示（Sandbox のプレースホルダーにしない） */
   showLearnerCorrectionTab?: boolean
   /**
+   * When set (e.g. published result from GET /api/writing/results/:id), shown instead of the plain 「提出本文」 card.
+   * Falls back to submitted body-only UI when omitted.
+   */
+  correctionTabDetailSlot?: ReactNode
+  /**
    * Real learner flows (trial / regular mail / logged-in student on /writing/app).
    * When set (e.g. 500): do not truncate input; show count as current/max; disable submit when over.
    * Omit for admin sandbox (legacy 400 / 1200 + slice behavior).
@@ -144,6 +149,7 @@ export default function AssignmentSubmitScreen({
   submittedTabStatusJa = null,
   correctionTabStatusJa = null,
   showLearnerCorrectionTab = false,
+  correctionTabDetailSlot,
   studentBodyMaxChars,
 }: AssignmentSubmitScreenProps) {
   const navigate = useNavigate()
@@ -523,10 +529,16 @@ export default function AssignmentSubmitScreen({
                           {correctionTabStatusJa}
                         </p>
                       ) : null}
-                      <p className="text-sm font-bold text-[#454652] mb-3 font-['Manrope',sans-serif]">提出本文</p>
-                      <div className="w-full min-h-80 bg-white p-8 rounded-xl border border-[#c6c5d4]/10 shadow-[0_10px_40px_rgba(30,27,19,0.04)] text-lg leading-relaxed font-['Plus_Jakarta_Sans',sans-serif] text-[#1e1b13] whitespace-pre-wrap">
-                        {submittedBodyDisplay ?? '（本文がありません）'}
-                      </div>
+                      {correctionTabDetailSlot != null ? (
+                        correctionTabDetailSlot
+                      ) : (
+                        <>
+                          <p className="text-sm font-bold text-[#454652] mb-3 font-['Manrope',sans-serif]">提出本文</p>
+                          <div className="w-full min-h-80 bg-white p-8 rounded-xl border border-[#c6c5d4]/10 shadow-[0_10px_40px_rgba(30,27,19,0.04)] text-lg leading-relaxed font-['Plus_Jakarta_Sans',sans-serif] text-[#1e1b13] whitespace-pre-wrap">
+                            {submittedBodyDisplay ?? '（本文がありません）'}
+                          </div>
+                        </>
+                      )}
                     </div>
                   ) : (
                     <div className="pb-20 lg:pb-0">
@@ -816,10 +828,16 @@ export default function AssignmentSubmitScreen({
                 {correctionTabStatusJa ? (
                   <p className="text-sm font-bold text-[#000666] px-2 font-['Manrope',sans-serif]">{correctionTabStatusJa}</p>
                 ) : null}
-                <p className="text-sm font-bold text-[#454652] px-2 font-['Manrope',sans-serif]">提出本文</p>
-                <div className="w-full min-h-80 p-8 rounded-2xl bg-white border border-[#c6c5d4]/10 text-lg leading-relaxed shadow-[0_4px_20px_rgba(0,0,0,0.05)] text-[#1e1b13] whitespace-pre-wrap">
-                  {submittedBodyDisplay ?? '（本文がありません）'}
-                </div>
+                {correctionTabDetailSlot != null ? (
+                  <div className="px-2">{correctionTabDetailSlot}</div>
+                ) : (
+                  <>
+                    <p className="text-sm font-bold text-[#454652] px-2 font-['Manrope',sans-serif]">提出本文</p>
+                    <div className="w-full min-h-80 p-8 rounded-2xl bg-white border border-[#c6c5d4]/10 text-lg leading-relaxed shadow-[0_4px_20px_rgba(0,0,0,0.05)] text-[#1e1b13] whitespace-pre-wrap">
+                      {submittedBodyDisplay ?? '（本文がありません）'}
+                    </div>
+                  </>
+                )}
               </div>
             ) : (
               <div className="px-2">

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import StudentAccountPanel from '../components/student/StudentAccountPanel'
 import AdminSandboxPanel from '../components/writing/AdminSandboxPanel'
+import StudentCorrectionResultInline from '../components/student/StudentCorrectionResultInline'
 import AssignmentSubmitScreen, { type AssignmentTabKind } from '../components/writing/AssignmentSubmitScreen'
 import WritingPageAdminPreview, {
   type WritingAdminPreviewPayload,
@@ -440,6 +441,13 @@ export default function WritingPage() {
       rt === 'corrected'
     )
   }, [useControlledAssignmentTabs, current?.accessKind, session?.runtimeStatus, submission?.status])
+
+  const correctionTabDetailSlot = useMemo(() => {
+    if (!submission?.id || !showLearnerCorrectionTab) return undefined
+    return (
+      <StudentCorrectionResultInline submissionId={submission.id} fallbackBodyText={submission.bodyText} />
+    )
+  }, [submission?.id, submission?.bodyText, showLearnerCorrectionTab])
 
   /** Sync assignment tabs with GET /sessions/current (sandbox + learner pipeline). */
   useEffect(() => {
@@ -997,6 +1005,7 @@ export default function WritingPage() {
               submittedTabStatusJa,
               correctionTabStatusJa,
               showLearnerCorrectionTab,
+              correctionTabDetailSlot,
             }
           : {})}
       />
