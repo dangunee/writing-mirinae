@@ -296,6 +296,8 @@ export default function CorrectionPage() {
           body: JSON.stringify({
             modelAnswer: modelAnswerToPersist,
             teacherComment: teacherComment ?? "",
+            /** Comparison plain (정서문): included on main save so loadDetail() + useEffect do not wipe unsaved textarea. */
+            improvedText: improvedText ?? "",
           }),
         }
       );
