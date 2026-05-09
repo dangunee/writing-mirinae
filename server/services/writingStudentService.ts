@@ -468,6 +468,9 @@ export async function getCurrentSessionForTrialApplication(
     return { ok: false, error: "no_active_course" };
   }
   const accessExpiresAtIso = trialApp.accessExpiresAt?.toISOString() ?? null;
+  const now = new Date();
+  const accessWindowExpired =
+    trialApp.accessExpiresAt != null && trialApp.accessExpiresAt.getTime() <= now.getTime();
 
   /** Zero sessions is never "completed"; retry bootstrap before declaring missing. */
   let sessions: Awaited<ReturnType<typeof repo.listSessionsForTrialApplicationOrdered>> = [];
@@ -523,8 +526,6 @@ export async function getCurrentSessionForTrialApplication(
     sessionIndexes: sessions.map((s) => s.index),
   });
 
-  const now = new Date();
-
   const pipeline = await repo.findActivePipelineSubmissionForTrial(db, applicationId);
   const rescueSubmitted =
     pipeline == null
@@ -566,12 +567,8 @@ export async function getCurrentSessionForTrialApplication(
       existingSubmission: activeRow.submission,
       now,
     });
-    const canSubmit = elig.ok && activeRow.submission.status === "draft";
-    const reasonIfNot = !elig.ok
-      ? elig.code
-      : activeRow.submission.status === "draft"
-        ? undefined
-        : "submission_not_editable";
+    const canSubmit = elig.ok && !accessWindowExpired;
+    const reasonIfNot = !elig.ok ? elig.code : accessWindowExpired ? "session_expired" : undefined;
 
     return {
       ok: true,
@@ -659,8 +656,12 @@ export async function getCurrentSessionForTrialApplication(
       mode: "fresh",
       session: trialSessionDtoFromRow(s),
       submission: null,
-      canSubmit: elig.ok,
-      ...(elig.ok ? {} : { reasonIfNot: elig.code }),
+      canSubmit: elig.ok && !accessWindowExpired,
+      ...(accessWindowExpired && elig.ok
+        ? { reasonIfNot: "session_expired" }
+        : elig.ok
+          ? {}
+          : { reasonIfNot: elig.code }),
     };
   }
 
@@ -702,6 +703,25 @@ export async function getCurrentSessionForTrialApplication(
             })),
           }
     );
+    if (accessWindowExpired && sessions.length > 0) {
+      const fallbackSession =
+        sessions
+          .filter((x) => !trialSessionCountsTowardSuccessfulAllDone(x))
+          .sort((a, b) => a.index - b.index)[0] ?? sessions[0];
+      return {
+        ok: true,
+        accessKind: "trial",
+        applicationId,
+        courseId: course.id,
+        accessExpiresAt: accessExpiresAtIso,
+        pendingSubmissionId: null,
+        mode: "fresh",
+        session: trialSessionDtoFromRow(fallbackSession),
+        submission: null,
+        canSubmit: false,
+        reasonIfNot: "session_expired",
+      };
+    }
     return { ok: false, error: "trial_session_missing" };
   }
 
@@ -728,7 +748,7 @@ export async function getCurrentSessionForTrialApplication(
     session: null,
     submission: null,
     canSubmit: false,
-    reasonIfNot: "all_sessions_completed",
+    reasonIfNot: accessWindowExpired ? "session_expired" : "all_sessions_completed",
   };
 }
 
@@ -1007,7 +1027,20 @@ export async function saveOrSubmitSubmissionForTrial(
     existing = pipeline.submission;
   }
 
+  const [trialAppAccess] = await db
+    .select({ accessExpiresAt: trialApplications.accessExpiresAt })
+    .from(trialApplications)
+    .where(eq(trialApplications.id, input.trialApplicationId))
+    .limit(1);
+
   const now = new Date();
+  if (
+    trialAppAccess?.accessExpiresAt != null &&
+    trialAppAccess.accessExpiresAt.getTime() <= now.getTime()
+  ) {
+    return { ok: false, status: 403, code: "session_expired" };
+  }
+
   const elig = evaluateTrialSubmitEligibility({
     trialApplicationId: input.trialApplicationId,
     session,

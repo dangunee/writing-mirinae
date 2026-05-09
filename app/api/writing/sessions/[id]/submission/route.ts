@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { getDb } from "../../../../../../server/db/client";
 import { parseRegularWritingGrantIdFromCookieHeader } from "../../../../../../server/lib/regularSessionCookie";
 import { fetchTrialApplicationIdFromMirinaeSessionCookie } from "../../../../../../server/lib/writingTrialUpstream";
-import { findActiveLinkedTrialApplicationForWritingSession } from "../../../../../../server/services/trialLinkedUserWritingSession";
+import { resolveLinkedTrialApplicationForWritingSession } from "../../../../../../server/services/trialLinkedUserWritingSession";
 import { requireWritingSubmissionEntitlement, resolveRoleFromEnv } from "../../../../../../server/lib/authMe";
 import { parseWritingSubmissionPost } from "../../../../../../server/lib/parseWritingSubmissionPost";
 import { getSessionUserId } from "../../../../../../server/lib/supabaseServer";
@@ -71,7 +71,7 @@ async function postSubmissionHandler(req: Request, context: { params: Promise<{ 
   const userId = await getSessionUserId();
 
   if (!trialApplicationId && userId && !grantId) {
-    const linked = await findActiveLinkedTrialApplicationForWritingSession(db, userId);
+    const linked = await resolveLinkedTrialApplicationForWritingSession(db, userId);
     trialApplicationId = linked?.id ?? null;
   }
 

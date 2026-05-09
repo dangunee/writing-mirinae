@@ -24,7 +24,7 @@ import {
   type TrialWritingPublicErrorCode,
 } from "../../../../../server/lib/trialWritingPublicErrors";
 import { parseWritingTrialAccessApplicationId } from "../../../../../server/lib/trialWritingSessionCookie";
-import { findActiveLinkedTrialApplicationForWritingSession } from "../../../../../server/services/trialLinkedUserWritingSession";
+import { resolveLinkedTrialApplicationForWritingSession } from "../../../../../server/services/trialLinkedUserWritingSession";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -309,7 +309,7 @@ export async function GET(req: Request) {
 
     if (userId) {
       const tTrialLinked = performance.now();
-      const linked = await findActiveLinkedTrialApplicationForWritingSession(db, userId);
+      const linked = await resolveLinkedTrialApplicationForWritingSession(db, userId);
       console.log("[sessions/current] branch=trial_linked_user", {
         ms: Math.round(performance.now() - tTrialLinked),
         hit: !!linked,
