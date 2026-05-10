@@ -83,6 +83,14 @@ function queueSortKeyFromItem(it: QueueItem): number {
   return new Date(it.submittedAt ?? it.createdAt).getTime();
 }
 
+/** Completion / activity timestamp for grouping & sorting the completed queue (newest first). */
+function queueCompletedActivityMs(it: QueueItem): number {
+  const pub = it.correction?.publishedAt;
+  const upd = it.correction?.updatedAt;
+  const raw = pub ?? upd ?? it.submittedAt ?? it.createdAt;
+  return new Date(raw).getTime();
+}
+
 export type QueueItem = {
   submissionId: string;
   studentUserId: string;
@@ -102,21 +110,29 @@ export type QueueItem = {
     teacherId: string;
     status: string;
     updatedAt: string;
+    /** ISO string when 공개됨; otherwise null (e.g. 첨삭 완료·미공개). */
+    publishedAt: string | null;
   };
 };
 
 export type QueueGroupedResponse = {
-  /** ISO date (YYYY-MM-DD) in UTC for grouping; items within each group are oldest first. */
+  /** `pending` | `completed` — matches query param. */
+  filter: "pending" | "completed";
+  /** ISO date (YYYY-MM-DD) in UTC for grouping. Pending: oldest-first within group; completed: newest-first within group. */
   groups: Array<{ date: string; items: QueueItem[] }>;
 };
 
-export async function getTeacherQueueGrouped(db: Db): Promise<QueueGroupedResponse> {
+export type TeacherQueueFilter = "pending" | "completed";
+
+export async function getTeacherQueueGrouped(db: Db, filter: TeacherQueueFilter = "pending"): Promise<QueueGroupedResponse> {
   try {
     await backfillSubmittedAdminSandboxMirrors(db);
   } catch (e) {
     console.warn("teacher_queue_sandbox_backfill_skipped", { err: e });
   }
-  const rows = await repo.listSubmissionQueue(db);
+  const rows =
+    filter === "completed" ? await repo.listSubmissionQueueCompleted(db) : await repo.listSubmissionQueuePending(db);
+
   const items: QueueItem[] = rows.map((r) => ({
     submissionId: r.submission.id,
     studentUserId: r.submission.userId ?? r.submission.regularAccessGrantId ?? "",
@@ -139,27 +155,32 @@ export async function getTeacherQueueGrouped(db: Db): Promise<QueueGroupedRespon
           teacherId: r.correction.teacherId,
           status: r.correction.status,
           updatedAt: r.correction.updatedAt.toISOString(),
+          publishedAt: r.correction.publishedAt?.toISOString() ?? null,
         }
       : null,
   }));
 
   const byDate = new Map<string, QueueItem[]>();
   for (const it of items) {
-    const d = new Date(queueSortKeyFromItem(it));
-    const key = d.toISOString().slice(0, 10);
+    const ms = filter === "completed" ? queueCompletedActivityMs(it) : queueSortKeyFromItem(it);
+    const key = new Date(ms).toISOString().slice(0, 10);
     const list = byDate.get(key) ?? [];
     list.push(it);
     byDate.set(key, list);
   }
 
-  const dates = [...byDate.keys()].sort((a, b) => a.localeCompare(b));
+  const dates = [...byDate.keys()].sort((a, b) => (filter === "completed" ? b.localeCompare(a) : a.localeCompare(b)));
   const groups = dates.map((date) => {
     const list = byDate.get(date)!;
-    list.sort((a, b) => queueSortKeyFromItem(a) - queueSortKeyFromItem(b));
+    if (filter === "completed") {
+      list.sort((a, b) => queueCompletedActivityMs(b) - queueCompletedActivityMs(a));
+    } else {
+      list.sort((a, b) => queueSortKeyFromItem(a) - queueSortKeyFromItem(b));
+    }
     return { date, items: list };
   });
 
-  return { groups };
+  return { filter, groups };
 }
 
 export type TeacherSubmissionDetail = {

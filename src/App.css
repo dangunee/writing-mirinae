@@ -440,6 +440,31 @@ a.status-badge.status.corrected {
   vertical-align: middle;
 }
 
+.teacher-queue-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.75rem 0 1rem;
+}
+
+.teacher-queue-tab {
+  padding: 0.35rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--color-border, #ccc);
+  background: var(--color-surface, #fff);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.teacher-queue-tab:hover {
+  border-color: var(--color-muted-fg, #888);
+}
+
+.teacher-queue-tab--active {
+  border-color: var(--color-accent, #2563eb);
+  font-weight: 600;
+}
+
 /* Modal */
 .modal-overlay {
   position: fixed;

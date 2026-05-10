@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 
 import {
   writingAssignmentMasters,
@@ -14,8 +14,6 @@ import {
   writingTerms,
 } from "../../db/schema";
 import type { Db } from "../db/client";
-
-const QUEUE_STATUSES = ["submitted", "in_review"] as const;
 
 /**
  * Some production DBs lack `grammar_check_result`; teacher routes must not select it (avoids PostgresError).
@@ -38,7 +36,13 @@ const submissionColumnsForTeacher = {
   updatedAt: writingSubmissions.updatedAt,
 } as const;
 
-export async function listSubmissionQueue(db: Db) {
+const QUEUE_STATUSES_PENDING = ["submitted", "in_review"] as const;
+const QUEUE_STATUSES_COMPLETED = ["corrected", "published"] as const;
+
+/**
+ * Pending work (oldest first). Trial + regular + sandbox mirrors — same as legacy queue.
+ */
+export async function listSubmissionQueuePending(db: Db) {
   const rows = await db
     .select({
       submission: submissionColumnsForTeacher,
@@ -50,9 +54,37 @@ export async function listSubmissionQueue(db: Db) {
     .innerJoin(writingSessions, eq(writingSubmissions.sessionId, writingSessions.id))
     .innerJoin(writingCourses, eq(writingSubmissions.courseId, writingCourses.id))
     .leftJoin(writingCorrections, eq(writingCorrections.submissionId, writingSubmissions.id))
-    .where(inArray(writingSubmissions.status, [...QUEUE_STATUSES]))
+    .where(inArray(writingSubmissions.status, [...QUEUE_STATUSES_PENDING]))
     .orderBy(asc(writingSubmissions.submittedAt), asc(writingSubmissions.createdAt), asc(writingSubmissions.id));
   return rows;
+}
+
+/**
+ * Finished pipeline rows (newest activity first). `corrected` = 첨삭 저장됨·미공개 가능, `published` = 학생 공개.
+ */
+export async function listSubmissionQueueCompleted(db: Db) {
+  const rows = await db
+    .select({
+      submission: submissionColumnsForTeacher,
+      session: writingSessions,
+      course: writingCourses,
+      correction: writingCorrections,
+    })
+    .from(writingSubmissions)
+    .innerJoin(writingSessions, eq(writingSubmissions.sessionId, writingSessions.id))
+    .innerJoin(writingCourses, eq(writingSubmissions.courseId, writingCourses.id))
+    .leftJoin(writingCorrections, eq(writingCorrections.submissionId, writingSubmissions.id))
+    .where(inArray(writingSubmissions.status, [...QUEUE_STATUSES_COMPLETED]))
+    .orderBy(
+      desc(sql`COALESCE(${writingCorrections.publishedAt}, ${writingCorrections.updatedAt}, ${writingSubmissions.updatedAt})`),
+      desc(writingSubmissions.id)
+    );
+  return rows;
+}
+
+/** @deprecated Use listSubmissionQueuePending — alias for backwards compatibility within repo. */
+export async function listSubmissionQueue(db: Db) {
+  return listSubmissionQueuePending(db);
 }
 
 export async function getSubmissionFullForTeacher(db: Db, submissionId: string) {
