@@ -34,6 +34,12 @@ export default function LandingNav({ goApp, variant = 'default' }: Props) {
   const accountMobileRef = useRef<HTMLDivElement>(null)
   const { me, loading, refetch } = useAuthMe()
   const primaryNav = me?.user ? primaryAccountNav(me.role) : null
+  /** Logged-in learners only — staff use 管理コンソール / 添削キュー. */
+  const showCorrectionListLink =
+    Boolean(me?.user) && me?.role !== 'admin' && me?.role !== 'teacher'
+
+  const headerPrimaryBtnClass =
+    "rounded-lg border border-[#000666] bg-white px-5 py-2 font-['Manrope'] text-sm font-bold text-[#000666] hover:bg-[#000666]/5 transition-colors"
 
   const handleLogout = useCallback(async () => {
     try {
@@ -96,12 +102,16 @@ export default function LandingNav({ goApp, variant = 'default' }: Props) {
             <div className="hidden md:flex items-center gap-8">
               {me?.user && !loading ? (
                 <>
-                  <Link
-                    to={primaryNav!.to}
-                    className="rounded-lg border border-[#000666] bg-white px-5 py-2 font-['Manrope'] text-sm font-bold text-[#000666] hover:bg-[#000666]/5 transition-colors"
-                  >
-                    {primaryNav!.label}
-                  </Link>
+                  <div className="flex items-center gap-3">
+                    {showCorrectionListLink ? (
+                      <Link to="/writing/app" className={headerPrimaryBtnClass}>
+                        添削リスト
+                      </Link>
+                    ) : null}
+                    <Link to={primaryNav!.to} className={headerPrimaryBtnClass}>
+                      {primaryNav!.label}
+                    </Link>
+                  </div>
                   <button
                     type="button"
                     onClick={() => void handleLogout()}
@@ -150,6 +160,14 @@ export default function LandingNav({ goApp, variant = 'default' }: Props) {
             <div className="flex md:hidden items-center gap-2">
               {me?.user && !loading ? (
                 <>
+                  {showCorrectionListLink ? (
+                    <Link
+                      to="/writing/app"
+                      className="font-['Manrope'] text-xs font-bold text-[#000666] px-1 whitespace-nowrap"
+                    >
+                      添削リスト
+                    </Link>
+                  ) : null}
                   <Link
                     to={primaryNav!.to}
                     className="font-['Manrope'] text-xs font-bold text-[#000666] px-1"
@@ -212,6 +230,15 @@ export default function LandingNav({ goApp, variant = 'default' }: Props) {
           <div className="mt-2 border-t border-[#1e1b13]/10 pt-3 flex flex-col gap-2">
             {me?.user ? (
               <>
+                {showCorrectionListLink ? (
+                  <Link
+                    to="/writing/app"
+                    className="font-['Manrope'] text-sm font-bold text-[#000666]"
+                    onClick={() => setOpen(false)}
+                  >
+                    添削リスト
+                  </Link>
+                ) : null}
                 <Link
                   to={primaryNav!.to}
                   className="font-['Manrope'] text-sm font-bold text-[#000666]"

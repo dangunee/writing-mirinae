@@ -1260,7 +1260,36 @@ export async function getSubmissionDetailForStudent(
   userId: string,
   submissionId: string
 ) {
-  const sub = await repo.getSubmissionByIdForUser(db, submissionId, userId);
+  const sub = await repo.getSubmissionByIdForStudentAccount(db, submissionId, userId);
+  if (!sub) return null;
+  await repo.lazyUnlockDueSessions(db, sub.courseId);
+  let imageUrl: string | null = null;
+  if (sub.imageStorageKey) {
+    imageUrl = await getSignedImageUrl(sub.imageStorageKey);
+  }
+  const attachments = await listSubmissionAttachmentsForApi(db, submissionId);
+  return {
+    id: sub.id,
+    sessionId: sub.sessionId,
+    courseId: sub.courseId,
+    status: sub.status,
+    bodyText: sub.bodyText,
+    imageMimeType: sub.imageMimeType,
+    imageUrl,
+    submissionMode: sub.submissionMode ?? null,
+    attachments,
+    submittedAt: sub.submittedAt?.toISOString() ?? null,
+    createdAt: sub.createdAt.toISOString(),
+    updatedAt: sub.updatedAt.toISOString(),
+  };
+}
+
+export async function getSubmissionDetailForTrialApplication(
+  db: Db,
+  trialApplicationId: string,
+  submissionId: string
+) {
+  const sub = await repo.getSubmissionByIdForTrial(db, submissionId, trialApplicationId);
   if (!sub) return null;
   await repo.lazyUnlockDueSessions(db, sub.courseId);
   let imageUrl: string | null = null;
@@ -1318,10 +1347,10 @@ export async function getSubmissionDetailForRegularGrant(
  * Regular session + cookie grant paths.
  */
 export async function getPublishedStudentResult(db: Db, userId: string, submissionId: string) {
-  const sub = await repo.getSubmissionByIdForUser(db, submissionId, userId);
+  const sub = await repo.getSubmissionByIdForStudentAccount(db, submissionId, userId);
   if (!sub) return null;
   await repo.lazyUnlockDueSessions(db, sub.courseId);
-  const joined = await repo.getSubmissionWithSessionForUser(db, submissionId, userId);
+  const joined = await repo.getSubmissionWithSessionForStudentAccount(db, submissionId, userId);
   if (!joined) return null;
   const { submission, session } = joined;
   const attachments = await listSubmissionAttachmentsForApi(db, submissionId);
@@ -1330,11 +1359,7 @@ export async function getPublishedStudentResult(db: Db, userId: string, submissi
     return buildMissedResultPayload(submission, session, attachments);
   }
 
-  if (submission.status !== "published") {
-    return null;
-  }
-
-  const row = await repo.getPublishedResultForSubmission(db, submissionId, userId);
+  const row = await repo.getPublishedResultRowForStudentAccount(db, submissionId, userId);
   if (!row) return null;
   return buildPublishedResultPayload(db, row, session);
 }
@@ -1352,11 +1377,25 @@ export async function getPublishedRegularResult(db: Db, grantId: string, submiss
     return buildMissedResultPayload(submission, session, attachments);
   }
 
-  if (submission.status !== "published") {
-    return null;
+  const row = await repo.getPublishedResultForSubmissionGrant(db, submissionId, grantId);
+  if (!row) return null;
+  return buildPublishedResultPayload(db, row, session);
+}
+
+export async function getPublishedTrialApplicationResult(db: Db, trialApplicationId: string, submissionId: string) {
+  const sub = await repo.getSubmissionByIdForTrial(db, submissionId, trialApplicationId);
+  if (!sub) return null;
+  await repo.lazyUnlockDueSessions(db, sub.courseId);
+  const joined = await repo.getSubmissionWithSessionForTrialApplication(db, submissionId, trialApplicationId);
+  if (!joined) return null;
+  const { submission, session } = joined;
+  const attachments = await listSubmissionAttachmentsForApi(db, submissionId);
+
+  if (sessionIsMissed(session)) {
+    return buildMissedResultPayload(submission, session, attachments);
   }
 
-  const row = await repo.getPublishedResultForSubmissionGrant(db, submissionId, grantId);
+  const row = await repo.getPublishedResultRowForTrialApplication(db, submissionId, trialApplicationId);
   if (!row) return null;
   return buildPublishedResultPayload(db, row, session);
 }
@@ -1396,7 +1435,10 @@ export async function getPublishedWritingResultForViewer(db: Db, viewerUserId: s
     return missed;
   }
 
-  if (submission.status !== "published") {
+  if (
+    submission.status !== "published" &&
+    submission.status !== "corrected"
+  ) {
     if (process.env.WRITING_DEBUG_RESULTS === "true") {
       console.info(
         JSON.stringify({

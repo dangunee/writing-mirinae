@@ -58,6 +58,15 @@ export default function ViewCorrectionPage() {
     )
   }
 
+  if (loadState === 'result_pending_sync') {
+    return (
+      <ViewCorrectionShell>
+        <p>添削データを確認中です。しばらくしてから再読み込みしてください。</p>
+        <Link to="/writing/app">목록으로</Link>
+      </ViewCorrectionShell>
+    )
+  }
+
   if (loadState !== 'ok' || result == null) {
     return (
       <ViewCorrectionShell>

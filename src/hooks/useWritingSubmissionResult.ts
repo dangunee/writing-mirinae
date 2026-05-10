@@ -4,9 +4,16 @@ import { apiUrl } from '../lib/apiUrl'
 import type { StudentWritingResultPayload } from '../lib/studentWritingResult'
 import { normalizeStudentWritingResultPayload } from '../lib/studentWritingResult'
 
-export type WritingSubmissionResultLoadState = 'idle' | 'loading' | 'ok' | 'not_found' | 'not_published'
+export type WritingSubmissionResultLoadState =
+  | 'idle'
+  | 'loading'
+  | 'ok'
+  | 'not_found'
+  | 'not_published'
+  /** Submission row is already `published` but published correction payload missing (sync/repair). */
+  | 'result_pending_sync'
 
-/** Fetch GET /api/writing/results/:submissionId — mirrors ViewCorrectionPage loader (published-only API). */
+/** Fetch GET /api/writing/results/:submissionId — same loader as ViewCorrectionPage (published correction only). */
 export function useWritingSubmissionResult(submissionId: string | undefined | null): {
   loadState: WritingSubmissionResultLoadState
   result: StudentWritingResultPayload | null
@@ -47,12 +54,23 @@ export function useWritingSubmissionResult(submissionId: string | undefined | nu
           })
           if (cancelled) return
           if (subRes.ok) {
+            let st: string | undefined
+            try {
+              const body = (await subRes.json()) as { status?: string }
+              st = typeof body.status === 'string' ? body.status : undefined
+            } catch {
+              st = undefined
+            }
             setResult(null)
-            setLoadState('not_published')
-          } else {
-            setResult(null)
-            setLoadState('not_found')
+            if (st === 'published') {
+              setLoadState('result_pending_sync')
+            } else {
+              setLoadState('not_published')
+            }
+            return
           }
+          setResult(null)
+          setLoadState('not_found')
           return
         }
 

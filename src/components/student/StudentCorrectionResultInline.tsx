@@ -29,6 +29,16 @@ export default function StudentCorrectionResultInline({ submissionId, fallbackBo
     )
   }
 
+  if (loadState === 'result_pending_sync') {
+    return (
+      <div className="rounded-xl border border-[#c6c5d4]/10 bg-white p-8 shadow-[0_10px_40px_rgba(30,27,19,0.04)]">
+        <p className="text-sm text-[#454652] font-['Manrope',sans-serif]">
+          添削データを確認中です。しばらくしてから再読み込みしてください。
+        </p>
+      </div>
+    )
+  }
+
   const fallback =
     fallbackBodyText != null && String(fallbackBodyText).trim() !== ''
       ? fallbackBodyText

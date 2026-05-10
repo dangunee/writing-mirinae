@@ -3,9 +3,11 @@ import { NextResponse } from "next/server";
 import { getDb } from "../../../../../server/db/client";
 import { parseRegularWritingGrantIdFromCookieHeader } from "../../../../../server/lib/regularSessionCookie";
 import { getSessionUserId } from "../../../../../server/lib/supabaseServer";
+import { parseWritingTrialAccessApplicationId } from "../../../../../server/lib/trialWritingSessionCookie";
 import {
   getSubmissionDetailForRegularGrant,
   getSubmissionDetailForStudent,
+  getSubmissionDetailForTrialApplication,
 } from "../../../../../server/services/writingStudentService";
 
 export const runtime = "nodejs";
@@ -22,6 +24,15 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   const userId = await getSessionUserId();
   if (userId) {
     const detail = await getSubmissionDetailForStudent(db, userId, submissionId);
+    if (!detail) {
+      return NextResponse.json({ error: "not_found" }, { status: 404 });
+    }
+    return NextResponse.json(detail);
+  }
+
+  const trialApplicationId = parseWritingTrialAccessApplicationId(req.headers.get("cookie") ?? "");
+  if (trialApplicationId) {
+    const detail = await getSubmissionDetailForTrialApplication(db, trialApplicationId, submissionId);
     if (!detail) {
       return NextResponse.json({ error: "not_found" }, { status: 404 });
     }

@@ -1,7 +1,8 @@
-import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, or } from "drizzle-orm";
 
 import {
   regularAccessGrants,
+  trialApplications,
   writingCorrectionAnnotations,
   writingCorrectionEvaluations,
   writingCorrectionFeedbackItems,
@@ -175,6 +176,53 @@ export async function getSubmissionWithSessionForUser(
     .from(writingSubmissions)
     .innerJoin(writingSessions, eq(writingSubmissions.sessionId, writingSessions.id))
     .where(and(eq(writingSubmissions.id, submissionId), eq(writingSubmissions.userId, userId)))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/**
+ * Logged-in learner: owns submission via `user_id` OR linked trial (`trial_applications.user_id`, not trashed).
+ */
+export async function getSubmissionByIdForStudentAccount(db: Db, submissionId: string, accountUserId: string) {
+  const rows = await db
+    .select({ submission: writingSubmissions })
+    .from(writingSubmissions)
+    .leftJoin(trialApplications, eq(writingSubmissions.trialApplicationId, trialApplications.id))
+    .where(
+      and(
+        eq(writingSubmissions.id, submissionId),
+        or(
+          eq(writingSubmissions.userId, accountUserId),
+          and(eq(trialApplications.userId, accountUserId), isNull(trialApplications.trashedAt))
+        )
+      )
+    )
+    .limit(1);
+  return rows[0]?.submission ?? null;
+}
+
+export async function getSubmissionWithSessionForStudentAccount(
+  db: Db,
+  submissionId: string,
+  accountUserId: string
+) {
+  const rows = await db
+    .select({
+      submission: writingSubmissions,
+      session: writingSessions,
+    })
+    .from(writingSubmissions)
+    .innerJoin(writingSessions, eq(writingSubmissions.sessionId, writingSessions.id))
+    .leftJoin(trialApplications, eq(writingSubmissions.trialApplicationId, trialApplications.id))
+    .where(
+      and(
+        eq(writingSubmissions.id, submissionId),
+        or(
+          eq(writingSubmissions.userId, accountUserId),
+          and(eq(trialApplications.userId, accountUserId), isNull(trialApplications.trashedAt))
+        )
+      )
+    )
     .limit(1);
   return rows[0] ?? null;
 }
@@ -536,6 +584,25 @@ export async function getSubmissionByIdForTrial(db: Db, submissionId: string, ap
   return rows[0] ?? null;
 }
 
+export async function getSubmissionWithSessionForTrialApplication(
+  db: Db,
+  submissionId: string,
+  applicationId: string
+) {
+  const rows = await db
+    .select({
+      submission: writingSubmissions,
+      session: writingSessions,
+    })
+    .from(writingSubmissions)
+    .innerJoin(writingSessions, eq(writingSubmissions.sessionId, writingSessions.id))
+    .where(
+      and(eq(writingSubmissions.id, submissionId), eq(writingSubmissions.trialApplicationId, applicationId))
+    )
+    .limit(1);
+  return rows[0] ?? null;
+}
+
 export type PublishedResultRow = {
   submission: typeof writingSubmissions.$inferSelect;
   correction: typeof writingCorrections.$inferSelect;
@@ -557,7 +624,7 @@ export async function getPublishedResultForSubmission(
       and(
         eq(writingSubmissions.id, submissionId),
         eq(writingSubmissions.userId, userId),
-        eq(writingSubmissions.status, "published"),
+        inArray(writingSubmissions.status, ["published", "corrected"]),
         eq(writingCorrections.status, "published")
       )
     )
@@ -583,7 +650,7 @@ export async function getPublishedResultForSubmissionStaffPreview(
     .where(
       and(
         eq(writingSubmissions.id, submissionId),
-        eq(writingSubmissions.status, "published"),
+        inArray(writingSubmissions.status, ["published", "corrected"]),
         eq(writingCorrections.status, "published")
       )
     )
@@ -607,7 +674,63 @@ export async function getPublishedResultForSubmissionGrant(
       and(
         eq(writingSubmissions.id, submissionId),
         eq(writingSubmissions.regularAccessGrantId, grantId),
-        eq(writingSubmissions.status, "published"),
+        inArray(writingSubmissions.status, ["published", "corrected"]),
+        eq(writingCorrections.status, "published")
+      )
+    )
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/**
+ * Student account (platform user or linked trial owner): visible correction = published row only; submission may be legacy `corrected` while correction already published.
+ */
+export async function getPublishedResultRowForStudentAccount(
+  db: Db,
+  submissionId: string,
+  accountUserId: string
+): Promise<PublishedResultRow | null> {
+  const rows = await db
+    .select({
+      submission: writingSubmissions,
+      correction: writingCorrections,
+    })
+    .from(writingSubmissions)
+    .innerJoin(writingCorrections, eq(writingCorrections.submissionId, writingSubmissions.id))
+    .leftJoin(trialApplications, eq(writingSubmissions.trialApplicationId, trialApplications.id))
+    .where(
+      and(
+        eq(writingSubmissions.id, submissionId),
+        or(
+          eq(writingSubmissions.userId, accountUserId),
+          and(eq(trialApplications.userId, accountUserId), isNull(trialApplications.trashedAt))
+        ),
+        inArray(writingSubmissions.status, ["published", "corrected"]),
+        eq(writingCorrections.status, "published")
+      )
+    )
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/** Trial cookie identity: submission must belong to the verified application id. */
+export async function getPublishedResultRowForTrialApplication(
+  db: Db,
+  submissionId: string,
+  applicationId: string
+): Promise<PublishedResultRow | null> {
+  const rows = await db
+    .select({
+      submission: writingSubmissions,
+      correction: writingCorrections,
+    })
+    .from(writingSubmissions)
+    .innerJoin(writingCorrections, eq(writingCorrections.submissionId, writingSubmissions.id))
+    .where(
+      and(
+        eq(writingSubmissions.id, submissionId),
+        eq(writingSubmissions.trialApplicationId, applicationId),
+        inArray(writingSubmissions.status, ["published", "corrected"]),
         eq(writingCorrections.status, "published")
       )
     )
