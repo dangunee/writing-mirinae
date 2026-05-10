@@ -1125,6 +1125,44 @@ a.status-badge.status.corrected {
   gap: 1.5rem;
 }
 
+.correction-view.learner-correction-result-root {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.learner-correction-result-card {
+  border-radius: 12px;
+  border: 1px solid rgba(0, 6, 102, 0.12);
+  overflow: hidden;
+  background: var(--color-surface);
+  box-shadow: 0 4px 20px rgba(30, 27, 19, 0.04);
+}
+
+.learner-correction-result-card__head {
+  margin: 0;
+  padding: 0.65rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #000666;
+  background: linear-gradient(180deg, #eef3fb 0%, #e8eef8 100%);
+  border-bottom: 1px solid rgba(0, 6, 102, 0.1);
+  font-family:
+    'Manrope',
+    ui-sans-serif,
+    system-ui,
+    sans-serif;
+}
+
+.learner-correction-result-card__body {
+  padding: 1rem 1.25rem;
+}
+
+.learner-correction-result-card__body .corrected-content {
+  margin: 0;
+}
+
 .view-section {
   background: var(--color-surface);
   border-radius: 12px;

@@ -239,6 +239,14 @@ export default function AssignmentSubmitScreen({
     onAssignmentTabChange(t)
   }
 
+  /** 添削完了タブ: 課題カードはデフォルト折りたたみ（提出タブは従来どおり常時表示）。 */
+  const [correctionAssignmentExpanded, setCorrectionAssignmentExpanded] = useState(false)
+  useEffect(() => {
+    if (!controlledAssignmentTab || assignmentTab !== 'correction') {
+      setCorrectionAssignmentExpanded(false)
+    }
+  }, [controlledAssignmentTab, assignmentTab])
+
   const validateFile = useCallback((f: File): boolean => {
     const okType = /^(image\/(png|jpeg)|application\/pdf)$/i.test(f.type) || /\.(png|jpg|jpeg|pdf)$/i.test(f.name)
     if (!okType) return false
@@ -266,6 +274,96 @@ export default function AssignmentSubmitScreen({
   }
 
   const mobileSubmit = handleSubmit
+
+  const assignmentThemeDesktopInner = (
+    <div className="flex flex-col md:flex-row gap-8">
+      <div className="flex-1">
+        <div className="mb-6">
+          <span className="bg-[#000666]/10 text-[#000666] px-3 py-1 rounded-full text-xs font-bold font-['Manrope',sans-serif] tracking-widest uppercase">
+            Theme
+          </span>
+          <h2 className="text-2xl font-bold text-[#1e1b13] mt-3 font-['Manrope',sans-serif]">{titleResolved}</h2>
+        </div>
+        <div className="bg-white p-6 rounded-lg border border-[#c6c5d4]/10 mb-6">
+          <p className="text-[#1e1b13] font-['Plus_Jakarta_Sans',sans-serif] leading-relaxed whitespace-pre-line">
+            {bodyResolved}
+          </p>
+        </div>
+        {requirementBlockDesktop ?? (
+          <div className="space-y-4">
+            <h3 className="font-bold text-[#000666] flex items-center gap-2 font-['Manrope',sans-serif]">
+              <span className="material-symbols-outlined text-sm trial-writing-ms">info</span>
+              Requirement
+            </h3>
+            <p className="text-sm text-[#454652] mb-4">下記に提示された文型を、必ず2つ以上使用すること。</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-white/60 p-4 rounded-lg border-l-4 border-[#000666]">
+                <p className="font-bold text-sm">1. ○-기로 약속하다</p>
+                <p className="text-xs text-[#454652] mt-1">例：다음 주말에 친구와 영화를 보기로 약속했다.</p>
+              </div>
+              <div className="bg-white/60 p-4 rounded-lg border-l-4 border-[#1b6d24]">
+                <p className="font-bold text-sm">2. ○-하는 편이다</p>
+                <p className="text-xs text-[#454652] mt-1">例：나는 약속 시간을 잘 지키는 편이다.</p>
+              </div>
+              <div className="bg-white/60 p-4 rounded-lg border-l-4 border-[#4c56af]">
+                <p className="font-bold text-sm">3. ○-기 때문에</p>
+                <p className="text-xs text-[#454652] mt-1">例：중요한 약속이기 때문에 늦으면 안 된다.</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+
+  const mobileLessonIntroBlock = (
+    <div className="mb-10">
+      <div className="inline-block px-3 py-1 rounded-full bg-black/5 text-[10px] font-['Manrope',sans-serif] font-bold tracking-widest text-[#000666] mb-3">
+        LESSON 04
+      </div>
+      <h2 className="font-['Manrope',sans-serif] text-3xl font-extrabold text-[#000666] leading-tight tracking-tighter mb-4">
+        現代社会における
+        <br />
+        デジタル技術の役割
+      </h2>
+      <div className="flex flex-wrap items-center gap-4 text-[#454652] text-sm">
+        <div className="flex items-center gap-1.5">
+          <span className="material-symbols-outlined text-base trial-writing-ms">calendar_today</span>
+          <span>期限: 2024年5月24日</span>
+        </div>
+        <div className="flex items-center gap-1.5 text-[#1b6d24]">
+          <span className="material-symbols-outlined text-base trial-writing-ms" style={{ fontVariationSettings: "'FILL' 1" }}>
+            stars
+          </span>
+          <span className="font-semibold">重要課題</span>
+        </div>
+      </div>
+    </div>
+  )
+
+  const mobileRequirementCard = (
+    <div className="bg-white p-6 rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.05)] relative overflow-hidden">
+      <div className="absolute top-0 right-0 w-24 h-24 bg-[#bdc2ff]/10 rounded-full -mr-12 -mt-12" />
+      <h3 className="font-['Manrope',sans-serif] font-bold text-lg mb-4 flex items-center gap-2">
+        <span className="material-symbols-outlined text-[#000666] trial-writing-ms">description</span>
+        課題要件
+      </h3>
+      <ul className="space-y-3 text-sm text-[#454652] leading-relaxed">
+        <li className="flex gap-3">
+          <span className="text-[#000666] font-bold">・</span>
+          <span>800文字以上 1200文字以内の論説文として作成してください。</span>
+        </li>
+        <li className="flex gap-3">
+          <span className="text-[#000666] font-bold">・</span>
+          <span>具体的な事例を最低2つ引用し、論理的な裏付けを行ってください。</span>
+        </li>
+        <li className="flex gap-3">
+          <span className="text-[#000666] font-bold">・</span>
+          <span>敬体（です・ます調）ではなく、常体（だ・である調）を使用してください。</span>
+        </li>
+      </ul>
+    </div>
+  )
 
   const submitDisabled = primarySubmitDisabled || primarySubmitLoading || bodyOverStudentLimit
 
@@ -379,45 +477,33 @@ export default function AssignmentSubmitScreen({
 
                 {desktopSlotBelowTabs}
 
-                <section className="rounded-xl p-8 mb-8 shadow-sm bg-white">
-                  <div className="flex flex-col md:flex-row gap-8">
-                    <div className="flex-1">
-                      <div className="mb-6">
-                        <span className="bg-[#000666]/10 text-[#000666] px-3 py-1 rounded-full text-xs font-bold font-['Manrope',sans-serif] tracking-widest uppercase">
-                          Theme
+                <section
+                  className={
+                    showCorrectionLearner
+                      ? 'rounded-xl mb-8 shadow-sm bg-white border border-[#c6c5d4]/10 overflow-hidden'
+                      : 'rounded-xl p-8 mb-8 shadow-sm bg-white'
+                  }
+                >
+                  {showCorrectionLearner ? (
+                    <>
+                      <button
+                        type="button"
+                        className="flex w-full items-center justify-between gap-3 px-5 py-3.5 text-left font-['Manrope',sans-serif] text-sm font-bold text-[#000666] bg-[#eef3fb] hover:bg-[#e4ecf8] transition-colors border-b border-[#000666]/10"
+                        aria-expanded={correctionAssignmentExpanded}
+                        onClick={() => setCorrectionAssignmentExpanded((v) => !v)}
+                      >
+                        <span>課題内容を見る</span>
+                        <span className="material-symbols-outlined text-[#000666] trial-writing-ms text-xl shrink-0">
+                          {correctionAssignmentExpanded ? 'expand_less' : 'expand_more'}
                         </span>
-                        <h2 className="text-2xl font-bold text-[#1e1b13] mt-3 font-['Manrope',sans-serif]">{titleResolved}</h2>
-                      </div>
-                      <div className="bg-white p-6 rounded-lg border border-[#c6c5d4]/10 mb-6">
-                        <p className="text-[#1e1b13] font-['Plus_Jakarta_Sans',sans-serif] leading-relaxed whitespace-pre-line">
-                          {bodyResolved}
-                        </p>
-                      </div>
-                      {requirementBlockDesktop ?? (
-                        <div className="space-y-4">
-                          <h3 className="font-bold text-[#000666] flex items-center gap-2 font-['Manrope',sans-serif]">
-                            <span className="material-symbols-outlined text-sm trial-writing-ms">info</span>
-                            Requirement
-                          </h3>
-                          <p className="text-sm text-[#454652] mb-4">下記に提示された文型を、必ず2つ以上使用すること。</p>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="bg-white/60 p-4 rounded-lg border-l-4 border-[#000666]">
-                              <p className="font-bold text-sm">1. ○-기로 약속하다</p>
-                              <p className="text-xs text-[#454652] mt-1">例：다음 주말에 친구와 영화를 보기로 약속했다.</p>
-                            </div>
-                            <div className="bg-white/60 p-4 rounded-lg border-l-4 border-[#1b6d24]">
-                              <p className="font-bold text-sm">2. ○-하는 편이다</p>
-                              <p className="text-xs text-[#454652] mt-1">例：나는 약속 시간을 잘 지키는 편이다.</p>
-                            </div>
-                            <div className="bg-white/60 p-4 rounded-lg border-l-4 border-[#4c56af]">
-                              <p className="font-bold text-sm">3. ○-기 때문에</p>
-                              <p className="text-xs text-[#454652] mt-1">例：중요한 약속이기 때문에 늦으면 안 된다.</p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                      </button>
+                      {correctionAssignmentExpanded ? (
+                        <div className="p-8 pt-6">{assignmentThemeDesktopInner}</div>
+                      ) : null}
+                    </>
+                  ) : (
+                    <div className="p-8">{assignmentThemeDesktopInner}</div>
+                  )}
                 </section>
 
                 <section className="space-y-6">
@@ -710,51 +796,32 @@ export default function AssignmentSubmitScreen({
 
           {mobileSlotBelowTabs}
 
-          <div className="mb-10">
-            <div className="inline-block px-3 py-1 rounded-full bg-black/5 text-[10px] font-['Manrope',sans-serif] font-bold tracking-widest text-[#000666] mb-3">
-              LESSON 04
-            </div>
-            <h2 className="font-['Manrope',sans-serif] text-3xl font-extrabold text-[#000666] leading-tight tracking-tighter mb-4">
-              現代社会における
-              <br />
-              デジタル技術の役割
-            </h2>
-            <div className="flex flex-wrap items-center gap-4 text-[#454652] text-sm">
-              <div className="flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-base trial-writing-ms">calendar_today</span>
-                <span>期限: 2024年5月24日</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-[#1b6d24]">
-                <span className="material-symbols-outlined text-base trial-writing-ms" style={{ fontVariationSettings: "'FILL' 1" }}>
-                  stars
+          {showCorrectionLearner ? (
+            <div className="mb-6 rounded-2xl border border-[#c6c5d4]/10 bg-white shadow-[0_4px_20px_rgba(0,0,0,0.05)] overflow-hidden">
+              <button
+                type="button"
+                className="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left font-['Manrope',sans-serif] text-sm font-bold text-[#000666] bg-[#eef3fb] hover:bg-[#e4ecf8] transition-colors border-b border-[#000666]/10"
+                aria-expanded={correctionAssignmentExpanded}
+                onClick={() => setCorrectionAssignmentExpanded((v) => !v)}
+              >
+                <span>課題内容を見る</span>
+                <span className="material-symbols-outlined text-[#000666] trial-writing-ms text-xl shrink-0">
+                  {correctionAssignmentExpanded ? 'expand_less' : 'expand_more'}
                 </span>
-                <span className="font-semibold">重要課題</span>
-              </div>
+              </button>
+              {correctionAssignmentExpanded ? (
+                <div className="p-4 pt-3 border-t border-[#1e1b13]/10 space-y-4">
+                  {mobileLessonIntroBlock}
+                  {mobileRequirementCard}
+                </div>
+              ) : null}
             </div>
-          </div>
+          ) : (
+            mobileLessonIntroBlock
+          )}
 
           <section className="grid grid-cols-1 gap-6 mb-12">
-            <div className="bg-white p-6 rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.05)] relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-[#bdc2ff]/10 rounded-full -mr-12 -mt-12" />
-              <h3 className="font-['Manrope',sans-serif] font-bold text-lg mb-4 flex items-center gap-2">
-                <span className="material-symbols-outlined text-[#000666] trial-writing-ms">description</span>
-                課題要件
-              </h3>
-              <ul className="space-y-3 text-sm text-[#454652] leading-relaxed">
-                <li className="flex gap-3">
-                  <span className="text-[#000666] font-bold">・</span>
-                  <span>800文字以上 1200文字以内の論説文として作成してください。</span>
-                </li>
-                <li className="flex gap-3">
-                  <span className="text-[#000666] font-bold">・</span>
-                  <span>具体的な事例を最低2つ引用し、論理的な裏付けを行ってください。</span>
-                </li>
-                <li className="flex gap-3">
-                  <span className="text-[#000666] font-bold">・</span>
-                  <span>敬体（です・ます調）ではなく、常体（だ・である調）を使用してください。</span>
-                </li>
-              </ul>
-            </div>
+            {!showCorrectionLearner ? mobileRequirementCard : null}
 
             {showSubmitColumn ? (
               <>

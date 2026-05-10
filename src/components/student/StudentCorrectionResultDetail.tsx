@@ -20,63 +20,74 @@ function hasPublishedCorrectionContent(correction: PublishedCorrection | null): 
   return false
 }
 
-function OriginalSection({
-  originalDisplay,
-  attachments,
-}: {
-  originalDisplay: string
-  attachments: StudentCorrectionAttachment[]
-}) {
+function AttachmentsBlock({ attachments }: { attachments: StudentCorrectionAttachment[] }) {
+  if (attachments.length === 0) return null
   return (
-    <div className="view-section">
-      <h3>내가 제출한 글</h3>
-      <div className="original-content">{originalDisplay}</div>
-      {attachments.length > 0 ? (
-        <div className="original-content" style={{ marginTop: '0.75rem' }}>
-          {attachments.map((a) =>
-            a.downloadUrl && a.mimeType?.startsWith('image/') ? (
-              <p key={a.id}>
-                <img src={a.downloadUrl} alt="" style={{ maxWidth: '100%', height: 'auto' }} />
-              </p>
-            ) : a.downloadUrl ? (
-              <p key={a.id}>
-                <a href={a.downloadUrl} target="_blank" rel="noreferrer">
-                  {a.originalFilename ?? '첨부 파일 (PDF 등)'}
-                </a>
-              </p>
-            ) : null,
-          )}
-        </div>
-      ) : null}
+    <div className="mt-3 space-y-3">
+      {attachments.map((a) =>
+        a.downloadUrl && a.mimeType?.startsWith('image/') ? (
+          <p key={a.id}>
+            <img src={a.downloadUrl} alt="" style={{ maxWidth: '100%', height: 'auto' }} />
+          </p>
+        ) : a.downloadUrl ? (
+          <p key={a.id}>
+            <a href={a.downloadUrl} target="_blank" rel="noreferrer">
+              {a.originalFilename ?? '첨부 파일 (PDF 등)'}
+            </a>
+          </p>
+        ) : null,
+      )}
     </div>
+  )
+}
+
+function ResultSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="learner-correction-result-card">
+      <h3 className="learner-correction-result-card__head">{title}</h3>
+      <div className="learner-correction-result-card__body">{children}</div>
+    </section>
   )
 }
 
 /**
  * Student-facing correction body — same blocks as /writing/app/view/:submissionId (no shell/header).
- * Uses global `.correction-view` / `.view-section` styles from App.css.
  */
 export default function StudentCorrectionResultDetail({ result }: { result: StudentWritingResultPayload }) {
   const originalText = result.submission?.bodyText ?? ''
-  const originalDisplay = originalText.trim() === '' ? '내용이 없습니다.' : originalText
+  const hasSubmittedText = originalText.trim().length > 0
   const attachments = Array.isArray(result.attachments) ? result.attachments : []
+  const submittedDisplay = hasSubmittedText ? originalText : ''
 
   if (result.outcome === 'missed') {
     const snap = result.session.modelAnswerSnapshot
-    const snapText = snap != null && String(snap).trim() !== '' ? String(snap) : null
+    const snapText = snap != null && String(snap).trim() !== '' ? String(snap).trim() : ''
 
     return (
-      <div className="correction-view">
-        <OriginalSection originalDisplay={originalDisplay} attachments={attachments} />
+      <div className="correction-view learner-correction-result-root">
+        {(hasSubmittedText || attachments.length > 0) && (
+          <ResultSection title="提出文">
+            {hasSubmittedText ? (
+              <div className="original-content">{submittedDisplay}</div>
+            ) : (
+              <p className="pending text-sm">（提出本文がありません）</p>
+            )}
+            <AttachmentsBlock attachments={attachments} />
+          </ResultSection>
+        )}
 
-        <div className="view-section">
-          <h3>강사님 첨삭</h3>
-          <p className="pending">提出期限を過ぎたため、添削は提供されません</p>
-          {snapText ? <div className="corrected-content">{snapText}</div> : null}
-          <p className="pending" style={{ marginTop: '0.75rem' }}>
+        {textNonEmpty(snapText) ? (
+          <ResultSection title="模範文">
+            <div className="corrected-content whitespace-pre-wrap">{snapText}</div>
+          </ResultSection>
+        ) : null}
+
+        <p className="pending text-sm px-1">
+          提出期限を過ぎたため、添削は提供されません
+          <span className="block mt-2 not-italic text-[#454652] text-xs">
             {formatSessionMetaLine(result.session as ResultSessionCommon & { modelAnswerSnapshot?: string | null })}
-          </p>
-        </div>
+          </span>
+        </p>
       </div>
     )
   }
@@ -84,55 +95,59 @@ export default function StudentCorrectionResultDetail({ result }: { result: Stud
   const correction = result.correction
   const hasCorrectedBody = hasPublishedCorrectionContent(correction)
 
-  return (
-    <div className="correction-view">
-      <OriginalSection originalDisplay={originalDisplay} attachments={attachments} />
+  const rawHtml = correction ? parseTeacherHtmlV1(correction.richDocumentJson) : null
+  const safeHtml = rawHtml != null ? sanitizeTeacherCorrectionHtml(rawHtml) : ''
+  const hasRich = safeHtml !== '' && isHtmlVisiblyNonEmpty(safeHtml)
 
-      <div className="view-section">
-        <h3>강사님 첨삭</h3>
+  return (
+    <div className="correction-view learner-correction-result-root">
+      {(hasSubmittedText || attachments.length > 0) && (
+        <ResultSection title="提出文">
+          {hasSubmittedText ? (
+            <div className="original-content">{submittedDisplay}</div>
+          ) : (
+            <p className="pending text-sm">（提出本文がありません）</p>
+          )}
+          <AttachmentsBlock attachments={attachments} />
+        </ResultSection>
+      )}
+
+      <ResultSection title="添削文">
         {correction != null && hasCorrectedBody ? (
-          <div className="published-correction-blocks">
-            {(() => {
-              const rawHtml = parseTeacherHtmlV1(correction.richDocumentJson)
-              const safeHtml = rawHtml != null ? sanitizeTeacherCorrectionHtml(rawHtml) : ''
-              const hasRich = safeHtml !== '' && isHtmlVisiblyNonEmpty(safeHtml)
-              return (
-                <>
-                  {hasRich && (
-                    <div
-                      className="corrected-content teacher-rich-content"
-                      dangerouslySetInnerHTML={{ __html: safeHtml }}
-                    />
-                  )}
-                  {!hasRich && textNonEmpty(correction.polishedSentence) && (
-                    <div className="corrected-content whitespace-pre-wrap">{correction.polishedSentence}</div>
-                  )}
-                  {textNonEmpty(correction.improvedText) && (
-                    <div className="improved-block" style={{ marginTop: '1rem' }}>
-                      <h4 className="improved-block-title">整理した比較文</h4>
-                      <div className="corrected-content whitespace-pre-wrap">{correction.improvedText}</div>
-                    </div>
-                  )}
-                  {textNonEmpty(correction.teacherComment) && (
-                    <div style={{ marginTop: '1rem' }}>
-                      <strong>강사 코멘트</strong>
-                      <div className="corrected-content whitespace-pre-wrap">{correction.teacherComment}</div>
-                    </div>
-                  )}
-                  {textNonEmpty(correction.modelAnswer) && (
-                    <div style={{ marginTop: '1rem' }}>
-                      <strong>模範文（参考）</strong>
-                      <div className="corrected-content whitespace-pre-wrap">{correction.modelAnswer}</div>
-                    </div>
-                  )}
-                </>
-              )
-            })()}
-          </div>
+          <>
+            {hasRich ? (
+              <div
+                className="corrected-content teacher-rich-content"
+                dangerouslySetInnerHTML={{ __html: safeHtml }}
+              />
+            ) : textNonEmpty(correction.polishedSentence) ? (
+              <div className="corrected-content whitespace-pre-wrap">{correction.polishedSentence}</div>
+            ) : (
+              <p className="pending text-sm">（添削文がありません）</p>
+            )}
+          </>
         ) : (
-          <p className="pending">아직 첨삭이 완료되지 않았습니다.</p>
+          <p className="pending text-sm">아직 첨삭이 완료되지 않았습니다.</p>
         )}
-      </div>
+      </ResultSection>
+
+      {correction != null && textNonEmpty(correction.improvedText) ? (
+        <ResultSection title="比較文">
+          <div className="corrected-content whitespace-pre-wrap">{correction.improvedText}</div>
+        </ResultSection>
+      ) : null}
+
+      {correction != null && textNonEmpty(correction.modelAnswer) ? (
+        <ResultSection title="模範文">
+          <div className="corrected-content whitespace-pre-wrap">{correction.modelAnswer}</div>
+        </ResultSection>
+      ) : null}
+
+      {correction != null && textNonEmpty(correction.teacherComment) ? (
+        <ResultSection title="講師の一言">
+          <div className="corrected-content whitespace-pre-wrap">{correction.teacherComment}</div>
+        </ResultSection>
+      ) : null}
     </div>
   )
 }
