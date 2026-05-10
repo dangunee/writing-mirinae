@@ -465,6 +465,77 @@ a.status-badge.status.corrected {
   font-weight: 600;
 }
 
+.teacher-queue-weeks {
+  margin-top: 0.25rem;
+}
+
+.assignment-table.teacher-queue-compact th,
+.assignment-table.teacher-queue-compact td {
+  padding: 0.28rem 0.45rem;
+  font-size: 0.78rem;
+  line-height: 1.2;
+  vertical-align: middle;
+}
+
+.assignment-table.teacher-queue-compact th {
+  font-size: 0.74rem;
+}
+
+.assignment-table.teacher-queue-compact tbody tr.teacher-queue-row {
+  cursor: pointer;
+}
+
+.assignment-table.teacher-queue-compact tbody tr.teacher-queue-row:focus-visible {
+  outline: 2px solid var(--color-accent, #2563eb);
+  outline-offset: -2px;
+}
+
+.assignment-table.teacher-queue-compact tbody tr.teacher-queue-date-row td {
+  padding-top: 0.65rem;
+  padding-bottom: 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  border-bottom: none;
+  background: transparent;
+}
+
+.assignment-table.teacher-queue-compact tbody tr.teacher-queue-date-row:first-child td {
+  padding-top: 0.15rem;
+}
+
+.teacher-queue-session-cell {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+}
+
+.teacher-queue-session-index {
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.teacher-queue-email-cell {
+  max-width: 11rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.teacher-queue-preview-cell {
+  max-width: min(22vw, 11rem);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assignment-table.teacher-queue-compact .teacher-queue-sandbox-badge {
+  margin-left: 0;
+  padding: 0.06rem 0.28rem;
+  font-size: 0.62rem;
+}
+
 /* Modal */
 .modal-overlay {
   position: fixed;

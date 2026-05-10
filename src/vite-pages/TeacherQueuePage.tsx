@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
-import { Link } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { NavigateFunction } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { apiUrl } from '../lib/apiUrl'
 import { TeacherPageNav } from '../components/teacher/TeacherPageNav'
 
@@ -8,6 +9,9 @@ type QueueTab = 'pending' | 'completed'
 /** GET /api/teacher/writing/submissions/queue — 서버 QueueGroupedResponse와 동형 */
 type QueueItem = {
   submissionId: string
+  /** 서버가 추가하기 전 응답과의 호환 */
+  studentName?: string | null
+  studentEmail?: string | null
   status: string
   submittedAt: string | null
   createdAt: string
@@ -30,36 +34,147 @@ type QueueGroupedResponse = {
 }
 
 function formatDateTime(iso: string | null): string {
-  if (iso == null || iso === '') return '—'
+  if (iso == null || iso === '') return '-'
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return iso
   return d.toLocaleString()
 }
 
-/** 제출 상태 API 값 → 표시 문구 */
+function dashCell(value: string | null | undefined): string {
+  const t = value?.trim()
+  return t ? t : '-'
+}
+
+/** 제출 상태 API 값 → 표시 (作文トレーニング UI) */
 function submissionStatusLabel(status: string): string {
   const map: Record<string, string> = {
-    submitted: '제출됨',
-    in_progress: '진행 중',
-    draft: '작성 중',
-    in_review: '검토 중',
-    corrected: '첨삭 완료',
-    published: '공개됨',
-    missed: '미제출(기한)',
+    submitted: '提出済み',
+    in_progress: '作成中',
+    draft: '下書き',
+    in_review: '確認中',
+    corrected: '添削済み',
+    published: '公開済み',
+    missed: '未提出',
   }
   return map[status] ?? status
 }
 
-/** 첨삭 레코드 유무·상태 → 표시 문구 */
+/** 첨삭 레코드 유무·상태 → 표시 */
 function correctionStatusLabel(c: QueueItem['correction']): string {
-  if (c == null) return '—'
-  if (c.status === 'draft') return '작성 중'
-  if (c.status === 'published') return '공개됨'
+  if (c == null) return '-'
+  if (c.status === 'draft') return '下書き'
+  if (c.status === 'published') return '公開済み'
   return c.status
 }
 
+function TeacherQueueRow({ item, navigate }: { item: QueueItem; navigate: NavigateFunction }) {
+  const to = `/writing/teacher/correct/${item.submissionId}`
+  const open = () => navigate(to)
+  const previewText = (item.bodyPreview ?? '').trim() || '-'
+
+  return (
+    <tr
+      className="teacher-queue-row"
+      tabIndex={0}
+      role="button"
+      aria-label={`セッション ${item.sessionIndex} の提出を開く`}
+      onClick={open}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          open()
+        }
+      }}
+    >
+      <td>
+        <span className="teacher-queue-session-cell">
+          <span className="teacher-queue-session-index">{item.sessionIndex}</span>
+          {item.isSandbox ? (
+            <span className="teacher-queue-sandbox-badge" title="Admin sandbox QA">
+              Sandbox (QA)
+            </span>
+          ) : null}
+        </span>
+      </td>
+      <td>{dashCell(item.studentName ?? null)}</td>
+      <td
+        className="teacher-queue-email-cell"
+        title={item.studentEmail?.trim() ? item.studentEmail.trim() : undefined}
+      >
+        {dashCell(item.studentEmail ?? null)}
+      </td>
+      <td>{formatDateTime(item.submittedAt)}</td>
+      <td>
+        <span className="status submitted">{submissionStatusLabel(item.status)}</span>
+      </td>
+      <td className="teacher-queue-preview-cell" title={previewText === '-' ? undefined : previewText}>
+        {previewText}
+      </td>
+      <td>
+        <span className="status corrected">{correctionStatusLabel(item.correction)}</span>
+      </td>
+      <td>{formatDateTime(item.correction?.publishedAt ?? null)}</td>
+      <td>{formatDateTime(item.correction?.updatedAt ?? null)}</td>
+    </tr>
+  )
+}
+
+function TeacherQueueTableBody({
+  groups,
+  navigate,
+}: {
+  groups: QueueGroupedResponse['groups']
+  navigate: NavigateFunction
+}) {
+  return (
+    <>
+      {groups.map((group) => (
+        <tbody key={group.date}>
+          <tr className="teacher-queue-date-row">
+            <td colSpan={9} className="teacher-queue-date-cell">
+              {group.date}
+            </td>
+          </tr>
+          {group.items.map((item) => (
+            <TeacherQueueRow key={item.submissionId} item={item} navigate={navigate} />
+          ))}
+        </tbody>
+      ))}
+    </>
+  )
+}
+
+const QUEUE_TABLE_HEAD = (
+  <thead>
+    <tr>
+      <th>セッション</th>
+      <th>受講者</th>
+      <th>メール</th>
+      <th>提出日時</th>
+      <th>状態</th>
+      <th>作文プレビュー</th>
+      <th>添削</th>
+      <th>公開日時</th>
+      <th>添削修正</th>
+    </tr>
+  </thead>
+)
+
 export default function TeacherQueuePage() {
-  const [queueTab, setQueueTab] = useState<QueueTab>('pending')
+  const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  const queueTab: QueueTab = useMemo(() => {
+    return searchParams.get('status') === 'completed' ? 'completed' : 'pending'
+  }, [searchParams])
+
+  const setQueueTab = useCallback(
+    (t: QueueTab) => {
+      setSearchParams({ status: t }, { replace: true })
+    },
+    [setSearchParams]
+  )
+
   const [data, setData] = useState<QueueGroupedResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -74,9 +189,9 @@ export default function TeacherQueuePage() {
       })
       if (!res.ok) {
         if (res.status === 401 || res.status === 403) {
-          setError('강사 권한이 필요합니다.')
+          setError('perm')
         } else {
-          setError('목록을 불러오지 못했습니다.')
+          setError('load')
         }
         setData(null)
         return
@@ -84,7 +199,7 @@ export default function TeacherQueuePage() {
       const json = (await res.json()) as QueueGroupedResponse
       setData(json)
     } catch {
-      setError('목록을 불러오지 못했습니다.')
+      setError('load')
       setData(null)
     } finally {
       setLoading(false)
@@ -94,32 +209,6 @@ export default function TeacherQueuePage() {
   useEffect(() => {
     void load()
   }, [load])
-
-  if (loading) {
-    return (
-      <div className="writing-page">
-        <div className="writing-page-top">
-          <h1 className="writing-page-title">첨삭 큐</h1>
-          <TeacherPageNav />
-        </div>
-        <TeacherQueueTabBar queueTab={queueTab} onChange={setQueueTab} />
-        <p className="status pending">불러오는 중…</p>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="writing-page">
-        <div className="writing-page-top">
-          <h1 className="writing-page-title">첨삭 큐</h1>
-          <TeacherPageNav />
-        </div>
-        <TeacherQueueTabBar queueTab={queueTab} onChange={setQueueTab} />
-        <p className="status pending">{error}</p>
-      </div>
-    )
-  }
 
   const groups = data?.groups ?? []
   const empty = groups.length === 0 || groups.every((g) => g.items.length === 0)
@@ -135,105 +224,20 @@ export default function TeacherQueuePage() {
 
       <TeacherQueueTabBar queueTab={queueTab} onChange={setQueueTab} />
 
-      {empty ? (
+      {loading ? (
+        <p className="status pending">불러오는 중…</p>
+      ) : error === 'perm' ? (
+        <p className="status pending">강사 권한이 필요합니다.</p>
+      ) : error ? (
+        <p className="status pending">목록을 불러오지 못했습니다.</p>
+      ) : empty ? (
         <p className="no-assignments">{emptyMessageJa}</p>
-      ) : queueTab === 'completed' ? (
-        <div className="assignment-weeks">
-          {groups.map((group) => (
-            <section key={group.date} className="week-section">
-              <h3 className="week-label">{group.date}</h3>
-              <table className="assignment-table">
-                <thead>
-                  <tr>
-                    <th>세션</th>
-                    <th>제출</th>
-                    <th>제출 상태</th>
-                    <th>미리보기</th>
-                    <th>첨삭</th>
-                    <th>공개일時</th>
-                    <th>첨삭 수정</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {group.items.map((item) => (
-                    <tr key={item.submissionId}>
-                      <td>
-                        <Link className="view-link" to={`/writing/teacher/correct/${item.submissionId}`}>
-                          {item.sessionIndex}
-                        </Link>
-                        {item.isSandbox ? (
-                          <span className="teacher-queue-sandbox-badge" title="Admin sandbox QA">
-                            Sandbox (QA)
-                          </span>
-                        ) : null}
-                      </td>
-                      <td>{formatDateTime(item.submittedAt)}</td>
-                      <td>
-                        <span className="status submitted">{submissionStatusLabel(item.status)}</span>
-                      </td>
-                      <td className="assignment-title">
-                        <Link className="view-link" to={`/writing/teacher/correct/${item.submissionId}`}>
-                          {(item.bodyPreview ?? '').trim() || '—'}
-                        </Link>
-                      </td>
-                      <td>
-                        <span className="status corrected">{correctionStatusLabel(item.correction)}</span>
-                      </td>
-                      <td>{formatDateTime(item.correction?.publishedAt ?? null)}</td>
-                      <td>{formatDateTime(item.correction?.updatedAt ?? null)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </section>
-          ))}
-        </div>
       ) : (
-        <div className="assignment-weeks">
-          {groups.map((group) => (
-            <section key={group.date} className="week-section">
-              <h3 className="week-label">{group.date}</h3>
-              <table className="assignment-table">
-                <thead>
-                  <tr>
-                    <th>세션</th>
-                    <th>제출</th>
-                    <th>상태</th>
-                    <th>미리보기</th>
-                    <th>첨삭</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {group.items.map((item) => (
-                    <tr key={item.submissionId}>
-                      <td>
-                        <Link className="view-link" to={`/writing/teacher/correct/${item.submissionId}`}>
-                          {item.sessionIndex}
-                        </Link>
-                        {item.isSandbox ? (
-                          <span className="teacher-queue-sandbox-badge" title="Admin sandbox QA">
-                            Sandbox (QA)
-                          </span>
-                        ) : null}
-                      </td>
-                      <td>{formatDateTime(item.submittedAt)}</td>
-                      <td>
-                        <span className="status submitted">{submissionStatusLabel(item.status)}</span>
-                      </td>
-                      <td className="assignment-title">
-                        <Link className="view-link" to={`/writing/teacher/correct/${item.submissionId}`}>
-                          {(item.bodyPreview ?? '').trim() || '—'}
-                        </Link>
-                      </td>
-                      <td>
-                        <span className="status corrected">{correctionStatusLabel(item.correction)}</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </section>
-          ))}
+        <div className="assignment-weeks teacher-queue-weeks">
+          <table className="assignment-table teacher-queue-compact">
+            {QUEUE_TABLE_HEAD}
+            <TeacherQueueTableBody groups={groups} navigate={navigate} />
+          </table>
         </div>
       )}
     </div>

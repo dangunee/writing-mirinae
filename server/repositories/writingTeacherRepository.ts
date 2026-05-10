@@ -1,6 +1,9 @@
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 
 import {
+  profiles,
+  regularAccessGrants,
+  trialApplications,
   writingAssignmentMasters,
   writingCorrectionAnnotations,
   writingCorrectionEvaluations,
@@ -39,6 +42,16 @@ const submissionColumnsForTeacher = {
 const QUEUE_STATUSES_PENDING = ["submitted", "in_review"] as const;
 const QUEUE_STATUSES_COMPLETED = ["corrected", "published"] as const;
 
+/** Display identity for teachers: logged-in student profile, mail-link grant, or trial application (one XOR path per submission). */
+const queueStudentIdentitySelect = {
+  studentName: sql<string | null>`
+    COALESCE(${profiles.name}, ${regularAccessGrants.studentName}, ${trialApplications.applicantName})
+  `.as("queue_student_name"),
+  studentEmail: sql<string | null>`
+    COALESCE(${profiles.email}, ${regularAccessGrants.studentEmail}, ${trialApplications.applicantEmail})
+  `.as("queue_student_email"),
+} as const;
+
 /**
  * Pending work (oldest first). Trial + regular + sandbox mirrors — same as legacy queue.
  */
@@ -49,11 +62,15 @@ export async function listSubmissionQueuePending(db: Db) {
       session: writingSessions,
       course: writingCourses,
       correction: writingCorrections,
+      ...queueStudentIdentitySelect,
     })
     .from(writingSubmissions)
     .innerJoin(writingSessions, eq(writingSubmissions.sessionId, writingSessions.id))
     .innerJoin(writingCourses, eq(writingSubmissions.courseId, writingCourses.id))
     .leftJoin(writingCorrections, eq(writingCorrections.submissionId, writingSubmissions.id))
+    .leftJoin(profiles, eq(writingSubmissions.userId, profiles.id))
+    .leftJoin(regularAccessGrants, eq(writingSubmissions.regularAccessGrantId, regularAccessGrants.id))
+    .leftJoin(trialApplications, eq(writingSubmissions.trialApplicationId, trialApplications.id))
     .where(inArray(writingSubmissions.status, [...QUEUE_STATUSES_PENDING]))
     .orderBy(asc(writingSubmissions.submittedAt), asc(writingSubmissions.createdAt), asc(writingSubmissions.id));
   return rows;
@@ -69,11 +86,15 @@ export async function listSubmissionQueueCompleted(db: Db) {
       session: writingSessions,
       course: writingCourses,
       correction: writingCorrections,
+      ...queueStudentIdentitySelect,
     })
     .from(writingSubmissions)
     .innerJoin(writingSessions, eq(writingSubmissions.sessionId, writingSessions.id))
     .innerJoin(writingCourses, eq(writingSubmissions.courseId, writingCourses.id))
     .leftJoin(writingCorrections, eq(writingCorrections.submissionId, writingSubmissions.id))
+    .leftJoin(profiles, eq(writingSubmissions.userId, profiles.id))
+    .leftJoin(regularAccessGrants, eq(writingSubmissions.regularAccessGrantId, regularAccessGrants.id))
+    .leftJoin(trialApplications, eq(writingSubmissions.trialApplicationId, trialApplications.id))
     .where(inArray(writingSubmissions.status, [...QUEUE_STATUSES_COMPLETED]))
     .orderBy(
       desc(sql`COALESCE(${writingCorrections.publishedAt}, ${writingCorrections.updatedAt}, ${writingSubmissions.updatedAt})`),

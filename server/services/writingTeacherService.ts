@@ -83,6 +83,12 @@ function queueSortKeyFromItem(it: QueueItem): number {
   return new Date(it.submittedAt ?? it.createdAt).getTime();
 }
 
+function queueStudentDisplayField(v: string | null | undefined): string | null {
+  if (v == null) return null;
+  const t = v.trim();
+  return t.length > 0 ? t : null;
+}
+
 /** Completion / activity timestamp for grouping & sorting the completed queue (newest first). */
 function queueCompletedActivityMs(it: QueueItem): number {
   const pub = it.correction?.publishedAt;
@@ -94,6 +100,9 @@ function queueCompletedActivityMs(it: QueueItem): number {
 export type QueueItem = {
   submissionId: string;
   studentUserId: string;
+  /** profiles.name | grant.student_name | trial.applicant_name — teacher display only. */
+  studentName: string | null;
+  studentEmail: string | null;
   status: string;
   submittedAt: string | null;
   createdAt: string;
@@ -135,7 +144,10 @@ export async function getTeacherQueueGrouped(db: Db, filter: TeacherQueueFilter 
 
   const items: QueueItem[] = rows.map((r) => ({
     submissionId: r.submission.id,
-    studentUserId: r.submission.userId ?? r.submission.regularAccessGrantId ?? "",
+    studentUserId:
+      r.submission.userId ?? r.submission.regularAccessGrantId ?? r.submission.trialApplicationId ?? "",
+    studentName: queueStudentDisplayField(r.studentName),
+    studentEmail: queueStudentDisplayField(r.studentEmail),
     status: r.submission.status,
     submittedAt: r.submission.submittedAt?.toISOString() ?? null,
     createdAt: r.submission.createdAt.toISOString(),
