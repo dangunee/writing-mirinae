@@ -42,6 +42,8 @@ type Props = {
   showAccountActions?: boolean
   /** GET /sessions/current と整合したアクセス種別（試用メールリンクのみ等の表示切替） */
   writingAppAccess?: AccessContext['type'] | null
+  /** 右サイドバー埋め込み: 下マージなし・ボタン縦並び（カード見た目は同一トーン） */
+  embedSidebar?: boolean
 }
 
 /**
@@ -51,6 +53,7 @@ export default function StudentAccountPanel({
   compact = false,
   showAccountActions = true,
   writingAppAccess = null,
+  embedSidebar = false,
 }: Props) {
   const { me, loading, error, refetch } = useAuthMe()
   const navigate = useNavigate()
@@ -67,12 +70,12 @@ export default function StudentAccountPanel({
     navigate('/writing', { replace: true })
   }
 
+  const outerMb = embedSidebar ? 'mb-0' : compact ? 'mb-3' : 'mb-6'
+
   if (loading) {
     return (
       <div
-        className={`rounded-xl border border-[#1e1b13]/10 bg-white/90 px-4 py-3 font-['Manrope',sans-serif] text-sm text-[#595c5e] shadow-sm ${
-          compact ? 'mb-3' : 'mb-6'
-        }`}
+        className={`rounded-xl border border-[#1e1b13]/10 bg-white/90 px-4 py-3 font-['Manrope',sans-serif] text-sm text-[#595c5e] shadow-sm ${outerMb}`}
         role="status"
       >
         アカウント情報を読み込み中…
@@ -83,9 +86,7 @@ export default function StudentAccountPanel({
   if (error) {
     return (
       <div
-        className={`rounded-xl border border-[#fde8e8] bg-[#fff8f8] px-4 py-3 font-['Manrope',sans-serif] text-sm text-[#8b1a1a] ${
-          compact ? 'mb-3' : 'mb-6'
-        }`}
+        className={`rounded-xl border border-[#fde8e8] bg-[#fff8f8] px-4 py-3 font-['Manrope',sans-serif] text-sm text-[#8b1a1a] ${outerMb}`}
       >
         アカウント情報を取得できませんでした。
         <button
@@ -115,9 +116,7 @@ export default function StudentAccountPanel({
 
     return (
       <div
-        className={`rounded-xl border border-[#1e1b13]/10 bg-[#F5F5F5] px-4 py-3 font-['Manrope',sans-serif] text-sm text-[#1e1b13]/80 shadow-sm ${
-          compact ? 'mb-3' : 'mb-6'
-        }`}
+        className={`rounded-xl border border-[#1e1b13]/10 bg-[#F5F5F5] px-4 py-3 font-['Manrope',sans-serif] text-sm text-[#1e1b13]/80 shadow-sm ${outerMb}`}
       >
         <div className="flex flex-wrap items-center gap-2">
           <span className={badgeActive}>{anonBadge}</span>
@@ -145,20 +144,18 @@ export default function StudentAccountPanel({
 
   return (
     <div
-      className={`rounded-xl border border-[#1e1b13]/10 bg-white px-4 py-3 font-['Manrope',sans-serif] shadow-[0_4px_20px_rgba(0,0,0,0.05)] ${
-        compact ? 'mb-3' : 'mb-6'
-      }`}
+      className={`rounded-xl border border-[#1e1b13]/10 bg-white px-4 py-3 font-['Manrope',sans-serif] shadow-[0_4px_20px_rgba(0,0,0,0.05)] ${outerMb}`}
     >
       <div
         className={
-          showAccountActions
+          showAccountActions && !embedSidebar
             ? 'flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'
-            : 'flex flex-col gap-2'
+            : 'flex flex-col gap-3'
         }
       >
         <div className="min-w-0 flex-1 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-widest text-[#595c5e]">Account</span>
+            <span className="text-xs font-bold uppercase tracking-widest text-[#595c5e]">ACCOUNT</span>
             <span className="rounded-full bg-[#000666]/10 px-2 py-0.5 text-[11px] font-bold text-[#000666]">
               {roleLabelJa(me.role)}
             </span>
@@ -180,7 +177,13 @@ export default function StudentAccountPanel({
           </div>
         </div>
         {showAccountActions ? (
-          <div className="flex flex-shrink-0 flex-wrap items-center gap-2 sm:justify-end">
+          <div
+            className={
+              embedSidebar
+                ? 'flex w-full flex-shrink-0 flex-col gap-2'
+                : 'flex flex-shrink-0 flex-wrap items-center gap-2 sm:justify-end'
+            }
+          >
             {me.role === 'admin' ? (
               <Link
                 to="/writing/admin"

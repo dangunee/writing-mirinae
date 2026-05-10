@@ -915,37 +915,33 @@ export default function WritingPage() {
     </>
   )
 
-  const mainTopSlot = (
-    <>
-      {sandboxErrorCode && isAdmin ? (
-        <div
-          className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-sm"
-          role="alert"
-        >
-          {adminSandboxErrorBannerText(sandboxErrorCode)}
-        </div>
-      ) : null}
-      <StudentAccountPanel compact showAccountActions={!isAdmin} writingAppAccess={accessContext.type} />
-      {isAdmin ? (
-        <>
-          <details className="mb-3 rounded-lg border border-amber-600/25 bg-amber-50/50 shadow-sm open:bg-amber-50/80">
-            <summary className="cursor-pointer select-none px-3 py-2 text-[11px] font-bold text-amber-950 marker:text-amber-800">
-              QAツール · Admin Sandbox（内部検証 · テスト提出用）
-            </summary>
-            <div className="border-t border-amber-700/15 px-1 pb-2 pt-0">
-              <AdminSandboxPanel
-                embedded
-                onSandboxChange={() => {
-                  void loadCurrent()
-                }}
-              />
-            </div>
-          </details>
-          <WritingPageAdminPreview onPreview={onAdminPreview} />
-        </>
-      ) : null}
-    </>
-  )
+  const mainTopSlot =
+    !isAdmin ? null : (
+      <>
+        {sandboxErrorCode ? (
+          <div
+            className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-sm"
+            role="alert"
+          >
+            {adminSandboxErrorBannerText(sandboxErrorCode)}
+          </div>
+        ) : null}
+        <details className="mb-3 rounded-lg border border-amber-600/25 bg-amber-50/50 shadow-sm open:bg-amber-50/80">
+          <summary className="cursor-pointer select-none px-3 py-2 text-[11px] font-bold text-amber-950 marker:text-amber-800">
+            QAツール · Admin Sandbox（内部検証 · テスト提出用）
+          </summary>
+          <div className="border-t border-amber-700/15 px-1 pb-2 pt-0">
+            <AdminSandboxPanel
+              embedded
+              onSandboxChange={() => {
+                void loadCurrent()
+              }}
+            />
+          </div>
+        </details>
+        <WritingPageAdminPreview onPreview={onAdminPreview} />
+      </>
+    )
 
   return (
     <div className="writing-submit-page writing-stitch-root">
@@ -953,6 +949,14 @@ export default function WritingPage() {
         mainTopSlot={mainTopSlot}
         landingNavVariant={accessContext.type === 'trial' && !isAdmin ? 'minimal' : 'default'}
         accessContext={accessContext}
+        sidebarAccountSlot={
+          <StudentAccountPanel
+            compact
+            embedSidebar
+            showAccountActions={!isAdmin}
+            writingAppAccess={accessContext.type}
+          />
+        }
         studentBodyMaxChars={studentBodyMaxChars}
         text={content}
         onTextChange={setContent}

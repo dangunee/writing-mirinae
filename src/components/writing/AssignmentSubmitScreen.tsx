@@ -78,6 +78,8 @@ export type AssignmentSubmitScreenProps = {
   desktopAfterSubmitSlot?: ReactNode
   /** デスクトップ右:「最近提出リスト」カード内の実データ（未指定時は案内文のみ） */
   desktopSidebarRecentSlot?: ReactNode
+  /** 右サイドバー先頭（デスクトップ・モバイル共通トーン）— アカウントカードなど */
+  sidebarAccountSlot?: ReactNode
   mobileSlotBelowTabs?: ReactNode
   /** デスクトップ課題カード（未指定時は Stitch デモ） */
   assignmentTitle?: string
@@ -86,9 +88,9 @@ export type AssignmentSubmitScreenProps = {
   mobileTextareaPlaceholder?: string
   /** 未指定時は Stitch デモの Requirement ブロック */
   requirementBlockDesktop?: ReactNode
-  /** メインカラム先頭（課題UIより上）。/writing/app のアカウント帯・管理者プレビュー等 */
+  /** メインカラム先頭（課題UIより上）。管理者向けサンドボックス通知・QA ツール等（アカウント帯は sidebarAccountSlot へ） */
   mainTopSlot?: ReactNode
-  /** `/writing/app` 試用: 上部 LandingNav をブランドのみにし、アカウントは mainTopSlot に集約 */
+  /** `/writing/app` 試用: 上部 LandingNav をブランドのみにし、アカウントは sidebarAccountSlot に集約 */
   landingNavVariant?: 'default' | 'minimal'
   /**
    * Parent drives 「提出 / 既提出 / 添削完了」 (Admin sandbox, trial, student, regular on /writing/app).
@@ -137,6 +139,7 @@ export default function AssignmentSubmitScreen({
   desktopSlotBelowTabs,
   desktopAfterSubmitSlot,
   desktopSidebarRecentSlot,
+  sidebarAccountSlot,
   mobileSlotBelowTabs,
   assignmentTitle,
   assignmentDescription,
@@ -368,6 +371,80 @@ export default function AssignmentSubmitScreen({
     </div>
   )
 
+  const calendarSection = (
+    <section className="bg-white p-6 rounded-2xl shadow-[0_10px_40px_rgba(30,27,19,0.04)]">
+      <div className="flex items-center justify-between mb-6 gap-2">
+        <h4 className="font-['Manrope',sans-serif] font-bold text-[#000666] shrink-0">学習カレンダー</h4>
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-sm font-bold font-['Manrope',sans-serif] text-[#1e1b13]/80 truncate tabular-nums">
+            {calendarTitle}
+          </span>
+          <div className="flex gap-2 shrink-0">
+            <span className="material-symbols-outlined text-[#1e1b13]/40 cursor-pointer hover:text-[#000666] trial-writing-ms">
+              chevron_left
+            </span>
+            <span className="material-symbols-outlined text-[#1e1b13]/40 cursor-pointer hover:text-[#000666] trial-writing-ms">
+              chevron_right
+            </span>
+          </div>
+        </div>
+      </div>
+      <div className="grid grid-cols-7 gap-y-4 text-center text-[10px] font-bold font-['Manrope',sans-serif] tracking-widest text-[#1e1b13]/40 uppercase mb-4">
+        <span>Sun</span>
+        <span>Mon</span>
+        <span>Tue</span>
+        <span>Wed</span>
+        <span>Thu</span>
+        <span>Fri</span>
+        <span>Sat</span>
+      </div>
+      <div className="grid grid-cols-7 gap-y-2 text-center text-sm font-medium">
+        {calendarCells.map((c) => {
+          const base =
+            'p-2 rounded-lg cursor-pointer relative flex flex-col items-center justify-center min-h-[2.25rem]'
+          if (c.muted) {
+            return (
+              <span key={c.key} className={`${base} text-[#1e1b13]/20`}>
+                {c.day}
+              </span>
+            )
+          }
+          if (c.selected) {
+            return (
+              <span key={c.key} className={`${base} bg-[#000666] text-white`}>
+                {c.day}
+                <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-white rounded-full" />
+              </span>
+            )
+          }
+          return (
+            <span key={c.key} className={`${base} hover:bg-[#f5edde]`}>
+              {c.day}
+            </span>
+          )
+        })}
+      </div>
+    </section>
+  )
+
+  const recentSubmissionsSection = (
+    <section>
+      <div className="flex items-center justify-between mb-6">
+        <h4 className="font-['Manrope',sans-serif] font-bold text-[#000666]">最近提出リスト</h4>
+        <span className="text-xs text-[#1e1b13]/40 font-['Manrope',sans-serif] tracking-tighter cursor-pointer hover:text-[#000666] transition-colors">
+          すべて見る
+        </span>
+      </div>
+      <div className="space-y-4">
+        {desktopSidebarRecentSlot ?? (
+          <p className="text-xs text-[#1e1b13]/45 font-['Manrope',sans-serif] leading-relaxed px-0.5">
+            表示できる提出履歴がありません。
+          </p>
+        )}
+      </div>
+    </section>
+  )
+
   const submitDisabled = primarySubmitDisabled || primarySubmitLoading || bodyOverStudentLimit
 
   return (
@@ -386,24 +463,7 @@ export default function AssignmentSubmitScreen({
 
       {/* ——— Desktop (md+) ——— */}
       <div className="relative hidden min-h-screen font-['Plus_Jakarta_Sans',sans-serif] text-[#1e1b13] bg-[#F5F5F5] trial-writing-scrollbar md:block">
-        <aside className="fixed left-0 top-0 z-40 flex h-full w-64 flex-col gap-2 bg-[#F5F5F5] pt-20">
-          <div className="px-6 py-4 mb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-[#e9e2d3] overflow-hidden border-2 border-[#000666]/10">
-                <img
-                  alt=""
-                  className="w-full h-full object-cover"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuBf38cpp30-_c-DF5-os4vw7U8Ck-EY8eMFC4bM745mzJMT1Ra9MnVR2EXoSnvnOKgGWYHXMsaHiOcbHR3YMdNO8TBw55I4DTomvDyHYkdwLu3sfR_ZpXi32QtUFaZTBgSvqviCJvqJW0SFnYX1CLBQ6odEdsSxtAgUr_EUeH4EKyzJQI6ByrxohVPhH86Uh9Wzx8sG_8d_AeidVf0OYToW05DTZ4KnVMkPXmZp6xJvZNNLEBIEfdL9Z8CwVJQOARWRvUNkge3gutM"
-                />
-              </div>
-              <div>
-                <p className="text-lg font-black text-[#1e1b13] font-['Manrope',sans-serif]">学習者様</p>
-                <p className="text-[10px] uppercase tracking-widest text-[#1e1b13]/60 font-['Manrope',sans-serif]">
-                  中級韓国語コース
-                </p>
-              </div>
-            </div>
-          </div>
+        <aside className="fixed left-0 top-0 z-40 flex h-full w-64 flex-col gap-2 bg-[#F5F5F5] pt-24">
           <div className="flex flex-col gap-1 pr-4">
             <span className="flex items-center gap-3 text-[#1e1b13]/70 ml-4 pl-4 py-3 rounded-l-full font-['Manrope',sans-serif] text-sm uppercase tracking-widest cursor-default">
               <span className="material-symbols-outlined trial-writing-ms">dashboard</span>
@@ -643,70 +703,9 @@ export default function AssignmentSubmitScreen({
 
             <aside className="w-full lg:w-80 p-8 lg:p-12 lg:pl-4 bg-[#F5F5F5]">
               <div className="sticky top-24 space-y-10">
-                <section className="bg-white p-6 rounded-2xl shadow-[0_10px_40px_rgba(30,27,19,0.04)]">
-                  <div className="flex items-center justify-between mb-6">
-                    <h4 className="font-['Manrope',sans-serif] font-bold text-[#000666]">{calendarTitle}</h4>
-                    <div className="flex gap-2">
-                      <span className="material-symbols-outlined text-[#1e1b13]/40 cursor-pointer hover:text-[#000666] trial-writing-ms">
-                        chevron_left
-                      </span>
-                      <span className="material-symbols-outlined text-[#1e1b13]/40 cursor-pointer hover:text-[#000666] trial-writing-ms">
-                        chevron_right
-                      </span>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-7 gap-y-4 text-center text-[10px] font-bold font-['Manrope',sans-serif] tracking-widest text-[#1e1b13]/40 uppercase mb-4">
-                    <span>Sun</span>
-                    <span>Mon</span>
-                    <span>Tue</span>
-                    <span>Wed</span>
-                    <span>Thu</span>
-                    <span>Fri</span>
-                    <span>Sat</span>
-                  </div>
-                  <div className="grid grid-cols-7 gap-y-2 text-center text-sm font-medium">
-                    {calendarCells.map((c) => {
-                      const base =
-                        'p-2 rounded-lg cursor-pointer relative flex flex-col items-center justify-center min-h-[2.25rem]'
-                      if (c.muted) {
-                        return (
-                          <span key={c.key} className={`${base} text-[#1e1b13]/20`}>
-                            {c.day}
-                          </span>
-                        )
-                      }
-                      if (c.selected) {
-                        return (
-                          <span key={c.key} className={`${base} bg-[#000666] text-white`}>
-                            {c.day}
-                            <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-white rounded-full" />
-                          </span>
-                        )
-                      }
-                      return (
-                        <span key={c.key} className={`${base} hover:bg-[#f5edde]`}>
-                          {c.day}
-                        </span>
-                      )
-                    })}
-                  </div>
-                </section>
-
-                <section>
-                  <div className="flex items-center justify-between mb-6">
-                    <h4 className="font-['Manrope',sans-serif] font-bold text-[#000666]">最近提出リスト</h4>
-                    <span className="text-xs text-[#1e1b13]/40 font-['Manrope',sans-serif] tracking-tighter cursor-pointer hover:text-[#000666] transition-colors">
-                      すべて見る
-                    </span>
-                  </div>
-                  <div className="space-y-4">
-                    {desktopSidebarRecentSlot ?? (
-                      <p className="text-xs text-[#1e1b13]/45 font-['Manrope',sans-serif] leading-relaxed px-0.5">
-                        表示できる提出履歴がありません。
-                      </p>
-                    )}
-                  </div>
-                </section>
+                {sidebarAccountSlot}
+                {calendarSection}
+                {recentSubmissionsSection}
               </div>
             </aside>
           </div>
@@ -718,6 +717,11 @@ export default function AssignmentSubmitScreen({
       <div className="md:hidden bg-[#f5f5f5] font-['Plus_Jakarta_Sans',sans-serif] text-[#1e1b13] min-h-screen pb-28">
         <main className="min-h-screen w-full min-w-0 pt-16 pb-24 px-4">
           {mainTopSlot ? <div className="mb-4 w-full">{mainTopSlot}</div> : null}
+          {sidebarAccountSlot ? <div className="mb-4 w-full">{sidebarAccountSlot}</div> : null}
+          <div className="space-y-10 mb-8">
+            {calendarSection}
+            {recentSubmissionsSection}
+          </div>
           <div className="flex space-x-1 mb-8 bg-black/5 p-1 rounded-xl">
             <button
               type="button"
