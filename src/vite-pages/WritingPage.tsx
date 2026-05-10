@@ -59,8 +59,8 @@ type CurrentSessionOk = {
 }
 
 const REQUIREMENT_FALLBACK: { title: string; example?: string }[] = [
-  { title: '주제에 맞게 작성할 것' },
-  { title: '분량·형식을 지킬 것' },
+  { title: 'テーマに沿って書くこと' },
+  { title: '分量・形式の指定を守ること' },
 ]
 
 function learnerAssignmentTabFromSession(
@@ -395,7 +395,7 @@ export default function WritingPage() {
       : isAdmin && adminPreview
         ? null
         : (current?.submission ?? null)
-  /** 관리자プレビュー: 목록 API에 세션 행이 있으면 실제 sessionId로 제출 가능 */
+  /** 管理者プレビュー: 一覧APIにセッション行があれば実際の sessionId で提出可能 */
   const canSubmit =
     current?.accessKind === 'admin_sandbox'
       ? Boolean(current.canSubmit)
@@ -491,7 +491,7 @@ export default function WritingPage() {
         ? `第${session.index}回 · Admin Sandbox（QA）`
         : isAdmin && adminPreview
           ? `第${session.index}回 · プレビュー`
-          : `제${session.index}회 · ${formatUnlockLabel(session.unlockAt)}`
+          : `第${session.index}回 · ${formatUnlockLabel(session.unlockAt)}`
       : ''
 
   const assignUi = parseAssignmentSnapshotForUi(session?.themeSnapshot ?? null)
@@ -500,7 +500,7 @@ export default function WritingPage() {
     session != null
       ? (assignUi.displayTitle || themeUiLegacy.title)?.trim()
         ? String((assignUi.displayTitle || themeUiLegacy.title)?.trim())
-        : `제${session.index}회 작문`
+        : `第${session.index}回作文`
       : '作文課題'
   const promptBody =
     (assignUi.prompt || assignUi.legacyInstruction || themeUiLegacy.instruction).trim() ||
@@ -596,7 +596,7 @@ export default function WritingPage() {
       : null
 
   const emptyAssignmentsText = (() => {
-    if (current?.ok && current.mode === 'all_done') return '모든 과제를 완료했습니다.'
+    if (current?.ok && current.mode === 'all_done') return 'すべての課題を完了しました。'
     if (
       current?.ok &&
       current.mode === 'fresh' &&
@@ -604,7 +604,7 @@ export default function WritingPage() {
       current.accessKind === 'trial' &&
       current.reasonIfNot === 'internal_error'
     ) {
-      return '체험 코스 세션을 불러오지 못했습니다. Vercel 환경변수 WRITING_TRIAL_COURSE_ID가 관리 화면에서 과제를 넣은 코스 UUID와 같은지, 그 코스가 active 상태인지 확인해 주세요.'
+      return '体験コースのセッションを読み込めませんでした。Vercel の環境変数 WRITING_TRIAL_COURSE_ID が、管理画面で課題を登録したコースの UUID と一致しているか、そのコースが有効（active）かどうかを確認してください。'
     }
     if (
       isAdmin &&
@@ -613,8 +613,8 @@ export default function WritingPage() {
     ) {
       return 'この回には課題が登録されていません。管理画面の「課題登録」でこのコース・回次に内容を保存してください。'
     }
-    if (current?.ok && current.mode === 'fresh') return '첫 과제를 시작하세요.'
-    return '아직 과제가 없습니다.'
+    if (current?.ok && current.mode === 'fresh') return '最初の課題を開始してください。'
+    return 'まだ課題がありません。'
   })()
 
   const submissionFlowKind = (() => {
@@ -626,7 +626,7 @@ export default function WritingPage() {
 
   const cardDescription = hasSession
     ? activeSessionDescription
-    : `${emptyAssignmentsText} 이용 가능한 과제가 열리면 이 영역에 과제 안내가 표시됩니다.`
+    : `${emptyAssignmentsText} 利用可能な課題が開くと、この欄に課題の案内が表示されます。`
 
   const handleSubmit = async () => {
     if (sandboxErrorCode) return
@@ -811,7 +811,7 @@ export default function WritingPage() {
     <>
       {loading ? (
         <p className="text-sm text-[#454652] mb-4 px-1" role="status">
-          불러오는 중…
+          読み込み中…
         </p>
       ) : null}
       {trialSubmitNotice ? (
@@ -853,7 +853,7 @@ export default function WritingPage() {
           <SubmissionFlow kind={submissionFlowKind} />
           {submission.status !== 'draft' ? (
             <p className="writing-lock-hint mb-6" role="status">
-              제출 후에는 수정할 수 없습니다.
+              提出後は本文を修正できません。
             </p>
           ) : null}
         </>
@@ -870,9 +870,9 @@ export default function WritingPage() {
     <div className="space-y-4">
       <h3 className="font-bold text-[#000666] flex items-center gap-2 font-['Manrope',sans-serif]">
         <span className="material-symbols-outlined text-sm">info</span>
-        Requirement
+        課題要件
       </h3>
-      <p className="text-sm text-[#454652] mb-4">아래 안내를 확인한 뒤 작문을 작성해 주세요.</p>
+      <p className="text-sm text-[#454652] mb-4">以下の指示を確認したうえで、作文を作成してください。</p>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {requirementCards
           ? requirementCards.map((item, index) => (
@@ -884,7 +884,7 @@ export default function WritingPage() {
                 </p>
                 <p className="font-bold text-sm">{item.expressionLabel}</p>
                 <p className="text-xs text-[#454652] mt-1">{item.translationJa}</p>
-                <p className="text-xs text-[#595c5e] mt-2 italic">예: {item.exampleKo}</p>
+                <p className="text-xs text-[#595c5e] mt-2 italic">例：{item.exampleKo}</p>
               </div>
             ))
           : REQUIREMENT_FALLBACK.map((item, index) => (
@@ -910,23 +910,8 @@ export default function WritingPage() {
         </p>
       ) : null}
       <p className="text-center text-[10px] text-[#454652] mt-6 mb-8 font-medium tracking-wide">
-        제출 후 강사 확인·첨삭 일정은 코스 안내에 따릅니다.
+        提出後の講師確認・添削の進め方や所要時間は、各コースの案内に従ってください。
       </p>
-      {showSessionTable && session != null ? (
-        <table className="assignment-table assignment-table-stitch writing-submit-table w-full">
-          <thead>
-            <tr>
-              <th scope="col">과제</th>
-              <th scope="col">제출</th>
-              <th scope="col">첨삭</th>
-              <th scope="col">결과</th>
-            </tr>
-          </thead>
-          <tbody>
-            <SessionRow session={session} submission={submission} />
-          </tbody>
-        </table>
-      ) : null}
     </>
   )
 
@@ -980,14 +965,14 @@ export default function WritingPage() {
         assignmentDescription={cardDescription}
         desktopTextareaPlaceholder={
           canUseForm
-            ? '여기에 작문을 입력해 주세요...'
+            ? 'ここに作文を入力してください…'
             : isAdmin && adminPreview && !adminPreview.sessionId?.trim()
               ? 'この回にはセッションがありません。管理画面で課題を登録してください。'
               : submissionBlockedJa ?? '現在は入力・提出できません。ページを更新してお試しください。'
         }
         mobileTextareaPlaceholder={
           canUseForm
-            ? '여기에 작문을 입력해 주세요...'
+            ? 'ここに作文を入力してください…'
             : isAdmin && adminPreview && !adminPreview.sessionId?.trim()
               ? 'この回にはセッションがありません。管理画面で課題を登録してください。'
               : submissionBlockedJa ?? '現在は入力・提出できません。ページを更新してお試しください。'
@@ -995,6 +980,15 @@ export default function WritingPage() {
         requirementBlockDesktop={requirementBlockDesktop}
         desktopSlotBelowTabs={desktopSlotBelowTabs}
         desktopAfterSubmitSlot={desktopAfterSubmitSlot}
+        desktopSidebarRecentSlot={
+          showSessionTable && session != null ? (
+            <RecentSubmissionSidebarCard
+              session={session}
+              submission={submission}
+              assignmentTitle={activeSessionTitle}
+            />
+          ) : undefined
+        }
         mobileSlotBelowTabs={desktopSlotBelowTabs}
         {...(useControlledAssignmentTabs
           ? {
@@ -1017,23 +1011,23 @@ function SubmissionBanner({ kind }: { kind: 'draft' | 'in_progress' | 'published
   if (kind === 'draft') {
     return (
       <div className="writing-submission-banner writing-submission-banner--neutral">
-        <p className="writing-submission-banner-title">작성 중입니다</p>
-        <p className="writing-submission-banner-desc">제출을 완료하면 강사가 확인할 수 있습니다.</p>
+        <p className="writing-submission-banner-title">作成中です</p>
+        <p className="writing-submission-banner-desc">提出が完了すると講師が内容を確認できます。</p>
       </div>
     )
   }
   if (kind === 'published') {
     return (
       <div className="writing-submission-banner writing-submission-banner--success">
-        <p className="writing-submission-banner-title">첨삭이 완료되었습니다</p>
-        <p className="writing-submission-banner-desc">아래에서 결과를 확인할 수 있습니다.</p>
+        <p className="writing-submission-banner-title">添削が完了しました</p>
+        <p className="writing-submission-banner-desc">下のタブや一覧から結果を確認できます。</p>
       </div>
     )
   }
   return (
     <div className="writing-submission-banner writing-submission-banner--success">
-      <p className="writing-submission-banner-title">과제를 제출했습니다</p>
-      <p className="writing-submission-banner-desc">강사 첨삭이 완료되면 결과를 확인할 수 있습니다.</p>
+      <p className="writing-submission-banner-title">課題を提出しました</p>
+      <p className="writing-submission-banner-desc">講師による添削が完了すると、結果を確認できます。</p>
     </div>
   )
 }
@@ -1051,29 +1045,32 @@ function SubmissionFlow({ kind }: { kind: 'draft' | 'in_progress' | 'published' 
       <div className="writing-status-flow-track">
         <div className={`writing-flow-step writing-flow-step--${s1}`}>
           <span className="writing-flow-dot" />
-          <span className="writing-flow-label">제출</span>
+          <span className="writing-flow-label">提出</span>
         </div>
         <div className={`writing-flow-line writing-flow-line--${lineAfter1}`} />
         <div className={`writing-flow-step writing-flow-step--${s2}`}>
           <span className="writing-flow-dot" />
-          <span className="writing-flow-label">첨삭 중</span>
+          <span className="writing-flow-label">添削中</span>
         </div>
         <div className={`writing-flow-line writing-flow-line--${lineAfter2}`} />
         <div className={`writing-flow-step writing-flow-step--${s3}`}>
           <span className="writing-flow-dot" />
-          <span className="writing-flow-label">완료</span>
+          <span className="writing-flow-label">完了</span>
         </div>
       </div>
     </div>
   )
 }
 
-function SessionRow({
+/** デスクトップ右サイドバー「最近提出リスト」— Stitch カード布局（クリックで結果ビューへ） */
+function RecentSubmissionSidebarCard({
   session,
   submission,
+  assignmentTitle,
 }: {
   session: NonNullable<CurrentSessionOk['session']>
   submission: CurrentSessionOk['submission']
+  assignmentTitle: string
 }) {
   const hasSubmission = submission != null
   const isPublished = submission?.status === 'published'
@@ -1084,72 +1081,68 @@ function SessionRow({
     submission.status !== 'draft' &&
     submission.status !== 'published'
   const rs = session.runtimeStatus
-  const canOpenResult =
+  const canOpenResult = Boolean(
     submission?.id &&
-    (rs === 'corrected' ||
-      rs === 'missed' ||
-      (rs == null || rs === ''
-        ? isPublished || session.status === 'missed'
-        : false))
-
-  return (
-    <tr>
-      <td className="assignment-title">제{session.index}회 작문</td>
-      <td>
-        {!hasSubmission ? (
-          <span className="status-badge status pending">미제출</span>
-        ) : isDraft ? (
-          <span className="status-badge status pending">
-            작성 중
-            <br />
-            <small>{formatDate(submission.submittedAt)}</small>
-          </span>
-        ) : (
-          <span className="status-badge status submitted">
-            제출됨
-            <br />
-            <small>{formatDate(submission.submittedAt)}</small>
-          </span>
-        )}
-      </td>
-      <td>
-        {canOpenResult ? (
-          <Link to={`/writing/app/view/${submission.id}`} className="status-badge status corrected">
-            완료
-            <br />
-            <small>결과 보기</small>
-          </Link>
-        ) : inProgress ? (
-          <span className="status-badge status partial writing-status-badge-pulse">
-            진행 중
-            <br />
-            <small>—</small>
-          </span>
-        ) : (
-          <span className="status-badge status pending">-</span>
-        )}
-      </td>
-      <td>
-        {/* [FIX] runtimeStatus corrected|missed 또는 레거시 published / session missed 일 때만 결과 (draft·locked 제외) */}
-        {canOpenResult ? (
-          <div className="view-links">
-            <Link to={`/writing/app/view/${submission.id}`} className="view-link">
-              결과 보기
-            </Link>
-          </div>
-        ) : (
-          <span className="status-badge status pending">-</span>
-        )}
-      </td>
-    </tr>
+      (rs === 'corrected' ||
+        rs === 'missed' ||
+        (rs == null || rs === '' ? isPublished || session.status === 'missed' : false)),
   )
+
+  let statusBadgeClass =
+    'bg-[#1e1b13]/10 text-[#1e1b13]/45 text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-tight'
+  let statusLabel = '—'
+
+  if (!hasSubmission) {
+    statusLabel = '未提出'
+  } else if (isDraft) {
+    statusBadgeClass =
+      'bg-[#1e1b13]/12 text-[#454652] text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-tight'
+    statusLabel = '下書き'
+  } else if (canOpenResult) {
+    statusBadgeClass =
+      'bg-[#1b6d24]/10 text-[#1b6d24] text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-tight'
+    statusLabel = '添削済み'
+  } else if (inProgress) {
+    statusBadgeClass =
+      'bg-[#b45309]/12 text-[#b45309] text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-tight writing-status-badge-pulse'
+    statusLabel = '添削中'
+  }
+
+  const dateLine = formatSidebarRecentDate(submission?.submittedAt)
+
+  const cardBody = (
+    <div className="bg-white/50 p-4 rounded-xl border border-[#c6c5d4]/10 transition-all group-hover:bg-white">
+      <div className="flex justify-between items-start mb-2">
+        <span className="text-[10px] font-bold font-['Manrope',sans-serif] tracking-widest text-[#1e1b13]/40 uppercase">
+          {dateLine}
+        </span>
+        <span className={statusBadgeClass}>{statusLabel}</span>
+      </div>
+      <p className="font-bold text-sm text-[#1e1b13] group-hover:text-[#000666] transition-colors leading-snug">
+        {assignmentTitle}
+      </p>
+    </div>
+  )
+
+  if (canOpenResult && submission?.id) {
+    return (
+      <Link
+        to={`/writing/app/view/${submission.id}`}
+        className="block group cursor-pointer rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#000666]/35"
+      >
+        {cardBody}
+      </Link>
+    )
+  }
+
+  return <div className="group rounded-xl cursor-default">{cardBody}</div>
 }
 
-function formatDate(iso: string | null | undefined): string {
+function formatSidebarRecentDate(iso: string | null | undefined): string {
   if (iso == null || iso === '') return '—'
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return '—'
-  return `${d.getMonth() + 1}/${d.getDate()}`
+  return `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`
 }
 
 function formatUnlockLabel(iso: string | null | undefined): string {

@@ -76,6 +76,8 @@ export type AssignmentSubmitScreenProps = {
   desktopSlotBelowTabs?: ReactNode
   /** デスクトップ: 提出ボタン列の下（進捗表など） */
   desktopAfterSubmitSlot?: ReactNode
+  /** デスクトップ右:「最近提出リスト」カード内の実データ（未指定時は案内文のみ） */
+  desktopSidebarRecentSlot?: ReactNode
   mobileSlotBelowTabs?: ReactNode
   /** デスクトップ課題カード（未指定時は Stitch デモ） */
   assignmentTitle?: string
@@ -117,7 +119,7 @@ export type AssignmentSubmitScreenProps = {
 }
 
 const DEFAULT_ASSIGNMENT_TITLE = '約束'
-const DEFAULT_ASSIGNMENT_BODY = `우리는 일상생활에서 많은 약속을 하며 살아갑니다. 친구와의 약속, 자신과의 다짐, 혹은 사회적인 규칙 등 다양한 형태의 '약속'이 있습니다. 여러분에게 가장 소중한 약속은 무엇인가요? 평소에 약속을 잘 지키는 편인가요? 약속의 의미와 자신의 경험에 대해 써 보세요.`
+const DEFAULT_ASSIGNMENT_BODY = `私たちは日常生活のなかでさまざまな「約束」を交わしながら暮らしています。友人との約束、自分への決意、あるいは社会的なルールなど、形はさまざまです。あなたにとって一番大切な約束は何ですか。普段、時間や内容を守るタイプですか。約束の意味と、ご自身の経験について韓国語で書いてみましょう。`
 
 /**
  * 作文提出 UI（Stitch）— trial / 正規で共通。提出 API は親または将来の loader で接続。
@@ -134,6 +136,7 @@ export default function AssignmentSubmitScreen({
   showDraftButton: showDraftButtonProp,
   desktopSlotBelowTabs,
   desktopAfterSubmitSlot,
+  desktopSidebarRecentSlot,
   mobileSlotBelowTabs,
   assignmentTitle,
   assignmentDescription,
@@ -293,7 +296,7 @@ export default function AssignmentSubmitScreen({
           <div className="space-y-4">
             <h3 className="font-bold text-[#000666] flex items-center gap-2 font-['Manrope',sans-serif]">
               <span className="material-symbols-outlined text-sm trial-writing-ms">info</span>
-              Requirement
+              課題要件
             </h3>
             <p className="text-sm text-[#454652] mb-4">下記に提示された文型を、必ず2つ以上使用すること。</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -448,7 +451,7 @@ export default function AssignmentSubmitScreen({
                       }
                       onClick={() => pickTab('submit')}
                     >
-                      提出 (Submit)
+                      提出
                     </button>
                     <button
                       type="button"
@@ -459,7 +462,7 @@ export default function AssignmentSubmitScreen({
                       }
                       onClick={() => pickTab('submitted')}
                     >
-                      既提出 (Already Submitted)
+                      既提出
                     </button>
                     <button
                       type="button"
@@ -470,7 +473,7 @@ export default function AssignmentSubmitScreen({
                       }
                       onClick={() => pickTab('correction')}
                     >
-                      添削完了 (Correction Completed)
+                      添削完了
                     </button>
                   </div>
                 </header>
@@ -697,56 +700,13 @@ export default function AssignmentSubmitScreen({
                     </span>
                   </div>
                   <div className="space-y-4">
-                    <div className="bg-white/50 p-4 rounded-xl border border-[#c6c5d4]/10 group hover:bg-white transition-all cursor-pointer">
-                      <div className="flex justify-between items-start mb-2">
-                        <span className="text-[10px] font-bold font-['Manrope',sans-serif] tracking-widest text-[#1e1b13]/40 uppercase">
-                          11.07
-                        </span>
-                        <span className="bg-[#1b6d24]/10 text-[#1b6d24] text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-tight">
-                          添削済み
-                        </span>
-                      </div>
-                      <p className="font-bold text-sm text-[#1e1b13] group-hover:text-[#000666] transition-colors">秋の夜長に思うこと</p>
-                    </div>
-                    <div className="bg-white/50 p-4 rounded-xl border border-[#c6c5d4]/10 group hover:bg-white transition-all cursor-pointer">
-                      <div className="flex justify-between items-start mb-2">
-                        <span className="text-[10px] font-bold font-['Manrope',sans-serif] tracking-widest text-[#1e1b13]/40 uppercase">
-                          11.02
-                        </span>
-                        <span className="bg-[#1b6d24]/10 text-[#1b6d24] text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-tight">
-                          添削済み
-                        </span>
-                      </div>
-                      <p className="font-bold text-sm text-[#1e1b13] group-hover:text-[#000666] transition-colors">週末の料理</p>
-                    </div>
-                    <div className="bg-white/50 p-4 rounded-xl border border-[#c6c5d4]/10 group hover:bg-white transition-all cursor-pointer">
-                      <div className="flex justify-between items-start mb-2">
-                        <span className="text-[10px] font-bold font-['Manrope',sans-serif] tracking-widest text-[#1e1b13]/40 uppercase">
-                          10.28
-                        </span>
-                        <span className="bg-[#1b6d24]/10 text-[#1b6d24] text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-tight">
-                          添削済み
-                        </span>
-                      </div>
-                      <p className="font-bold text-sm text-[#1e1b13] group-hover:text-[#000666] transition-colors">私の故郷</p>
-                    </div>
+                    {desktopSidebarRecentSlot ?? (
+                      <p className="text-xs text-[#1e1b13]/45 font-['Manrope',sans-serif] leading-relaxed px-0.5">
+                        表示できる提出履歴がありません。
+                      </p>
+                    )}
                   </div>
                 </section>
-
-                <div className="rounded-2xl overflow-hidden relative group">
-                  <img
-                    alt=""
-                    className="w-full h-40 object-cover group-hover:scale-110 transition-transform duration-700"
-                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuBoTCEnYgiS_70iaRHoi6WAVVAYW7ZrCFUCGkFaSPkbTBB2jjLWy-gURdpytuZJE7XABZaZAQFMfxY6fUXHsp-XDr079paTxg2ki5E6aXDUKkCenkoSStwjeA9e_PbZ3MPDimO25gBK648BcJVvICecb98y489ydXS95GXHjD2LHotcIbKBDjrKMOboJ54qKLaKq9O1W4xpHqz3SNCBPaKGXrGu0EKPk2pgAkS_UBMcMNlbX3dqAZM_i7haGATmFIe7pYTr2CLTZrs"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#000666]/80 to-transparent flex items-end p-4">
-                    <p className="text-white text-xs font-bold leading-tight">
-                      文法マスターコース
-                      <br />
-                      <span className="opacity-70 font-normal">上級者向けの新しい教材が登場</span>
-                    </p>
-                  </div>
-                </div>
               </div>
             </aside>
           </div>
@@ -828,7 +788,7 @@ export default function AssignmentSubmitScreen({
                 <div className="space-y-6">
                   <div className="flex justify-between items-end px-2">
                     <label className="font-['Manrope',sans-serif] text-[10px] font-bold tracking-widest text-[#454652] uppercase">
-                      Drafting Canvas
+                      入力エリア
                     </label>
                     <span className="text-[10px] font-medium text-[#454652]">
                       {useStudentCharLimit ? count : Math.min(count, maxChars)} / {maxChars} 文字
