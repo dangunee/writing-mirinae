@@ -463,32 +463,7 @@ export default function AssignmentSubmitScreen({
 
       {/* ——— Desktop (md+) ——— */}
       <div className="relative hidden min-h-screen font-['Plus_Jakarta_Sans',sans-serif] text-[#1e1b13] bg-[#F5F5F5] trial-writing-scrollbar md:block">
-        <aside className="fixed left-0 top-0 z-40 flex h-full w-64 flex-col gap-2 bg-[#F5F5F5] pt-24">
-          <div className="flex flex-col gap-1 pr-4">
-            <span className="flex items-center gap-3 text-[#1e1b13]/70 ml-4 pl-4 py-3 rounded-l-full font-['Manrope',sans-serif] text-sm uppercase tracking-widest cursor-default">
-              <span className="material-symbols-outlined trial-writing-ms">dashboard</span>
-              <span>ダッシュボード</span>
-            </span>
-            <span className="flex items-center gap-3 bg-white text-[#000666] rounded-l-full ml-4 pl-4 py-3 font-bold font-['Manrope',sans-serif] text-sm uppercase tracking-widest">
-              <span className="material-symbols-outlined trial-writing-ms">edit_note</span>
-              <span>課題提出</span>
-            </span>
-            <span className="flex items-center gap-3 text-[#1e1b13]/70 ml-4 pl-4 py-3 rounded-l-full font-['Manrope',sans-serif] text-sm uppercase tracking-widest cursor-default">
-              <span className="material-symbols-outlined trial-writing-ms">history_edu</span>
-              <span>添削履歴</span>
-            </span>
-            <span className="flex items-center gap-3 text-[#1e1b13]/70 ml-4 pl-4 py-3 rounded-l-full font-['Manrope',sans-serif] text-sm uppercase tracking-widest cursor-default">
-              <span className="material-symbols-outlined trial-writing-ms">calendar_month</span>
-              <span>学習カレンダー</span>
-            </span>
-          </div>
-        </aside>
-
-        <div className="hidden min-h-screen w-full min-w-0 flex-row md:flex">
-          {/* fixed サイドバー幅分の in-flow 予約 */}
-          <div className="w-64 shrink-0" aria-hidden="true" />
-
-          <main className="flex min-h-screen min-w-0 flex-1 flex-col bg-[#F5F5F5] pt-20">
+        <main className="flex min-h-screen min-w-0 w-full flex-col bg-[#F5F5F5] pt-20">
           {mainTopSlot ? (
             <div className="w-full shrink-0 px-8 pt-1 pb-2 lg:px-12">
               <div className="mx-auto w-full max-w-6xl">{mainTopSlot}</div>
@@ -710,7 +685,6 @@ export default function AssignmentSubmitScreen({
             </aside>
           </div>
         </main>
-        </div>
       </div>
 
       {/* ——— Mobile (< md) ——— */}
