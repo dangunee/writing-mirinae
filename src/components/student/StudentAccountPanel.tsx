@@ -1,4 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom'
+import type { ReactNode } from 'react'
 
 import { useAuthMe } from '../../hooks/useAuthMe'
 import { apiUrl } from '../../lib/apiUrl'
@@ -15,13 +16,36 @@ function roleLabelJa(role: AuthMePayload['role']): string {
 const badgeActive =
   'shrink-0 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold leading-tight border-[#000666]/35 bg-[#e8eef8] text-[#000666] shadow-sm'
 
-/** 旧左サイドバーの白カード／ナビ行トーン（右サイドバー埋め込み時） */
-const writingSidebarAccountCard =
-  'bg-white p-6 rounded-2xl shadow-[0_10px_40px_rgba(30,27,19,0.04)] border border-[#c6c5d4]/10 font-[\'Manrope\',sans-serif]'
+/** 旧左サイドバーの白カード／ナビ行トーン（右サイドバー埋め込み時）— ゆったりしたパディング */
+const writingSidebarAccountCardEmbed =
+  'bg-white px-7 py-7 rounded-2xl shadow-[0_10px_40px_rgba(30,27,19,0.04)] border border-[#c6c5d4]/10 font-[\'Manrope\',sans-serif]'
 
-/** アクティブナビ項目と同系統のフル幅ボタン */
+/** アクティブナビ項目と同系統のフル幅ボタン（読みやすい高さ） */
 const writingSidebarNavBtn =
-  'flex w-full items-center justify-center rounded-xl border border-[#c6c5d4]/30 bg-white px-4 py-3 text-sm font-bold uppercase tracking-widest text-[#000666] hover:bg-[#f5f5f5] transition-colors text-center'
+  'flex w-full min-h-[3rem] items-center justify-center rounded-xl border border-[#c6c5d4]/30 bg-white px-4 py-3.5 text-sm font-bold text-[#000666] hover:bg-[#f5f5f5] transition-colors text-center'
+
+function SidebarAccountIconTitle({
+  title,
+  trailing,
+}: {
+  title: string
+  trailing?: ReactNode
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <span
+        className="material-symbols-outlined shrink-0 text-2xl leading-none text-[#000666] trial-writing-ms"
+        aria-hidden
+      >
+        person
+      </span>
+      <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <span className="font-['Manrope',sans-serif] text-lg font-bold tracking-tight text-[#000666]">{title}</span>
+        {trailing ? <div className="flex shrink-0 flex-wrap items-center gap-2">{trailing}</div> : null}
+      </div>
+    </div>
+  )
+}
 
 /** Only entitlements that are actually active (omit gray placeholders). */
 function ActiveEntitlementBadges({ e }: { e: AuthMePayload['entitlements'] }) {
@@ -50,7 +74,7 @@ type Props = {
   showAccountActions?: boolean
   /** GET /sessions/current と整合したアクセス種別（試用メールリンクのみ等の表示切替） */
   writingAppAccess?: AccessContext['type'] | null
-  /** 右サイドバー埋め込み: 下マージなし・ボタン縦並び（カード見た目は同一トーン） */
+  /** 右サイドバー埋め込み: Stitch ナビトーン・下部に mb-8 でカレンダーとの間隔 */
   embedSidebar?: boolean
 }
 
@@ -78,19 +102,26 @@ export default function StudentAccountPanel({
     navigate('/writing', { replace: true })
   }
 
-  const outerMb = embedSidebar ? 'mb-0' : compact ? 'mb-3' : 'mb-6'
+  const outerMb = embedSidebar ? 'mb-8' : compact ? 'mb-3' : 'mb-6'
 
   if (loading) {
     return (
       <div
         className={
           embedSidebar
-            ? `${writingSidebarAccountCard} text-sm text-[#595c5e] ${outerMb}`
+            ? `${writingSidebarAccountCardEmbed} mb-8 text-sm text-[#595c5e]`
             : `rounded-xl border border-[#1e1b13]/10 bg-white/90 px-4 py-3 font-['Manrope',sans-serif] text-sm text-[#595c5e] shadow-sm ${outerMb}`
         }
         role="status"
       >
-        アカウント情報を読み込み中…
+        {embedSidebar ? (
+          <>
+            <SidebarAccountIconTitle title="アカウント" />
+            <p className="mt-5 text-sm leading-relaxed">アカウント情報を読み込み中…</p>
+          </>
+        ) : (
+          'アカウント情報を読み込み中…'
+        )}
       </div>
     )
   }
@@ -100,18 +131,32 @@ export default function StudentAccountPanel({
       <div
         className={
           embedSidebar
-            ? `${writingSidebarAccountCard} text-sm leading-relaxed text-[#8b1a1a] ${outerMb}`
+            ? `${writingSidebarAccountCardEmbed} mb-8 text-sm leading-relaxed text-[#8b1a1a]`
             : `rounded-xl border border-[#fde8e8] bg-[#fff8f8] px-4 py-3 font-['Manrope',sans-serif] text-sm text-[#8b1a1a] ${outerMb}`
         }
       >
-        アカウント情報を取得できませんでした。
-        <button
-          type="button"
-          onClick={() => void refetch()}
-          className={`font-bold text-[#000666] underline ${embedSidebar ? 'ml-0 mt-2 block' : 'ml-2'}`}
-        >
-          再試行
-        </button>
+        {embedSidebar ? (
+          <>
+            <SidebarAccountIconTitle title="アカウント" />
+            <p className="mt-5">
+              アカウント情報を取得できませんでした。
+              <button
+                type="button"
+                onClick={() => void refetch()}
+                className="mt-3 block font-bold text-[#000666] underline"
+              >
+                再試行
+              </button>
+            </p>
+          </>
+        ) : (
+          <>
+            アカウント情報を取得できませんでした。
+            <button type="button" onClick={() => void refetch()} className="ml-2 font-bold text-[#000666] underline">
+              再試行
+            </button>
+          </>
+        )}
       </div>
     )
   }
@@ -134,70 +179,125 @@ export default function StudentAccountPanel({
       <div
         className={
           embedSidebar
-            ? `${writingSidebarAccountCard} text-sm text-[#1e1b13]/90 ${outerMb}`
+            ? `${writingSidebarAccountCardEmbed} mb-8 text-sm text-[#1e1b13]/90`
             : `rounded-xl border border-[#1e1b13]/10 bg-[#F5F5F5] px-4 py-3 font-['Manrope',sans-serif] text-sm text-[#1e1b13]/80 shadow-sm ${outerMb}`
         }
       >
-        <div className="flex flex-wrap items-center gap-2">
-          <span className={badgeActive}>{anonBadge}</span>
-        </div>
-        <p className={`font-semibold text-[#000666] ${embedSidebar ? 'mt-3' : 'mt-2'}`}>{anonTitle}</p>
-        <p className={`text-xs text-[#595c5e] ${embedSidebar ? 'mt-2' : 'mt-1'}`}>
-          ログインするとマイページで学習サマリーを確認できます。
-        </p>
-        <div className={embedSidebar ? 'mt-4 flex flex-col gap-3' : 'mt-2 flex flex-wrap gap-2'}>
-          <Link
-            to="/writing/login"
-            className={
-              embedSidebar
-                ? writingSidebarNavBtn
-                : 'inline-flex rounded-lg bg-[#000666] px-3 py-1.5 text-xs font-bold text-white hover:opacity-90'
-            }
-          >
-            ログイン
-          </Link>
-          <Link
-            to="/writing/signup"
-            className={
-              embedSidebar
-                ? `${writingSidebarNavBtn} normal-case font-semibold tracking-normal`
-                : 'text-xs font-semibold text-[#000666] underline'
-            }
-          >
-            新規登録
-          </Link>
-        </div>
+        {embedSidebar ? (
+          <>
+            <SidebarAccountIconTitle title="アカウント" trailing={<span className={badgeActive}>{anonBadge}</span>} />
+            <div className="mt-5 flex flex-col gap-4">
+              <p className="font-semibold leading-snug text-[#000666]">{anonTitle}</p>
+              <p className="text-xs leading-relaxed text-[#595c5e]">
+                ログインするとマイページで学習サマリーを確認できます。
+              </p>
+            </div>
+            <div className="mt-6 flex flex-col gap-3 border-t border-[#c6c5d4]/10 pt-6">
+              <Link to="/writing/login" className={writingSidebarNavBtn}>
+                ログイン
+              </Link>
+              <Link
+                to="/writing/signup"
+                className={`${writingSidebarNavBtn} font-semibold normal-case tracking-normal`}
+              >
+                新規登録
+              </Link>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={badgeActive}>{anonBadge}</span>
+            </div>
+            <p className="mt-2 font-semibold text-[#000666]">{anonTitle}</p>
+            <p className="mt-1 text-xs text-[#595c5e]">
+              ログインするとマイページで学習サマリーを確認できます。
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Link
+                to="/writing/login"
+                className="inline-flex rounded-lg bg-[#000666] px-3 py-1.5 text-xs font-bold text-white hover:opacity-90"
+              >
+                ログイン
+              </Link>
+              <Link to="/writing/signup" className="text-xs font-semibold text-[#000666] underline">
+                新規登録
+              </Link>
+            </div>
+          </>
+        )}
       </div>
     )
   }
 
   const showMypageLink = me.role === 'student'
 
-  const accountLabelClass = embedSidebar
-    ? 'text-xs font-bold uppercase tracking-widest text-[#1e1b13]/70'
-    : 'text-xs font-bold uppercase tracking-widest text-[#595c5e]'
+  const roleBadgeEl = (
+    <span className="rounded-full bg-[#000666]/10 px-2 py-0.5 text-[11px] font-bold text-[#000666]">
+      {roleLabelJa(me.role)}
+    </span>
+  )
 
-  const outerLoggedClass = embedSidebar
-    ? `${writingSidebarAccountCard} ${outerMb}`
-    : `rounded-xl border border-[#1e1b13]/10 bg-white px-4 py-3 font-['Manrope',sans-serif] shadow-[0_4px_20px_rgba(0,0,0,0.05)] ${outerMb}`
+  if (embedSidebar) {
+    return (
+      <div className={`${writingSidebarAccountCardEmbed} mb-8`}>
+        <SidebarAccountIconTitle title="アカウント" trailing={roleBadgeEl} />
+        <div className="mt-5 flex flex-col gap-4">
+          <p className="truncate text-sm font-semibold leading-snug text-[#1e1b13]" title={me.user.email ?? ''}>
+            {me.user.email ?? me.user.id}
+          </p>
+          <div className="flex flex-wrap items-center gap-2" aria-label="利用権限">
+            {trialMailLinkContext ? (
+              <span className={badgeActive}>体験 · 利用中</span>
+            ) : (
+              <>
+                {me.entitlements.hasTrial ? (
+                  <span className={badgeActive}>体験 · 利用可</span>
+                ) : null}
+              </>
+            )}
+            <ActiveEntitlementBadges e={me.entitlements} />
+          </div>
+        </div>
+        {showAccountActions ? (
+          <div className="mt-6 flex flex-col gap-3 border-t border-[#c6c5d4]/10 pt-6">
+            {me.role === 'admin' ? (
+              <Link to="/writing/admin" className={writingSidebarNavBtn}>
+                管理コンソール
+              </Link>
+            ) : null}
+            {!hideSettingsLink ? (
+              <Link to="/writing/app/settings" className={writingSidebarNavBtn}>
+                設定
+              </Link>
+            ) : null}
+            {showMypageLink ? (
+              <Link to="/writing/app/mypage" className={writingSidebarNavBtn}>
+                マイページ
+              </Link>
+            ) : null}
+            <button type="button" onClick={() => void onLogout()} className={writingSidebarNavBtn}>
+              ログアウト
+            </button>
+          </div>
+        ) : null}
+      </div>
+    )
+  }
 
-  const metaSpacing = embedSidebar ? 'space-y-3' : 'space-y-2'
+  const outerLoggedClass = `rounded-xl border border-[#1e1b13]/10 bg-white px-4 py-3 font-['Manrope',sans-serif] shadow-[0_4px_20px_rgba(0,0,0,0.05)] ${outerMb}`
 
   return (
     <div className={outerLoggedClass}>
       <div
         className={
-          showAccountActions && !embedSidebar
-            ? 'flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'
-            : 'flex flex-col gap-3'
+          showAccountActions ? 'flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between' : 'flex flex-col gap-3'
         }
       >
-        <div className={`min-w-0 flex-1 ${metaSpacing}`}>
+        <div className="min-w-0 flex-1 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <span className={accountLabelClass}>ACCOUNT</span>
-            <span className="rounded-full bg-[#000666]/10 px-2 py-0.5 text-[11px] font-bold text-[#000666]">
-              {roleLabelJa(me.role)}
-            </span>
+            <span className="text-xs font-bold uppercase tracking-widest text-[#595c5e]">ACCOUNT</span>
+            {roleBadgeEl}
           </div>
           <p className="truncate text-sm font-semibold text-[#1e1b13]" title={me.user.email ?? ''}>
             {me.user.email ?? me.user.id}
@@ -216,21 +316,11 @@ export default function StudentAccountPanel({
           </div>
         </div>
         {showAccountActions ? (
-          <div
-            className={
-              embedSidebar
-                ? 'flex w-full flex-shrink-0 flex-col gap-3 pt-1'
-                : 'flex flex-shrink-0 flex-wrap items-center gap-2 sm:justify-end'
-            }
-          >
+          <div className="flex flex-shrink-0 flex-wrap items-center gap-2 sm:justify-end">
             {me.role === 'admin' ? (
               <Link
                 to="/writing/admin"
-                className={
-                  embedSidebar
-                    ? writingSidebarNavBtn
-                    : 'rounded-lg border border-[#1e1b13]/15 bg-white px-3 py-1.5 text-xs font-bold text-[#4052b6] hover:bg-[#fafafa]'
-                }
+                className="rounded-lg border border-[#1e1b13]/15 bg-white px-3 py-1.5 text-xs font-bold text-[#4052b6] hover:bg-[#fafafa]"
               >
                 管理コンソール
               </Link>
@@ -238,11 +328,7 @@ export default function StudentAccountPanel({
             {!hideSettingsLink ? (
               <Link
                 to="/writing/app/settings"
-                className={
-                  embedSidebar
-                    ? writingSidebarNavBtn
-                    : 'rounded-lg border border-[#1e1b13]/15 bg-white px-3 py-1.5 text-xs font-bold text-[#000666] hover:bg-[#fafafa]'
-                }
+                className="rounded-lg border border-[#1e1b13]/15 bg-white px-3 py-1.5 text-xs font-bold text-[#000666] hover:bg-[#fafafa]"
               >
                 設定
               </Link>
@@ -250,11 +336,7 @@ export default function StudentAccountPanel({
             {showMypageLink ? (
               <Link
                 to="/writing/app/mypage"
-                className={
-                  embedSidebar
-                    ? writingSidebarNavBtn
-                    : 'rounded-lg border border-[#1e1b13]/15 bg-[#F5F5F5] px-3 py-1.5 text-xs font-bold text-[#000666] hover:bg-[#ebebeb]'
-                }
+                className="rounded-lg border border-[#1e1b13]/15 bg-[#F5F5F5] px-3 py-1.5 text-xs font-bold text-[#000666] hover:bg-[#ebebeb]"
               >
                 マイページ
               </Link>
@@ -262,11 +344,7 @@ export default function StudentAccountPanel({
             <button
               type="button"
               onClick={() => void onLogout()}
-              className={
-                embedSidebar
-                  ? writingSidebarNavBtn
-                  : 'rounded-lg border border-[#1e1b13]/20 px-3 py-1.5 text-xs font-semibold text-[#595c5e] hover:bg-[#fafafa]'
-              }
+              className="rounded-lg border border-[#1e1b13]/20 px-3 py-1.5 text-xs font-semibold text-[#595c5e] hover:bg-[#fafafa]"
             >
               ログアウト
             </button>
