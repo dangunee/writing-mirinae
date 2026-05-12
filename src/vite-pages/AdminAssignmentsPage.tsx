@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import AdminAssignmentsCsvImport from '../components/admin/AdminAssignmentsCsvImport'
+import AdminAssignmentsList from '../components/admin/AdminAssignmentsList'
 import AdminCourseEmptyBootstrap from '../components/admin/AdminCourseEmptyBootstrap'
+import {
+  assignmentsCompleteForCourseSessions,
+  fetchAssignmentsCompleteForCourse,
+  formatCourseLabelWithAssignmentCompletion,
+  type ListSessionRow,
+} from '../lib/adminAssignmentsCourseCompletion'
 import {
   adminCourseSelectValue,
   type AdminOrphanCourse,
@@ -12,7 +19,6 @@ import {
 import { apiUrl } from '../lib/apiUrl'
 import {
   ASSIGNMENT_REQUIREMENT_SLOT_COUNT,
-  assignmentListPreviewLine,
   hasRegisteredThemeSnapshot,
   parseAssignmentSnapshotForUi,
 } from '../lib/writingThemeSnapshot'
@@ -23,13 +29,6 @@ type AdminCourseOption = {
   status: string
   isAdminSandbox: boolean
   sessionCount: number
-}
-
-type ListSessionRow = {
-  sessionIndex: number
-  sessionId: string | null
-  hasThemeSnapshot: boolean
-  themeSnapshot: string | null
 }
 
 export default function AdminAssignmentsPage() {
@@ -45,6 +44,9 @@ export default function AdminAssignmentsPage() {
   const [listError, setListError] = useState<string | null>(null)
 
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
+
+  /** Per-course: all 10 sessions have theme_snapshot (for dropdown 「登録完了」). */
+  const [assignmentCompleteByCourseId, setAssignmentCompleteByCourseId] = useState<Record<string, boolean>>({})
 
   const reloadCourses = useCallback(async (opts?: { lockedCourseId?: string }) => {
     setCoursesLoading(true)
@@ -62,6 +64,7 @@ export default function AdminAssignmentsPage() {
         setCoursesError(typeof data.error === 'string' ? data.error : `HTTP ${res.status}`)
         setTermTargets([])
         setOrphanCourses([])
+        setAssignmentCompleteByCourseId({})
         return
       }
       const rows = data.courses
@@ -84,10 +87,28 @@ export default function AdminAssignmentsPage() {
         if (keepPrev) return prev
         return pickDefaultCourseId('', terms, orphans, allIds)
       })
+
+      const courseIds = [
+        ...new Set(
+          [
+            ...terms.map((x) => x.courseId).filter((id): id is string => Boolean(id)),
+            ...orphans.map((o) => o.courseId),
+          ].filter(Boolean)
+        ),
+      ]
+      if (courseIds.length === 0) {
+        setAssignmentCompleteByCourseId({})
+      } else {
+        const pairs = await Promise.all(
+          courseIds.map(async (id) => [id, await fetchAssignmentsCompleteForCourse(id)] as const)
+        )
+        setAssignmentCompleteByCourseId(Object.fromEntries(pairs))
+      }
     } catch {
       setCoursesError('load_failed')
       setTermTargets([])
       setOrphanCourses([])
+      setAssignmentCompleteByCourseId({})
     } finally {
       setCoursesLoading(false)
     }
@@ -145,7 +166,12 @@ export default function AdminAssignmentsPage() {
         setSessions([])
         return
       }
-      setSessions(data.sessions)
+      const listSessions = data.sessions
+      setSessions(listSessions)
+      setAssignmentCompleteByCourseId((prev) => ({
+        ...prev,
+        [cid]: assignmentsCompleteForCourseSessions(listSessions),
+      }))
     } catch {
       setListError('load_failed')
       setSessions([])
@@ -257,11 +283,7 @@ export default function AdminAssignmentsPage() {
           </div>
         )}
       </div>
-    ) : (
-      <div className="rounded border border-dashed border-[#c5c8cc] bg-white/60 p-6 text-sm text-[#595c5e]">
-        回次をリストから選ぶと、ここに登録内容が表示されます。
-      </div>
-    )
+    ) : null
 
   return (
     <div className="min-h-screen bg-[#f5f7fa] px-4 py-8 font-['Be_Vietnam_Pro',sans-serif] text-[#2c2f32]">
@@ -269,7 +291,7 @@ export default function AdminAssignmentsPage() {
         <p className="text-xs font-bold uppercase tracking-widest text-[#595c5e]">Admin</p>
         <h1 className="font-['Plus_Jakarta_Sans'] text-2xl font-extrabold text-[#2c2f32]">課題管理（一覧）</h1>
         <p className="mt-2 text-sm text-[#595c5e]">
-          コースごとに回次（1〜10）の登録状況を確認し、プレビューまたは編集できます。右のリンクからも登録・編集に進めます。
+          コースごとに回次（1〜10）の登録状況を確認し、プレビューまたは編集できます。各回のカードから登録・編集に進めます。
         </p>
 
         {coursesLoading ? (
@@ -314,12 +336,20 @@ export default function AdminAssignmentsPage() {
                       key={t.termId}
                       value={t.courseId ? `c:${t.courseId}` : `e:${t.termId}`}
                     >
-                      {t.label}
+                      {t.courseId
+                        ? formatCourseLabelWithAssignmentCompletion(
+                            t.label,
+                            assignmentCompleteByCourseId[t.courseId]
+                          )
+                        : t.label}
                     </option>
                   ))}
                   {orphanCourses.map((o) => (
                     <option key={o.courseId} value={`o:${o.courseId}`}>
-                      {o.displayName}
+                      {formatCourseLabelWithAssignmentCompletion(
+                        o.displayName,
+                        assignmentCompleteByCourseId[o.courseId]
+                      )}
                     </option>
                   ))}
                 </>
@@ -331,73 +361,47 @@ export default function AdminAssignmentsPage() {
             <AdminAssignmentsCsvImport
               courseId={courseId}
               disabled={coursesLoading || ensuringCourse || listLoading}
-              onImported={() => void loadList(courseId)}
+              onImported={async () => {
+                await loadList(courseId)
+                const ids = [
+                  ...new Set([
+                    ...termTargets.map((x) => x.courseId).filter((id): id is string => Boolean(id)),
+                    ...orphanCourses.map((o) => o.courseId),
+                  ]),
+                ]
+                if (ids.length === 0) return
+                const pairs = await Promise.all(
+                  ids.map(async (id) => [id, await fetchAssignmentsCompleteForCourse(id)] as const)
+                )
+                setAssignmentCompleteByCourseId(Object.fromEntries(pairs))
+              }}
             />
           </div>
 
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-            <div className="min-w-0 flex-1 space-y-4 order-1">
-              {listLoading ? (
-                <p className="text-sm text-[#595c5e]" role="status">
-                  セッション一覧を読み込み中…
-                </p>
-              ) : null}
-              {listError ? (
-                <p className="text-sm text-[#ba1a1a]" role="alert">
-                  一覧を取得できませんでした（{listError}）
-                </p>
-              ) : null}
-              {!listLoading && !listError ? detailPanel : null}
-            </div>
-
-            <aside className="w-full shrink-0 space-y-2 lg:w-72 order-2 lg:order-2">
+          <div className="space-y-6">
+            <section className="space-y-3">
               <p className="text-xs font-bold uppercase tracking-widest text-[#595c5e]">回次一覧</p>
+              <AdminAssignmentsList
+                courseId={courseId}
+                displaySessions={displaySessions}
+                selectedIndex={selectedIndex}
+                onSelectSession={setSelectedIndex}
+                listLoading={listLoading}
+                listError={listError}
+              />
+            </section>
+
+            <section className="min-w-0 space-y-4">
               {!listLoading && !listError && courseId ? (
-                <ul className="max-h-[70vh] space-y-2 overflow-y-auto pr-1">
-                  {displaySessions.map((s) => {
-                    const registered = hasRegisteredThemeSnapshot(s.themeSnapshot)
-                    const preview = assignmentListPreviewLine(s.themeSnapshot)
-                    const createHref = `/writing/admin/assignments/new?courseId=${encodeURIComponent(courseId)}&sessionIndex=${s.sessionIndex}`
-                    return (
-                      <li
-                        key={s.sessionIndex}
-                        className={`rounded border border-[#c5c8cc] bg-white/80 p-3 ${
-                          selectedIndex === s.sessionIndex ? 'ring-2 ring-[#4052b6]' : ''
-                        }`}
-                      >
-                        <button
-                          type="button"
-                          className="w-full text-left"
-                          onClick={() => setSelectedIndex(s.sessionIndex)}
-                        >
-                          <p className="font-semibold text-[#2c2f32]">第{s.sessionIndex}回</p>
-                          <p className="mt-1 text-xs text-[#595c5e]">
-                            {registered ? (
-                              <>
-                                <span className="text-[#1b5e20]">登録済み</span>
-                                {preview ? ` — ${preview}` : ''}
-                              </>
-                            ) : (
-                              <span className="text-[#ba1a1a]">未登録</span>
-                            )}
-                          </p>
-                        </button>
-                        <div className="mt-2">
-                          <Link
-                            to={createHref}
-                            className="inline-block rounded bg-[#4052b6] px-3 py-1.5 text-xs font-semibold !text-white hover:!text-white focus-visible:!text-white"
-                          >
-                            {registered ? '編集/再登録' : '新規登録'}
-                          </Link>
-                        </div>
-                      </li>
-                    )
-                  })}
-                </ul>
-              ) : !courseId && !listLoading && !listError ? (
-                <p className="text-xs text-[#595c5e]">コースを選んでください。</p>
+                selectedIndex == null ? (
+                  <div className="rounded border border-dashed border-[#c5c8cc] bg-white/60 px-4 py-3 text-sm text-[#595c5e]">
+                    上の一覧から回次を選ぶと、ここに登録内容のプレビューが表示されます。
+                  </div>
+                ) : (
+                  detailPanel
+                )
               ) : null}
-            </aside>
+            </section>
           </div>
         </div>
 
