@@ -1,5 +1,3 @@
-import { Link } from 'react-router-dom'
-
 import { assignmentListPreviewLine, hasRegisteredThemeSnapshot } from '../../lib/writingThemeSnapshot'
 import type { ListSessionRow } from '../../lib/adminAssignmentsCourseCompletion'
 
@@ -41,15 +39,14 @@ export default function AdminAssignmentsList({
   }
 
   return (
-    <ul className="flex w-full flex-col gap-4">
+    <ul className="flex w-full flex-col gap-2">
       {displaySessions.map((s) => {
         const registered = hasRegisteredThemeSnapshot(s.themeSnapshot)
         const preview = assignmentListPreviewLine(s.themeSnapshot)
-        const createHref = `/writing/admin/assignments/new?courseId=${encodeURIComponent(courseId)}&sessionIndex=${s.sessionIndex}`
         return (
           <li
             key={s.sessionIndex}
-            className={`w-full rounded border border-[#c5c8cc] bg-white/80 p-4 shadow-sm transition-colors hover:bg-white hover:shadow-md ${
+            className={`w-full rounded border border-[#c5c8cc] bg-white/80 p-3 shadow-sm transition-colors hover:bg-white hover:shadow-md ${
               selectedIndex === s.sessionIndex ? 'ring-2 ring-[#4052b6]' : ''
             }`}
           >
@@ -59,7 +56,7 @@ export default function AdminAssignmentsList({
               onClick={() => onSelectSession(s.sessionIndex)}
             >
               <p className="font-semibold text-[#2c2f32]">第{s.sessionIndex}回</p>
-              <p className="mt-1 text-xs text-[#595c5e]">
+              <p className="mt-1 break-words text-xs text-[#595c5e]">
                 {registered ? (
                   <>
                     <span className="text-[#1b5e20]">登録済み</span>
@@ -70,14 +67,6 @@ export default function AdminAssignmentsList({
                 )}
               </p>
             </button>
-            <div className="mt-2">
-              <Link
-                to={createHref}
-                className="inline-block rounded bg-[#4052b6] px-3 py-1.5 text-xs font-semibold !text-white hover:!text-white focus-visible:!text-white"
-              >
-                {registered ? '編集/再登録' : '新規登録'}
-              </Link>
-            </div>
           </li>
         )
       })}

@@ -1,8 +1,17 @@
+import { useMemo } from 'react'
+
 import {
   adminCourseSelectValue,
   type AdminOrphanCourse,
   type AdminTermTarget,
 } from '../../lib/adminCourseTermSelect'
+
+/** Put sandbox / 体験など特殊コースを右端に寄せる（通常孤立コースより後ろ）。 */
+function orphanSortScore(o: AdminOrphanCourse): number {
+  if (o.isAdminSandbox) return 2
+  if (o.displayName.includes('体験')) return 1
+  return 0
+}
 
 export type AdminAssignmentsCoursePickerProps = {
   termTargets: AdminTermTarget[]
@@ -31,6 +40,15 @@ export default function AdminAssignmentsCoursePicker({
 }: AdminAssignmentsCoursePickerProps) {
   const selectValue = adminCourseSelectValue(courseId, termTargets, orphanCourses)
 
+  const sortedTerms = useMemo(
+    () => [...termTargets].sort((a, b) => a.sortOrder - b.sortOrder),
+    [termTargets]
+  )
+  const sortedOrphans = useMemo(
+    () => [...orphanCourses].sort((a, b) => orphanSortScore(a) - orphanSortScore(b)),
+    [orphanCourses]
+  )
+
   if (termTargets.length === 0 && orphanCourses.length === 0) {
     return <p className="text-xs text-[#595c5e]">（期またはコースがありません）</p>
   }
@@ -42,7 +60,7 @@ export default function AdminAssignmentsCoursePicker({
 
   return (
     <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="対象コース（期）">
-      {termTargets.map((t) => {
+      {sortedTerms.map((t) => {
         const raw = t.courseId ? `c:${t.courseId}` : `e:${t.termId}`
         const selected = selectValue === raw
         const hasCourse = Boolean(t.courseId)
@@ -69,7 +87,7 @@ export default function AdminAssignmentsCoursePicker({
           </button>
         )
       })}
-      {orphanCourses.map((o) => {
+      {sortedOrphans.map((o) => {
         const raw = `o:${o.courseId}`
         const selected = selectValue === raw
         const complete = assignmentCompleteByCourseId[o.courseId] === true

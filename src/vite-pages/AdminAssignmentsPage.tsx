@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import AdminAssignmentsCoursePicker from '../components/admin/AdminAssignmentsCoursePicker'
 import AdminAssignmentsCsvImport from '../components/admin/AdminAssignmentsCsvImport'
@@ -43,6 +43,9 @@ export default function AdminAssignmentsPage() {
   const [listError, setListError] = useState<string | null>(null)
 
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
+
+  /** After `courseId` changes, next successful list load should pick the first registered session (1→10). */
+  const needsAutoSelectRef = useRef(true)
 
   /** Per-course: all 10 sessions have theme_snapshot (for dropdown 「登録完了」). */
   const [assignmentCompleteByCourseId, setAssignmentCompleteByCourseId] = useState<Record<string, boolean>>({})
@@ -150,6 +153,7 @@ export default function AdminAssignmentsPage() {
     if (!cid) return
     setListLoading(true)
     setListError(null)
+    setSessions([])
     try {
       const q = new URLSearchParams({ courseId: cid })
       const res = await fetch(apiUrl(`/api/writing/admin/assignments/list?${q}`), {
@@ -182,8 +186,32 @@ export default function AdminAssignmentsPage() {
   useEffect(() => {
     if (!courseId) return
     void loadList(courseId)
-    setSelectedIndex(null)
   }, [courseId, loadList])
+
+  useEffect(() => {
+    needsAutoSelectRef.current = true
+  }, [courseId])
+
+  useEffect(() => {
+    if (!courseId || listLoading) return
+    if (listError) {
+      setSelectedIndex(null)
+      return
+    }
+    if (!needsAutoSelectRef.current) return
+    needsAutoSelectRef.current = false
+
+    const byIdx = new Map(sessions.map((s) => [s.sessionIndex, s]))
+    let firstRegistered: number | null = null
+    for (let i = 1; i <= 10; i++) {
+      const row = byIdx.get(i)
+      if (row && hasRegisteredThemeSnapshot(row.themeSnapshot)) {
+        firstRegistered = i
+        break
+      }
+    }
+    setSelectedIndex(firstRegistered)
+  }, [courseId, listLoading, listError, sessions])
 
   /** Always 10 rows (1–10), even if the API returns fewer or no DB rows for some indices. */
   const displaySessions = useMemo((): ListSessionRow[] => {
@@ -215,16 +243,14 @@ export default function AdminAssignmentsPage() {
       <div className="rounded border border-[#c5c8cc] bg-white p-4">
         <p className="text-xs font-bold uppercase tracking-widest text-[#595c5e]">登録内容</p>
         <p className="mt-1 text-sm font-semibold text-[#2c2f32]">第{selectedIndex}回</p>
-        <p className="mt-2">
+        <div className="mt-3 flex flex-wrap gap-3">
           <Link
             to={`/writing/admin/assignments/new?courseId=${encodeURIComponent(courseId)}&sessionIndex=${selectedIndex}`}
-            className="text-sm font-semibold text-[#4052b6] underline"
+            className="inline-block rounded bg-[#4052b6] px-4 py-2 text-sm font-semibold !text-white no-underline hover:opacity-90"
           >
-            {hasRegisteredThemeSnapshot(selectedRow.themeSnapshot)
-              ? 'この課題を編集する'
-              : 'この回で課題を登録する'}
+            {hasRegisteredThemeSnapshot(selectedRow.themeSnapshot) ? '編集/再登録' : '新規登録'}
           </Link>
-        </p>
+        </div>
         {!detailUi ? (
           <p className="mt-3 text-sm text-[#595c5e]">この回には課題が登録されていません。</p>
         ) : (
@@ -290,7 +316,7 @@ export default function AdminAssignmentsPage() {
         <p className="text-xs font-bold uppercase tracking-widest text-[#595c5e]">Admin</p>
         <h1 className="font-['Plus_Jakarta_Sans'] text-2xl font-extrabold text-[#2c2f32]">課題管理（一覧）</h1>
         <p className="mt-2 text-sm text-[#595c5e]">
-          コースごとに回次（1〜10）の登録状況を確認し、プレビューまたは編集できます。各回のカードから登録・編集に進めます。
+          コースを選び、右の回次一覧で回を選ぶと左に登録内容が表示されます。編集・新規登録はプレビュー内のボタンから行います。
         </p>
 
         {coursesLoading ? (
@@ -354,8 +380,21 @@ export default function AdminAssignmentsPage() {
             </div>
           </div>
 
-          <div className="space-y-6">
-            <section className="space-y-3">
+          <div className="mt-6 flex flex-col gap-6 lg:flex-row lg:items-start">
+            <section className="min-w-0 flex-1 space-y-3 lg:order-1">
+              <p className="text-xs font-bold uppercase tracking-widest text-[#595c5e]">課題プレビュー</p>
+              {!listLoading && !listError && courseId ? (
+                selectedIndex == null ? (
+                  <div className="rounded border border-dashed border-[#c5c8cc] bg-white/60 px-4 py-3 text-sm text-[#595c5e]">
+                    回次をリストから選ぶと、ここに登録内容が表示されます。
+                  </div>
+                ) : (
+                  detailPanel
+                )
+              ) : null}
+            </section>
+
+            <aside className="w-full shrink-0 space-y-2 lg:order-2 lg:w-72 lg:max-h-[min(70vh,calc(100vh-8rem))] lg:overflow-y-auto xl:w-80">
               <p className="text-xs font-bold uppercase tracking-widest text-[#595c5e]">回次一覧</p>
               <AdminAssignmentsList
                 courseId={courseId}
@@ -365,19 +404,7 @@ export default function AdminAssignmentsPage() {
                 listLoading={listLoading}
                 listError={listError}
               />
-            </section>
-
-            <section className="min-w-0 space-y-4">
-              {!listLoading && !listError && courseId ? (
-                selectedIndex == null ? (
-                  <div className="rounded border border-dashed border-[#c5c8cc] bg-white/60 px-4 py-3 text-sm text-[#595c5e]">
-                    上の一覧から回次を選ぶと、ここに登録内容のプレビューが表示されます。
-                  </div>
-                ) : (
-                  detailPanel
-                )
-              ) : null}
-            </section>
+            </aside>
           </div>
         </div>
 
