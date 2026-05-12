@@ -1,16 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import AdminAssignmentsCoursePicker from '../components/admin/AdminAssignmentsCoursePicker'
 import AdminAssignmentsCsvImport from '../components/admin/AdminAssignmentsCsvImport'
 import AdminAssignmentsList from '../components/admin/AdminAssignmentsList'
 import AdminCourseEmptyBootstrap from '../components/admin/AdminCourseEmptyBootstrap'
 import {
   assignmentsCompleteForCourseSessions,
   fetchAssignmentsCompleteForCourse,
-  formatCourseLabelWithAssignmentCompletion,
   type ListSessionRow,
 } from '../lib/adminAssignmentsCourseCompletion'
 import {
-  adminCourseSelectValue,
   type AdminOrphanCourse,
   type AdminTermTarget,
   parseAdminCourseSelectValue,
@@ -316,66 +315,43 @@ export default function AdminAssignmentsPage() {
               選択した期のコースを準備中…
             </p>
           ) : null}
-          <label className="block max-w-xl">
-            <span className="font-semibold text-[#2c2f32]">対象コース（期）</span>
-            <select
-              className="mt-1 w-full rounded border border-[#c5c8cc] bg-white px-3 py-2 text-[#2c2f32]"
-              value={adminCourseSelectValue(courseId, termTargets, orphanCourses)}
-              onChange={(e) => void handleCourseSelectChange(e.target.value)}
-              disabled={coursesLoading || ensuringCourse || (termTargets.length === 0 && orphanCourses.length === 0)}
-            >
-              {termTargets.length === 0 && orphanCourses.length === 0 ? (
-                <option value="">（期またはコースがありません）</option>
-              ) : (
-                <>
-                  <option value="" disabled={Boolean(courseId)}>
-                    期を選択…
-                  </option>
-                  {termTargets.map((t) => (
-                    <option
-                      key={t.termId}
-                      value={t.courseId ? `c:${t.courseId}` : `e:${t.termId}`}
-                    >
-                      {t.courseId
-                        ? formatCourseLabelWithAssignmentCompletion(
-                            t.label,
-                            assignmentCompleteByCourseId[t.courseId]
-                          )
-                        : t.label}
-                    </option>
-                  ))}
-                  {orphanCourses.map((o) => (
-                    <option key={o.courseId} value={`o:${o.courseId}`}>
-                      {formatCourseLabelWithAssignmentCompletion(
-                        o.displayName,
-                        assignmentCompleteByCourseId[o.courseId]
-                      )}
-                    </option>
-                  ))}
-                </>
-              )}
-            </select>
-          </label>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <AdminAssignmentsCsvImport
-              courseId={courseId}
-              disabled={coursesLoading || ensuringCourse || listLoading}
-              onImported={async () => {
-                await loadList(courseId)
-                const ids = [
-                  ...new Set([
-                    ...termTargets.map((x) => x.courseId).filter((id): id is string => Boolean(id)),
-                    ...orphanCourses.map((o) => o.courseId),
-                  ]),
-                ]
-                if (ids.length === 0) return
-                const pairs = await Promise.all(
-                  ids.map(async (id) => [id, await fetchAssignmentsCompleteForCourse(id)] as const)
-                )
-                setAssignmentCompleteByCourseId(Object.fromEntries(pairs))
-              }}
-            />
+          <div className="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-start lg:justify-between">
+            <div className="min-w-0 flex-1 space-y-2">
+              <span className="block font-semibold text-[#2c2f32]">対象コース（期）</span>
+              <AdminAssignmentsCoursePicker
+                termTargets={termTargets}
+                orphanCourses={orphanCourses}
+                courseId={courseId}
+                assignmentCompleteByCourseId={assignmentCompleteByCourseId}
+                disabled={
+                  coursesLoading ||
+                  ensuringCourse ||
+                  (termTargets.length === 0 && orphanCourses.length === 0)
+                }
+                onSelectCourse={(raw) => void handleCourseSelectChange(raw)}
+              />
+            </div>
+            <div className="flex shrink-0 flex-wrap items-center gap-2 lg:self-start lg:pt-7">
+              <AdminAssignmentsCsvImport
+                courseId={courseId}
+                disabled={coursesLoading || ensuringCourse || listLoading}
+                onImported={async () => {
+                  await loadList(courseId)
+                  const ids = [
+                    ...new Set([
+                      ...termTargets.map((x) => x.courseId).filter((id): id is string => Boolean(id)),
+                      ...orphanCourses.map((o) => o.courseId),
+                    ]),
+                  ]
+                  if (ids.length === 0) return
+                  const pairs = await Promise.all(
+                    ids.map(async (id) => [id, await fetchAssignmentsCompleteForCourse(id)] as const)
+                  )
+                  setAssignmentCompleteByCourseId(Object.fromEntries(pairs))
+                }}
+              />
+            </div>
           </div>
 
           <div className="space-y-6">

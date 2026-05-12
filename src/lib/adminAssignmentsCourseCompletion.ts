@@ -30,14 +30,3 @@ export async function fetchAssignmentsCompleteForCourse(courseId: string): Promi
   if (!res.ok || !data.ok || !Array.isArray(data.sessions)) return false
   return assignmentsCompleteForCourseSessions(data.sessions)
 }
-
-/**
- * When all 10 assignments are registered, show 「登録完了」instead of API suffix 「準備中」or 「active」.
- */
-export function formatCourseLabelWithAssignmentCompletion(
-  apiLabel: string,
-  assignmentsComplete: boolean | undefined
-): string {
-  if (assignmentsComplete !== true) return apiLabel
-  return apiLabel.replace(/ · (準備中|active)$/u, ' · 登録完了')
-}
