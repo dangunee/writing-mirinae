@@ -333,17 +333,14 @@ export default function AdminAssignmentsPage() {
             <div className="flex shrink-0 flex-wrap items-center justify-end gap-x-3 gap-y-2">
               <button
                 type="button"
-                onClick={beginInlineEdit}
+                onClick={(e) => {
+                  e.preventDefault()
+                  beginInlineEdit()
+                }}
                 className="inline-block shrink-0 rounded bg-[#4052b6] px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
               >
                 {hasRegisteredThemeSnapshot(selectedRow.themeSnapshot) ? '編集/再登録' : '新規登録'}
               </button>
-              <Link
-                to={`/writing/admin/assignments/new?courseId=${encodeURIComponent(courseId)}&sessionIndex=${selectedIndex}`}
-                className="text-xs font-semibold text-[#4052b6] underline"
-              >
-                フルページで開く
-              </Link>
             </div>
           </div>
           {!detailUi ? (
@@ -426,7 +423,7 @@ export default function AdminAssignmentsPage() {
         ) : null}
       </div>
     )
-  }, [selectedIndex, selectedRow, detailUi, courseId, beginInlineEdit])
+  }, [selectedIndex, selectedRow, detailUi, beginInlineEdit])
 
   return (
     <div className="min-h-screen bg-[#f5f7fa] px-4 py-8 font-['Be_Vietnam_Pro',sans-serif] text-[#2c2f32]">
@@ -434,7 +431,7 @@ export default function AdminAssignmentsPage() {
         <p className="text-xs font-bold uppercase tracking-widest text-[#595c5e]">Admin</p>
         <h1 className="font-['Plus_Jakarta_Sans'] text-2xl font-extrabold text-[#2c2f32]">課題管理（一覧）</h1>
         <p className="mt-2 text-sm text-[#595c5e]">
-          コースを選び、右の回次一覧で回を選ぶと左に登録内容が表示されます。「編集/再登録」「新規登録」でこの画面から直接編集できます（必要なら「フルページで開く」から登録ページへ移動できます）。
+          コースを選び、右の回次一覧で回を選ぶと左に登録内容が表示されます。「編集/再登録」「新規登録」でこの画面から直接編集できます。
         </p>
 
         {coursesLoading ? (
@@ -555,11 +552,6 @@ export default function AdminAssignmentsPage() {
         </div>
 
         <p className="mt-8">
-          <Link to="/writing/admin/assignments/new" className="text-sm font-semibold text-[#4052b6] underline">
-            課題登録（新規）へ
-          </Link>
-        </p>
-        <p className="mt-4">
           <Link to="/writing/admin" className="text-sm text-[#595c5e] underline">
             管理コンソールへ戻る
           </Link>
