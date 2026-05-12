@@ -5,7 +5,10 @@ import {
   ASSIGNMENT_REQUIREMENT_SLOT_COUNT,
   type ThemeSnapshotV1,
 } from "../lib/writingAssignmentSnapshot";
-import { isKoreanGrammarLevelJa } from "../../src/lib/koreanGrammarLevel";
+import {
+  normalizeAdminAssignmentRequirementsPayload,
+  requirementSlotHasAnyContent,
+} from "../../src/lib/adminAssignmentRequirements";
 import type { Db } from "../db/client";
 import * as repo from "../repositories/writingStudentRepository";
 
@@ -35,19 +38,19 @@ function validateSnapshot(s: ThemeSnapshotV1): { ok: true } | { ok: false; code:
   if (s.modelAnswer != null && s.modelAnswer.length > MAX_MODEL_ANSWER) {
     return { ok: false, code: "text_too_long" };
   }
-  if (!Array.isArray(s.requirements) || s.requirements.length !== ASSIGNMENT_REQUIREMENT_SLOT_COUNT) {
-    return { ok: false, code: "requirements_slot_count" };
+
+  const normalized = normalizeAdminAssignmentRequirementsPayload(s.requirements);
+  if (!normalized.ok) {
+    return normalized;
   }
-  for (const r of s.requirements) {
-    const ek = r.expressionKey?.trim() ?? "";
-    const el = r.expressionLabel?.trim() ?? "";
-    const pat = r.pattern?.trim() ?? "";
-    const tj = r.translationJa?.trim() ?? "";
-    const ex = r.exampleKo?.trim() ?? "";
-    const gl = r.grammarLevel?.trim() ?? "";
-    if (!ek || !el || !pat || !tj || !ex || !isKoreanGrammarLevelJa(gl)) {
-      return { ok: false, code: "invalid_requirement_field" };
-    }
+
+  for (const r of normalized.requirements) {
+    if (!requirementSlotHasAnyContent(r)) continue;
+    const ek = r.expressionKey.trim();
+    const el = r.expressionLabel.trim();
+    const pat = r.pattern.trim();
+    const tj = r.translationJa.trim();
+    const ex = r.exampleKo.trim();
     if (
       ek.length > MAX_REQ_FIELD ||
       el.length > MAX_REQ_FIELD ||
@@ -58,6 +61,7 @@ function validateSnapshot(s: ThemeSnapshotV1): { ok: true } | { ok: false; code:
       return { ok: false, code: "text_too_long" };
     }
   }
+
   return { ok: true };
 }
 
@@ -98,7 +102,7 @@ export async function upsertAssignmentContentForCourse(
     theme: input.snapshot.theme.trim(),
     title: input.snapshot.title.trim(),
     prompt: input.snapshot.prompt.trim(),
-    requirements: input.snapshot.requirements.map((r) => ({
+    requirements: input.snapshot.requirements.slice(0, ASSIGNMENT_REQUIREMENT_SLOT_COUNT).map((r) => ({
       grammarLevel: r.grammarLevel.trim(),
       expressionKey: r.expressionKey.trim(),
       expressionLabel: r.expressionLabel.trim(),

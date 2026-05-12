@@ -1,41 +1,13 @@
 import { NextResponse } from "next/server";
 
 import { getDb } from "../../../../../../server/db/client";
-import {
-  ASSIGNMENT_REQUIREMENT_SLOT_COUNT,
-  type ThemeSnapshotV1,
-} from "../../../../../../server/lib/writingAssignmentSnapshot";
-import { isKoreanGrammarLevelJa } from "../../../../../../src/lib/koreanGrammarLevel";
+import { type ThemeSnapshotV1 } from "../../../../../../server/lib/writingAssignmentSnapshot";
+import { normalizeAdminAssignmentRequirementsPayload } from "../../../../../../src/lib/adminAssignmentRequirements";
 import { requireAdminSessionUserId } from "../../../../../../server/lib/requireAdminSession";
 import { upsertAssignmentContentForCourse } from "../../../../../../server/services/writingAdminAssignmentService";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function parseRequirement(raw: unknown): ThemeSnapshotV1["requirements"][0] | null {
-  if (raw == null || typeof raw !== "object") return null;
-  const o = raw as Record<string, unknown>;
-  const expressionKey = typeof o.expressionKey === "string" ? o.expressionKey : "";
-  const expressionLabel = typeof o.expressionLabel === "string" ? o.expressionLabel : "";
-  const pattern = typeof o.pattern === "string" ? o.pattern : "";
-  const translationJa = typeof o.translationJa === "string" ? o.translationJa : "";
-  const exampleKo = typeof o.exampleKo === "string" ? o.exampleKo : "";
-  const grammarLevelRaw = typeof o.grammarLevel === "string" ? o.grammarLevel.trim() : "";
-  if (!expressionKey || !expressionLabel || !pattern || !translationJa || !exampleKo) {
-    return null;
-  }
-  if (!isKoreanGrammarLevelJa(grammarLevelRaw)) {
-    return null;
-  }
-  return {
-    grammarLevel: grammarLevelRaw,
-    expressionKey,
-    expressionLabel,
-    pattern,
-    translationJa,
-    exampleKo,
-  };
-}
 
 /**
  * POST /api/writing/admin/assignments/create — admin-only; writes structured JSON to writing.sessions.theme_snapshot.
@@ -70,18 +42,11 @@ export async function POST(req: Request) {
   }
 
   const reqArr = b.requirements;
-  const requirements: ThemeSnapshotV1["requirements"] = [];
-  if (Array.isArray(reqArr) && reqArr.length === ASSIGNMENT_REQUIREMENT_SLOT_COUNT) {
-    for (let i = 0; i < ASSIGNMENT_REQUIREMENT_SLOT_COUNT; i++) {
-      const p = parseRequirement(reqArr[i]);
-      if (!p) {
-        return NextResponse.json({ ok: false, code: "invalid_requirements" }, { status: 400 });
-      }
-      requirements.push(p);
-    }
-  } else {
-    return NextResponse.json({ ok: false, code: "requirements_slot_count" }, { status: 400 });
+  const normalizedReq = normalizeAdminAssignmentRequirementsPayload(reqArr);
+  if (!normalizedReq.ok) {
+    return NextResponse.json({ ok: false, code: normalizedReq.code }, { status: 400 });
   }
+  const requirements = normalizedReq.requirements;
 
   const snapshot: ThemeSnapshotV1 = {
     theme: theme.trim() || title.trim(),
