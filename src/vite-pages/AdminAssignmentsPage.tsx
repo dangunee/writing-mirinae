@@ -47,6 +47,16 @@ export default function AdminAssignmentsPage() {
   /** After `courseId` changes, next successful list load should pick the first registered session (1→10). */
   const needsAutoSelectRef = useRef(true)
 
+  /**
+   * Which course the current `sessions` state belongs to (cleared while fetching).
+   * Prevents auto-select from running on a stale render where `courseId` already changed but `sessions`
+   * still reflect the previous course — which consumed `needsAutoSelectRef` and left the preview empty.
+   */
+  const listSessionsCourseIdRef = useRef<string | null>(null)
+
+  /** Supersede in-flight list fetches when `courseId` changes quickly. */
+  const listLoadSeqRef = useRef(0)
+
   /** Per-course: all 10 sessions have theme_snapshot (for dropdown 「登録完了」). */
   const [assignmentCompleteByCourseId, setAssignmentCompleteByCourseId] = useState<Record<string, boolean>>({})
 
@@ -151,6 +161,8 @@ export default function AdminAssignmentsPage() {
 
   const loadList = useCallback(async (cid: string) => {
     if (!cid) return
+    const seq = ++listLoadSeqRef.current
+    listSessionsCourseIdRef.current = null
     setListLoading(true)
     setListError(null)
     setSessions([])
@@ -164,22 +176,32 @@ export default function AdminAssignmentsPage() {
         sessions?: ListSessionRow[]
         error?: string
       }
+
+      if (seq !== listLoadSeqRef.current) return
+
       if (!res.ok || !data.ok || !Array.isArray(data.sessions)) {
         setListError(typeof data.error === 'string' ? data.error : `HTTP ${res.status}`)
         setSessions([])
+        listSessionsCourseIdRef.current = null
         return
       }
+
       const listSessions = data.sessions
+      listSessionsCourseIdRef.current = cid
       setSessions(listSessions)
       setAssignmentCompleteByCourseId((prev) => ({
         ...prev,
         [cid]: assignmentsCompleteForCourseSessions(listSessions),
       }))
     } catch {
+      if (seq !== listLoadSeqRef.current) return
       setListError('load_failed')
       setSessions([])
+      listSessionsCourseIdRef.current = null
     } finally {
-      setListLoading(false)
+      if (seq === listLoadSeqRef.current) {
+        setListLoading(false)
+      }
     }
   }, [])
 
@@ -198,6 +220,7 @@ export default function AdminAssignmentsPage() {
       setSelectedIndex(null)
       return
     }
+    if (listSessionsCourseIdRef.current !== courseId) return
     if (!needsAutoSelectRef.current) return
     needsAutoSelectRef.current = false
 
