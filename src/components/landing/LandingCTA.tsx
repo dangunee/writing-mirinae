@@ -15,22 +15,22 @@ export default function LandingCTA() {
         <div className="bg-white/5 p-5 md:p-8 rounded-2xl backdrop-blur-sm border border-white/10 text-left">
           <div className="grid md:grid-cols-2 gap-5 md:gap-6 mb-6 md:mb-8">
             <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest opacity-60">氏名</label>
+              <label className="text-[10px] font-bold tracking-wide opacity-60">氏名</label>
               <input
                 name="dummy-name"
                 autoComplete="name"
                 className="w-full bg-white/10 border-transparent rounded-lg p-4 text-sm text-white placeholder:text-white/20 focus:ring-2 focus:ring-white/40 focus:border-white/30 transition-all"
-                placeholder="姓名"
+                placeholder="お名前"
                 type="text"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest opacity-60">メールアドレス</label>
+              <label className="text-[10px] font-bold tracking-wide opacity-60">メールアドレス</label>
               <input
                 name="dummy-email"
                 autoComplete="email"
                 className="w-full bg-white/10 border-transparent rounded-lg p-4 text-sm text-white placeholder:text-white/20 focus:ring-2 focus:ring-white/40 focus:border-white/30 transition-all"
-                placeholder="example@mirinae.jp"
+                placeholder="メールアドレスを入力"
                 type="email"
               />
             </div>
@@ -38,7 +38,7 @@ export default function LandingCTA() {
 
           <Link
             to="/writing/course"
-            className="w-full inline-flex items-center justify-center bg-[#000666] text-white py-4 md:py-5 rounded-lg font-['Manrope'] font-bold tracking-widest uppercase hover:bg-[#000666]/90 transition-all text-xs md:text-sm"
+            className="w-full inline-flex items-center justify-center bg-[#000666] text-white py-4 md:py-5 rounded-lg font-['Manrope'] font-bold tracking-wide hover:bg-[#000666]/90 transition-all text-xs md:text-sm"
           >
             受講を申し込む
           </Link>

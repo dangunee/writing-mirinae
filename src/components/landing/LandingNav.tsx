@@ -122,7 +122,7 @@ export default function LandingNav({ goApp, variant = 'default' }: Props) {
                   <button
                     type="button"
                     onClick={goApp}
-                    className="bg-[#000666] px-6 py-2 font-['Manrope'] text-sm font-bold uppercase tracking-widest text-white hover:opacity-90 active:scale-[0.99] transition-all rounded-lg"
+                    className="bg-[#000666] px-6 py-2 font-['Manrope'] text-sm font-bold tracking-wide text-white hover:opacity-90 active:scale-[0.99] transition-all rounded-lg"
                   >
                     お申し込み
                   </button>
@@ -132,7 +132,7 @@ export default function LandingNav({ goApp, variant = 'default' }: Props) {
                   <button
                     type="button"
                     onClick={goApp}
-                    className="bg-[#000666] px-6 py-2 font-['Manrope'] text-sm font-bold uppercase tracking-widest text-white hover:opacity-90 active:scale-[0.99] transition-all rounded-lg"
+                    className="bg-[#000666] px-6 py-2 font-['Manrope'] text-sm font-bold tracking-wide text-white hover:opacity-90 active:scale-[0.99] transition-all rounded-lg"
                   >
                     お申し込み
                   </button>
@@ -223,7 +223,7 @@ export default function LandingNav({ goApp, variant = 'default' }: Props) {
               goApp()
               setOpen(false)
             }}
-            className="w-full bg-[#000666] px-4 py-2.5 font-['Manrope'] text-xs font-bold uppercase tracking-widest text-white rounded-lg hover:opacity-90 active:scale-[0.99] transition-all text-center"
+            className="w-full bg-[#000666] px-4 py-2.5 font-['Manrope'] text-xs font-bold tracking-wide text-white rounded-lg hover:opacity-90 active:scale-[0.99] transition-all text-center"
           >
             お申し込み
           </button>

@@ -16,27 +16,27 @@ type Step = {
 const STEPS: Step[] = [
   {
     no: '01',
-    title: 'Write & Submit',
+    title: '執筆と提出',
     desc: '独自のプラットフォームで課題を執筆・提出します。',
-    sub: '학생용 과제 제출',
+    sub: '課題の提出',
     imageClass: 'bg-[#efe7cc]',
-    imageAlt: 'Write & Submit',
+    imageAlt: '執筆と提出のイメージ',
   },
   {
     no: '02',
-    title: 'Professional Feedback',
+    title: '講師からのフィードバック',
     desc: '専門講師が文法、語彙、文体を緻密に添削します。',
-    sub: '전문 첨삭',
+    sub: '専門家による添削',
     imageClass: 'bg-[#e0e4f0]',
-    imageAlt: 'Professional Feedback',
+    imageAlt: '講師からのフィードバック',
   },
   {
     no: '03',
-    title: 'Model Answer & Review',
+    title: '模範文と復習',
     desc: '模範解答を参考に、自身の表現をアップデートします。',
-    sub: '모범문 확인',
+    sub: '模範文で確認',
     imageClass: 'bg-[#eeeeee]',
-    imageAlt: 'Model Answer & Review',
+    imageAlt: '模範文と復習',
   },
 ]
 
@@ -64,7 +64,7 @@ export default function LandingProcess() {
                   />
                   <div className="relative z-10 h-full flex items-center justify-center px-4 text-center">
                     <div>
-                      <div className="text-[8px] md:text-[10px] font-bold tracking-[0.22em] uppercase text-[#000666]/35 mb-2">
+                      <div className="text-[8px] md:text-[10px] font-bold tracking-[0.18em] text-[#000666]/35 mb-2">
                         {item.no}
                       </div>
                       <div className="text-[11px] md:text-sm font-bold text-[#000666]/55 italic">{item.title}</div>
@@ -82,7 +82,7 @@ export default function LandingProcess() {
               <div>
                 <h3 className="font-bold text-base md:text-xl mb-2 md:mb-4 headline-font text-[#000666]">{item.title}</h3>
                 <p className="text-[#454652] text-xs md:text-sm leading-relaxed mb-3 md:mb-4">{item.desc}</p>
-                <span className="text-[9px] md:text-[10px] font-bold text-[#000666]/40 tracking-widest uppercase">
+                <span className="text-[9px] md:text-[10px] font-bold text-[#000666]/40 tracking-wide">
                   {item.sub}
                 </span>
               </div>

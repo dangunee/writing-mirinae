@@ -7,8 +7,8 @@ export default function LandingCorrection() {
     <section className="py-24 bg-[#ECECEC] px-6 md:px-8 border-y border-[#c6c5d4]/10">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-14 md:mb-16">
-          <span className="font-['Manrope'] text-[10px] md:text-xs tracking-[0.2em] uppercase text-[#000666] mb-3 md:mb-4 block font-bold">
-            Feedback System
+          <span className="font-['Manrope'] text-[10px] md:text-xs tracking-[0.15em] text-[#000666] mb-3 md:mb-4 block font-bold">
+            フィードバック体制
           </span>
           <h2 className="headline-font text-3xl md:text-4xl font-extrabold text-[#000666] tracking-tight">
             プロによる丁寧な添削指導
@@ -26,8 +26,8 @@ export default function LandingCorrection() {
                   <span className="material-symbols-outlined text-[#000666]">edit_note</span>
                   <h3 className="font-bold headline-font text-base md:text-lg text-[#000666]">実際の添削例</h3>
                 </div>
-                <span className="text-[10px] font-bold tracking-widest uppercase opacity-40 hidden sm:inline">
-                  Topic: Lifestyle &amp; Culture
+                <span className="text-[10px] font-bold tracking-wide opacity-40 hidden sm:inline">
+                  テーマ：ライフスタイルと文化
                 </span>
               </div>
               <div className="space-y-4 md:space-y-6 leading-relaxed text-base md:text-lg text-[#1e1b13]/80">
@@ -47,8 +47,8 @@ export default function LandingCorrection() {
               </div>
               <div className="mt-8 md:mt-12 pt-6 md:pt-8 border-t border-dashed border-[#c6c5d4]/30">
                 <div className="flex items-center gap-4 mb-3 md:mb-4">
-                  <span className="bg-[#000666]/10 text-[#000666] text-[9px] md:text-[10px] px-2 md:px-3 py-0.5 md:py-1 rounded-full font-bold uppercase tracking-widest">
-                    Polished Version
+                  <span className="bg-[#000666]/10 text-[#000666] text-[9px] md:text-[10px] px-2 md:px-3 py-0.5 md:py-1 rounded-full font-bold tracking-wide">
+                    推敲後のテキスト
                   </span>
                 </div>
                 <p className="text-[#000666] font-medium italic leading-relaxed text-sm md:text-base">
@@ -65,8 +65,8 @@ export default function LandingCorrection() {
             >
               <div className="flex items-center gap-2 mb-2 md:mb-3">
                 <span className="material-symbols-outlined text-[#000666] text-lg md:text-xl">spellcheck</span>
-                <h4 className="font-bold text-[11px] md:text-sm text-[#000666] uppercase tracking-tight">
-                  Grammar &amp; Syntax
+                <h4 className="font-bold text-[11px] md:text-sm text-[#000666] tracking-tight">
+                  文法・語順
                 </h4>
               </div>
               <p className="text-xs md:text-sm text-[#454652] leading-relaxed">
@@ -78,8 +78,8 @@ export default function LandingCorrection() {
             >
               <div className="flex items-center gap-2 mb-2 md:mb-3">
                 <span className="material-symbols-outlined text-[#000666] text-lg md:text-xl">auto_awesome</span>
-                <h4 className="font-bold text-[11px] md:text-sm text-[#000666] uppercase tracking-tight">
-                  Natural Expression
+                <h4 className="font-bold text-[11px] md:text-sm text-[#000666] tracking-tight">
+                  自然な表現
                 </h4>
               </div>
               <p className="text-xs md:text-sm text-[#454652] leading-relaxed">
@@ -91,7 +91,7 @@ export default function LandingCorrection() {
             >
               <div className="flex items-center gap-2 mb-3">
                 <span className="material-symbols-outlined text-[#670007] text-xl">translate</span>
-                <h4 className="font-bold text-sm text-[#670007] uppercase tracking-tight">Vocabulary Choice</h4>
+                <h4 className="font-bold text-sm text-[#670007] tracking-tight">語彙の選択</h4>
               </div>
               <p className="text-sm text-[#454652] leading-relaxed">
                 固有名詞（松田聖子）のハングル表記を修正。日本人が間違えやすい外来語表記も徹底的にチェックします。
@@ -100,7 +100,7 @@ export default function LandingCorrection() {
             <button
               type="button"
               onClick={() => navigate('/writing/correction-detail')}
-              className="w-full mt-1 py-4 rounded-lg border-2 border-[#000666] text-[#000666] font-bold text-xs md:text-sm uppercase tracking-widest hover:bg-[#000666] hover:text-white transition-all font-['Manrope']"
+              className="w-full mt-1 py-4 rounded-lg border-2 border-[#000666] text-[#000666] font-bold text-xs md:text-sm tracking-wide hover:bg-[#000666] hover:text-white transition-all font-['Manrope']"
             >
               添削システムを詳しく見る
             </button>
