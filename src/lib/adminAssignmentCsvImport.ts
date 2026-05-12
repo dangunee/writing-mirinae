@@ -4,6 +4,7 @@ import {
   ASSIGNMENT_REQUIREMENT_SLOT_COUNT,
   type AssignmentRequirement,
 } from './writingThemeSnapshot'
+import { normalizeImportedProseLineBreaks } from './normalizeImportedProseLineBreaks'
 import { DEFAULT_KOREAN_GRAMMAR_LEVEL_JA } from './koreanGrammarLevel'
 
 /** Expected CSV columns (see writing_1gi_assignments.csv). */
@@ -197,9 +198,9 @@ export function parseAdminAssignmentsCsvText(csvText: string): AdminAssignmentCs
     }
 
     const themeTitle = cell(row.theme_title)
-    const prompt = cell(row.prompt)
+    const prompt = normalizeImportedProseLineBreaks(cell(row.prompt))
     const modelAnswerRaw = cell(row.model_answer)
-    const modelAnswer = modelAnswerRaw ? modelAnswerRaw : undefined
+    const modelAnswer = modelAnswerRaw ? normalizeImportedProseLineBreaks(modelAnswerRaw) : undefined
 
     if (!themeTitle) {
       return { ok: false, error: `${i + 1} 行目: theme_title が空です。` }

@@ -508,19 +508,11 @@ export default function AdminAssignmentsPage() {
                   </div>
                 ) : inlineEditing && selectedIndex != null && selectedRow && courseId.trim() ? (
                   <div className="space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-                      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-                        <span className="text-xs font-bold uppercase tracking-widest text-[#595c5e]">
-                          課題を編集中
-                        </span>
-                        <span className="text-sm font-semibold text-[#2c2f32]">第{selectedIndex}回</span>
-                      </div>
-                      <Link
-                        to={`/writing/admin/assignments/new?courseId=${encodeURIComponent(courseId)}&sessionIndex=${selectedIndex}`}
-                        className="text-xs font-semibold text-[#4052b6] underline"
-                      >
-                        フルページで開く
-                      </Link>
+                    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+                      <span className="text-xs font-bold uppercase tracking-widest text-[#595c5e]">
+                        課題を編集中
+                      </span>
+                      <span className="text-sm font-semibold text-[#2c2f32]">第{selectedIndex}回</span>
                     </div>
                     <AdminAssignmentSnapshotFieldsForm
                       courseId={courseId.trim()}

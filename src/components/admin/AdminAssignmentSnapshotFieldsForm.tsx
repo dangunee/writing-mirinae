@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 
 import { apiUrl } from '../../lib/apiUrl'
+import { normalizeImportedProseLineBreaks } from '../../lib/normalizeImportedProseLineBreaks'
 import {
   ADMIN_ASSIGNMENT_REQUIRED_SLOT_COUNT,
   isRequirementSlotDuplicateOfPrevious,
@@ -93,8 +94,10 @@ export default function AdminAssignmentSnapshotFieldsForm({
 }: AdminAssignmentSnapshotFieldsFormProps) {
   const [theme, setTheme] = useState(() => seed.theme)
   const [title, setTitle] = useState(() => seed.title)
-  const [prompt, setPrompt] = useState(() => seed.prompt)
-  const [modelAnswer, setModelAnswer] = useState(() => seed.modelAnswer)
+  const [prompt, setPrompt] = useState(() => normalizeImportedProseLineBreaks(seed.prompt))
+  const [modelAnswer, setModelAnswer] = useState(() =>
+    normalizeImportedProseLineBreaks(seed.modelAnswer)
+  )
   const [req, setReq] = useState<AssignmentRequirementsTuple>(
     () => padAssignmentRequirementsToSlotCount(seed.requirements) as AssignmentRequirementsTuple
   )
@@ -107,8 +110,8 @@ export default function AdminAssignmentSnapshotFieldsForm({
     serializeSeed({
       theme: seed.theme,
       title: seed.title,
-      prompt: seed.prompt,
-      modelAnswer: seed.modelAnswer,
+      prompt: normalizeImportedProseLineBreaks(seed.prompt),
+      modelAnswer: normalizeImportedProseLineBreaks(seed.modelAnswer),
       requirements: padAssignmentRequirementsToSlotCount(seed.requirements),
     })
   )
@@ -121,8 +124,8 @@ export default function AdminAssignmentSnapshotFieldsForm({
     const nextSeed: AssignmentSnapshotFormSeed = {
       theme: seed.theme,
       title: seed.title,
-      prompt: seed.prompt,
-      modelAnswer: seed.modelAnswer,
+      prompt: normalizeImportedProseLineBreaks(seed.prompt),
+      modelAnswer: normalizeImportedProseLineBreaks(seed.modelAnswer),
       requirements: padded,
     }
     setTheme(nextSeed.theme)
@@ -221,16 +224,18 @@ export default function AdminAssignmentSnapshotFieldsForm({
 
   const cancelHandler = useCallback(() => {
     const padded = padAssignmentRequirementsToSlotCount(seed.requirements)
+    const promptNorm = normalizeImportedProseLineBreaks(seed.prompt)
+    const modelNorm = normalizeImportedProseLineBreaks(seed.modelAnswer)
     setTheme(seed.theme)
     setTitle(seed.title)
-    setPrompt(seed.prompt)
-    setModelAnswer(seed.modelAnswer)
+    setPrompt(promptNorm)
+    setModelAnswer(modelNorm)
     setReq(padded as AssignmentRequirementsTuple)
     baselineSerialized.current = serializeSeed({
       theme: seed.theme,
       title: seed.title,
-      prompt: seed.prompt,
-      modelAnswer: seed.modelAnswer,
+      prompt: promptNorm,
+      modelAnswer: modelNorm,
       requirements: padded,
     })
     setError(null)
@@ -370,7 +375,7 @@ export default function AdminAssignmentSnapshotFieldsForm({
       <label className="block">
         <span className="font-semibold text-[#2c2f32]">模範解答</span>
         <textarea
-          className="mt-1 min-h-[22rem] w-full resize-y rounded border border-[#c5c8cc] bg-white px-3 py-2 text-[#2c2f32]"
+          className="mt-1 min-h-[14rem] w-full resize-y rounded border border-[#c5c8cc] bg-white px-3 py-2 text-[#2c2f32]"
           value={modelAnswer}
           onChange={(e) => setModelAnswer(e.target.value)}
           disabled={disabled}
