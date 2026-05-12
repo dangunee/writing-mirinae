@@ -6,11 +6,24 @@ import {
   type AdminTermTarget,
 } from '../../lib/adminCourseTermSelect'
 
-/** Put sandbox / 体験など特殊コースを右端に寄せる（通常孤立コースより後ろ）。 */
+/** terms の後: 体験系 → その他の孤立コース → 管理者 sandbox（必ず最後） */
 function orphanSortScore(o: AdminOrphanCourse): number {
   if (o.isAdminSandbox) return 2
-  if (o.displayName.includes('体験')) return 1
-  return 0
+  if (o.displayName.includes('体験')) return 0
+  return 1
+}
+
+function compareOrphans(a: AdminOrphanCourse, b: AdminOrphanCourse): number {
+  const d = orphanSortScore(a) - orphanSortScore(b)
+  if (d !== 0) return d
+  return a.displayName.localeCompare(b.displayName, 'ja')
+}
+
+/** 通常コース（期）: sortOrder 昇順 → 画面上は 1기 … 8기 が左から並ぶ想定 */
+function compareTerms(a: AdminTermTarget, b: AdminTermTarget): number {
+  const d = a.sortOrder - b.sortOrder
+  if (d !== 0) return d
+  return a.termId.localeCompare(b.termId)
 }
 
 export type AdminAssignmentsCoursePickerProps = {
@@ -40,14 +53,8 @@ export default function AdminAssignmentsCoursePicker({
 }: AdminAssignmentsCoursePickerProps) {
   const selectValue = adminCourseSelectValue(courseId, termTargets, orphanCourses)
 
-  const sortedTerms = useMemo(
-    () => [...termTargets].sort((a, b) => a.sortOrder - b.sortOrder),
-    [termTargets]
-  )
-  const sortedOrphans = useMemo(
-    () => [...orphanCourses].sort((a, b) => orphanSortScore(a) - orphanSortScore(b)),
-    [orphanCourses]
-  )
+  const sortedTerms = useMemo(() => [...termTargets].sort(compareTerms), [termTargets])
+  const sortedOrphans = useMemo(() => [...orphanCourses].sort(compareOrphans), [orphanCourses])
 
   if (termTargets.length === 0 && orphanCourses.length === 0) {
     return <p className="text-xs text-[#595c5e]">（期またはコースがありません）</p>

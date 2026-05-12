@@ -240,73 +240,96 @@ export default function AdminAssignmentsPage() {
 
   const detailPanel =
     selectedIndex != null && selectedRow ? (
-      <div className="rounded border border-[#c5c8cc] bg-white p-4">
-        <p className="text-xs font-bold uppercase tracking-widest text-[#595c5e]">登録内容</p>
-        <p className="mt-1 text-sm font-semibold text-[#2c2f32]">第{selectedIndex}回</p>
-        <div className="mt-3 flex flex-wrap gap-3">
-          <Link
-            to={`/writing/admin/assignments/new?courseId=${encodeURIComponent(courseId)}&sessionIndex=${selectedIndex}`}
-            className="inline-block rounded bg-[#4052b6] px-4 py-2 text-sm font-semibold !text-white no-underline hover:opacity-90"
-          >
-            {hasRegisteredThemeSnapshot(selectedRow.themeSnapshot) ? '編集/再登録' : '新規登録'}
-          </Link>
+      <div className="space-y-4">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-widest text-[#595c5e]">登録内容</p>
+          <p className="mt-1 text-sm font-semibold text-[#2c2f32]">第{selectedIndex}回</p>
+          <div className="mt-3 flex flex-wrap gap-3">
+            <Link
+              to={`/writing/admin/assignments/new?courseId=${encodeURIComponent(courseId)}&sessionIndex=${selectedIndex}`}
+              className="inline-block rounded bg-[#4052b6] px-4 py-2 text-sm font-semibold !text-white no-underline hover:opacity-90"
+            >
+              {hasRegisteredThemeSnapshot(selectedRow.themeSnapshot) ? '編集/再登録' : '新規登録'}
+            </Link>
+          </div>
+          {!detailUi ? (
+            <p className="mt-4 text-sm text-[#595c5e]">この回には課題が登録されていません。</p>
+          ) : null}
         </div>
-        {!detailUi ? (
-          <p className="mt-3 text-sm text-[#595c5e]">この回には課題が登録されていません。</p>
-        ) : (
-          <div className="mt-3 space-y-3 text-sm">
-            <div>
-              <p className="text-xs font-bold text-[#595c5e]">theme</p>
-              <p className="whitespace-pre-wrap text-[#2c2f32]">{detailUi.theme || '—'}</p>
-            </div>
-            <div>
-              <p className="text-xs font-bold text-[#595c5e]">title</p>
-              <p className="whitespace-pre-wrap text-[#2c2f32]">{detailUi.displayTitle || '—'}</p>
-            </div>
-            <div>
-              <p className="text-xs font-bold text-[#595c5e]">prompt</p>
-              <p className="whitespace-pre-wrap text-[#2c2f32]">{detailUi.prompt || detailUi.legacyInstruction || '—'}</p>
-            </div>
-            <div>
-              <p className="text-xs font-bold text-[#595c5e]">
-                必須文法・表現（{ASSIGNMENT_REQUIREMENT_SLOT_COUNT}件）
-              </p>
-              <ol className="mt-1 list-decimal space-y-2 pl-5">
-                {detailUi.requirements.slice(0, ASSIGNMENT_REQUIREMENT_SLOT_COUNT).map((r, i) => (
-                  <li key={i} className="space-y-1">
-                    <p>
-                      <span className="text-[#595c5e]">レベル: </span>
-                      {r.grammarLevel}
-                    </p>
-                    <p>
-                      <span className="text-[#595c5e]">expressionLabel: </span>
-                      {r.expressionLabel}
-                    </p>
-                    <p>
-                      <span className="text-[#595c5e]">translationJa: </span>
-                      {r.translationJa}
-                    </p>
-                    <p className="whitespace-pre-wrap">
-                      <span className="text-[#595c5e]">exampleKo: </span>
-                      {r.exampleKo}
-                    </p>
-                  </li>
-                ))}
-              </ol>
-              {detailUi.requirements.length === 0 && detailUi.kind === 'legacy' ? (
-                <p className="text-xs text-[#595c5e]">（レガシー形式のため要件ブロックはありません）</p>
-              ) : null}
-            </div>
+
+        {detailUi ? (
+          <>
+            <section className="rounded border border-[#c5c8cc] bg-white p-4">
+              <p className="text-xs font-bold uppercase tracking-widest text-[#595c5e]">課題</p>
+              <div className="mt-3 space-y-3 text-sm text-[#2c2f32]">
+                {detailUi.theme.trim() ? (
+                  <p className="whitespace-pre-wrap leading-relaxed">{detailUi.theme}</p>
+                ) : null}
+                {detailUi.displayTitle.trim() ? (
+                  <p className="whitespace-pre-wrap font-semibold leading-snug">{detailUi.displayTitle}</p>
+                ) : null}
+                {(detailUi.prompt || detailUi.legacyInstruction).trim() ? (
+                  <p className="whitespace-pre-wrap leading-relaxed">
+                    {detailUi.prompt || detailUi.legacyInstruction}
+                  </p>
+                ) : null}
+                {!detailUi.theme.trim() &&
+                !detailUi.displayTitle.trim() &&
+                !(detailUi.prompt || detailUi.legacyInstruction).trim() ? (
+                  <p className="text-[#595c5e]">—</p>
+                ) : null}
+              </div>
+            </section>
+
+            <section className="rounded border border-[#c5c8cc] bg-white p-4">
+              <p className="text-xs font-bold uppercase tracking-widest text-[#595c5e]">必須文法・表現</p>
+              <div className="mt-3 space-y-4 text-sm">
+                <ol className="list-decimal space-y-4 pl-5 marker:text-[#595c5e]">
+                  {detailUi.requirements.slice(0, ASSIGNMENT_REQUIREMENT_SLOT_COUNT).map((r, i) => (
+                    <li key={i} className="space-y-2 pl-1">
+                      <p className="text-[#2c2f32]">
+                        <span className="font-semibold text-[#595c5e]">レベル</span>
+                        <span className="mx-1 text-[#595c5e]">:</span>
+                        {r.grammarLevel}
+                      </p>
+                      <p className="text-[#2c2f32]">
+                        <span className="font-semibold text-[#595c5e]">文型</span>
+                        <span className="mx-1 text-[#595c5e]">:</span>
+                        <span className="whitespace-pre-wrap">{r.expressionLabel}</span>
+                      </p>
+                      <p className="text-[#2c2f32]">
+                        <span className="font-semibold text-[#595c5e]">訳</span>
+                        <span className="mx-1 text-[#595c5e]">:</span>
+                        <span className="whitespace-pre-wrap">{r.translationJa}</span>
+                      </p>
+                      <p className="whitespace-pre-wrap leading-relaxed text-[#2c2f32]">
+                        <span className="font-semibold text-[#595c5e]">例</span>
+                        <span className="mx-1 text-[#595c5e]">:</span>
+                        {r.exampleKo}
+                      </p>
+                    </li>
+                  ))}
+                </ol>
+                {detailUi.requirements.length === 0 ? (
+                  detailUi.kind === 'legacy' ? (
+                    <p className="text-xs text-[#595c5e]">（レガシー形式のため要件ブロックはありません）</p>
+                  ) : (
+                    <p className="text-sm text-[#595c5e]">—</p>
+                  )
+                ) : null}
+              </div>
+            </section>
+
             {detailUi.modelAnswer != null && String(detailUi.modelAnswer).trim() !== '' ? (
-              <div>
-                <p className="text-xs font-bold text-[#595c5e]">modelAnswer（管理者のみ）</p>
-                <p className="mt-1 whitespace-pre-wrap rounded bg-[#f0f2f5] p-2 text-[#2c2f32]">
+              <section className="rounded border border-[#c5c8cc] bg-white p-4">
+                <p className="text-xs font-bold uppercase tracking-widest text-[#595c5e]">模範文</p>
+                <p className="mt-3 whitespace-pre-wrap rounded bg-[#f0f2f5] p-3 text-sm leading-relaxed text-[#2c2f32]">
                   {detailUi.modelAnswer}
                 </p>
-              </div>
+              </section>
             ) : null}
-          </div>
-        )}
+          </>
+        ) : null}
       </div>
     ) : null
 
