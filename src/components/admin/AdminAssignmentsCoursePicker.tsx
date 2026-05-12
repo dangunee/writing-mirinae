@@ -1,30 +1,11 @@
 import { useMemo } from 'react'
 
+import { buildSortedCoursePickerRows } from '../../lib/adminCoursePickerSort'
 import {
   adminCourseSelectValue,
   type AdminOrphanCourse,
   type AdminTermTarget,
 } from '../../lib/adminCourseTermSelect'
-
-/** terms の後: 体験系 → その他の孤立コース → 管理者 sandbox（必ず最後） */
-function orphanSortScore(o: AdminOrphanCourse): number {
-  if (o.isAdminSandbox) return 2
-  if (o.displayName.includes('体験')) return 0
-  return 1
-}
-
-function compareOrphans(a: AdminOrphanCourse, b: AdminOrphanCourse): number {
-  const d = orphanSortScore(a) - orphanSortScore(b)
-  if (d !== 0) return d
-  return a.displayName.localeCompare(b.displayName, 'ja')
-}
-
-/** 通常コース（期）: sortOrder 昇順 → 画面上は 1기 … 8기 が左から並ぶ想定 */
-function compareTerms(a: AdminTermTarget, b: AdminTermTarget): number {
-  const d = a.sortOrder - b.sortOrder
-  if (d !== 0) return d
-  return a.termId.localeCompare(b.termId)
-}
 
 export type AdminAssignmentsCoursePickerProps = {
   termTargets: AdminTermTarget[]
@@ -53,8 +34,10 @@ export default function AdminAssignmentsCoursePicker({
 }: AdminAssignmentsCoursePickerProps) {
   const selectValue = adminCourseSelectValue(courseId, termTargets, orphanCourses)
 
-  const sortedTerms = useMemo(() => [...termTargets].sort(compareTerms), [termTargets])
-  const sortedOrphans = useMemo(() => [...orphanCourses].sort(compareOrphans), [orphanCourses])
+  const sortedCourses = useMemo(
+    () => buildSortedCoursePickerRows(termTargets, orphanCourses),
+    [termTargets, orphanCourses]
+  )
 
   if (termTargets.length === 0 && orphanCourses.length === 0) {
     return <p className="text-xs text-[#595c5e]">（期またはコースがありません）</p>
@@ -67,34 +50,37 @@ export default function AdminAssignmentsCoursePicker({
 
   return (
     <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="対象コース（期）">
-      {sortedTerms.map((t) => {
-        const raw = t.courseId ? `c:${t.courseId}` : `e:${t.termId}`
-        const selected = selectValue === raw
-        const hasCourse = Boolean(t.courseId)
-        const complete = hasCourse ? assignmentCompleteByCourseId[t.courseId!] === true : false
-        const statusLabel = complete ? '登録完了' : '準備中'
-        const title = t.title.trim() || '（無題の期）'
+      {sortedCourses.map((row) => {
+        if (row.kind === 'term') {
+          const t = row.term
+          const raw = t.courseId ? `c:${t.courseId}` : `e:${t.termId}`
+          const selected = selectValue === raw
+          const hasCourse = Boolean(t.courseId)
+          const complete = hasCourse ? assignmentCompleteByCourseId[t.courseId!] === true : false
+          const statusLabel = complete ? '登録完了' : '準備中'
+          const title = t.title.trim() || '（無題の期）'
 
-        return (
-          <button
-            key={t.termId}
-            type="button"
-            role="radio"
-            aria-checked={selected}
-            disabled={disabled}
-            onClick={() => onSelectCourse(raw)}
-            className={selected ? selectedCls : idleCls}
-          >
-            <span className="font-semibold text-[#2c2f32]">{title}</span>
-            <span
-              className={`mt-0.5 text-xs font-semibold ${complete ? 'text-[#1b5e20]' : 'text-[#595c5e]'}`}
+          return (
+            <button
+              key={`term:${t.termId}`}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              disabled={disabled}
+              onClick={() => onSelectCourse(raw)}
+              className={selected ? selectedCls : idleCls}
             >
-              {statusLabel}
-            </span>
-          </button>
-        )
-      })}
-      {sortedOrphans.map((o) => {
+              <span className="font-semibold text-[#2c2f32]">{title}</span>
+              <span
+                className={`mt-0.5 text-xs font-semibold ${complete ? 'text-[#1b5e20]' : 'text-[#595c5e]'}`}
+              >
+                {statusLabel}
+              </span>
+            </button>
+          )
+        }
+
+        const o = row.orphan
         const raw = `o:${o.courseId}`
         const selected = selectValue === raw
         const complete = assignmentCompleteByCourseId[o.courseId] === true
@@ -103,7 +89,7 @@ export default function AdminAssignmentsCoursePicker({
 
         return (
           <button
-            key={o.courseId}
+            key={`orphan:${o.courseId}`}
             type="button"
             role="radio"
             aria-checked={selected}

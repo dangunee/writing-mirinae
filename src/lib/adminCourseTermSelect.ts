@@ -1,5 +1,7 @@
 /** GET /api/writing/admin/courses の termTargets / orphanCourses 用（UI と ensure 連携） */
 
+import { pickFirstCourseIdInPickerOrder } from './adminCoursePickerSort'
+
 export type AdminTermTarget = {
   termId: string
   title: string
@@ -42,7 +44,7 @@ export function parseAdminCourseSelectValue(raw: string): AdminCourseSelectParse
   return { kind: 'course', courseId: raw }
 }
 
-/** 最初に選ぶコース: URL > 最初の期に紐づくコース > 孤立コース */
+/** 最初に選ぶコース: URL > 画面上の並び順で最初に紐づくコース（numbered → trial → sandbox） */
 export function pickDefaultCourseId(
   urlCourseId: string,
   termTargets: AdminTermTarget[],
@@ -51,7 +53,5 @@ export function pickDefaultCourseId(
 ): string {
   const url = urlCourseId.trim()
   if (url.length > 0 && allCourseIds.has(url)) return url
-  const fromTerm = termTargets.find((t) => t.courseId)?.courseId
-  if (fromTerm) return fromTerm
-  return orphanCourses[0]?.courseId ?? ''
+  return pickFirstCourseIdInPickerOrder(termTargets, orphanCourses) ?? ''
 }
