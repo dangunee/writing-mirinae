@@ -101,21 +101,49 @@ function buildRequirementSlot(
   }
 }
 
-function padRequirementsToFive(
-  three: AssignmentRequirement[],
+/** Slot 3 when CSV omits requirement_3 / example_3 (or either is blank). */
+function emptyThirdRequirementSlot(sessionIndex: number): AssignmentRequirement {
+  return {
+    grammarLevel: DEFAULT_KOREAN_GRAMMAR_LEVEL_JA,
+    expressionKey: `csv-s${sessionIndex}-r3-pad`,
+    expressionLabel: '',
+    pattern: '',
+    translationJa: '',
+    exampleKo: '',
+  }
+}
+
+/**
+ * Slots 4–5 always duplicate slot 3 (including empty placeholder fields).
+ * Distinct expressionKeys satisfy aggregation keys on the client payload.
+ */
+function extendToFiveRequirementSlots(
+  r1: AssignmentRequirement,
+  r2: AssignmentRequirement,
+  r3: AssignmentRequirement,
   sessionIndex: number
 ): AssignmentRequirement[] {
-  if (three.length !== 3) return []
-  const out = [...three]
-  while (out.length < ASSIGNMENT_REQUIREMENT_SLOT_COUNT) {
-    const slot = out.length + 1
-    const src = out[out.length - 1]!
-    out.push({
-      ...src,
-      expressionKey: `csv-s${sessionIndex}-r${slot}-pad`,
-    })
+  return [
+    r1,
+    r2,
+    r3,
+    { ...r3, expressionKey: `csv-s${sessionIndex}-r4-pad` },
+    { ...r3, expressionKey: `csv-s${sessionIndex}-r5-pad` },
+  ]
+}
+
+function buildThirdRequirementSlotFromRow(
+  row: Record<string, string>,
+  sessionIndex: number
+): AssignmentRequirement | 'invalid_filled_pair' {
+  const req = cell(row.requirement_3)
+  const ex = cell(row.example_3)
+  if (!req || !ex) {
+    return emptyThirdRequirementSlot(sessionIndex)
   }
-  return out.slice(0, ASSIGNMENT_REQUIREMENT_SLOT_COUNT)
+  const built = buildRequirementSlot(req, ex, sessionIndex, 3)
+  if (!built) return 'invalid_filled_pair'
+  return built
 }
 
 function promptHead(prompt: string, max = 72): string {
@@ -182,15 +210,22 @@ export function parseAdminAssignmentsCsvText(csvText: string): AdminAssignmentCs
 
     const r1 = buildRequirementSlot(cell(row.requirement_1), cell(row.example_1), sessionIndex, 1)
     const r2 = buildRequirementSlot(cell(row.requirement_2), cell(row.example_2), sessionIndex, 2)
-    const r3 = buildRequirementSlot(cell(row.requirement_3), cell(row.example_3), sessionIndex, 3)
-    if (!r1 || !r2 || !r3) {
+    if (!r1 || !r2) {
       return {
         ok: false,
-        error: `${i + 1} 行目: requirement_1〜3 と example_1〜3 はすべて必須です（API は文法スロットが ${ASSIGNMENT_REQUIREMENT_SLOT_COUNT} 件のため、4〜5 件目は 3 件目を自動複製します）。`,
+        error: `${i + 1} 行目: requirement_1・example_1 と requirement_2・example_2 はそれぞれ必須です。requirement_3 / example_3 は省略可能です（片方でも空ならスロット 3 は空のまま、スロット 4〜5 はその内容を複製します）。`,
       }
     }
 
-    const requirements = padRequirementsToFive([r1, r2, r3], sessionIndex)
+    const r3OrErr = buildThirdRequirementSlotFromRow(row, sessionIndex)
+    if (r3OrErr === 'invalid_filled_pair') {
+      return {
+        ok: false,
+        error: `${i + 1} 行目: requirement_3 と example_3 に値がある場合は、有効な文型・例文の組み合わせにしてください（〜 区切りなど）。`,
+      }
+    }
+
+    const requirements = extendToFiveRequirementSlots(r1, r2, r3OrErr, sessionIndex)
     if (requirements.length !== ASSIGNMENT_REQUIREMENT_SLOT_COUNT) {
       return { ok: false, error: `${i + 1} 行目: 要件の組み立てに失敗しました。` }
     }

@@ -156,8 +156,10 @@ export default function AdminAssignmentsCsvImport({ courseId, disabled, onImport
                   CSV で課題を一括登録
                 </p>
                 <p className="mt-1 text-xs text-[#595c5e]">
-                  列: session_index, theme_title, prompt, requirement_1〜3, example_1〜3, model_answer（API のため必須スロット{' '}
-                  {ASSIGNMENT_REQUIREMENT_SLOT_COUNT} 件に足りない分は 3 件目を複製します）
+                  列: session_index, theme_title, prompt, requirement_1〜3, example_1〜3, model_answer。
+                  requirement_1・2 と example_1・2 は必須。requirement_3 / example_3 は任意（どちらかが空ならスロット 3
+                  は空欄のまま）。API のためスロット {ASSIGNMENT_REQUIREMENT_SLOT_COUNT} 件に合わせ、スロット 4〜5
+                  は常にスロット 3 と同じ内容で複製します。
                 </p>
               </div>
               <button
