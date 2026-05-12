@@ -41,7 +41,7 @@ export default function AdminAssignmentsList({
   }
 
   return (
-    <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+    <ul className="flex w-full flex-col gap-4">
       {displaySessions.map((s) => {
         const registered = hasRegisteredThemeSnapshot(s.themeSnapshot)
         const preview = assignmentListPreviewLine(s.themeSnapshot)
@@ -49,7 +49,7 @@ export default function AdminAssignmentsList({
         return (
           <li
             key={s.sessionIndex}
-            className={`rounded border border-[#c5c8cc] bg-white/80 p-3 shadow-sm transition-colors hover:bg-white hover:shadow-md ${
+            className={`w-full rounded border border-[#c5c8cc] bg-white/80 p-4 shadow-sm transition-colors hover:bg-white hover:shadow-md ${
               selectedIndex === s.sessionIndex ? 'ring-2 ring-[#4052b6]' : ''
             }`}
           >
