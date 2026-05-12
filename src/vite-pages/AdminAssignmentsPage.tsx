@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import AdminAssignmentSnapshotFieldsForm, {
+  emptyAssignmentSnapshotSeed,
+} from '../components/admin/AdminAssignmentSnapshotFieldsForm'
 import AdminAssignmentsCoursePicker from '../components/admin/AdminAssignmentsCoursePicker'
 import AdminAssignmentsCsvImport from '../components/admin/AdminAssignmentsCsvImport'
 import AdminAssignmentsList from '../components/admin/AdminAssignmentsList'
@@ -19,6 +22,7 @@ import { apiUrl } from '../lib/apiUrl'
 import {
   ASSIGNMENT_REQUIREMENT_SLOT_COUNT,
   hasRegisteredThemeSnapshot,
+  padAssignmentRequirementsToSlotCount,
   parseAssignmentSnapshotForUi,
 } from '../lib/writingThemeSnapshot'
 
@@ -43,6 +47,14 @@ export default function AdminAssignmentsPage() {
   const [listError, setListError] = useState<string | null>(null)
 
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
+  const [inlineEditing, setInlineEditing] = useState(false)
+  const [inlineFormSeed, setInlineFormSeed] = useState(() => emptyAssignmentSnapshotSeed())
+  const [inlineSeedVersion, setInlineSeedVersion] = useState(0)
+  const [inlineLegacyHint, setInlineLegacyHint] = useState(false)
+  const inlineDirtyRef = useRef(false)
+  const onInlineDirtyChange = useCallback((dirty: boolean) => {
+    inlineDirtyRef.current = dirty
+  }, [])
 
   /** After `courseId` changes, next successful list load should pick the first registered session (1→10). */
   const needsAutoSelectRef = useRef(true)
@@ -128,6 +140,13 @@ export default function AdminAssignmentsPage() {
 
   async function handleCourseSelectChange(raw: string) {
     if (!raw.trim()) return
+    if (inlineEditing && inlineDirtyRef.current) {
+      if (!window.confirm('未保存の変更があります。コースを切り替えますか？')) return
+    }
+    if (inlineEditing) {
+      setInlineEditing(false)
+      inlineDirtyRef.current = false
+    }
     const parsed = parseAdminCourseSelectValue(raw)
     if (parsed.kind === 'course') {
       setCourseId(parsed.courseId)
@@ -261,8 +280,47 @@ export default function AdminAssignmentsPage() {
     return parseAssignmentSnapshotForUi(selectedRow.themeSnapshot)
   }, [selectedRow])
 
-  const detailPanel =
-    selectedIndex != null && selectedRow ? (
+  const beginInlineEdit = useCallback(() => {
+    if (selectedIndex == null || !courseId.trim()) return
+    const row = displaySessions.find((s) => s.sessionIndex === selectedIndex) ?? null
+    if (!row) return
+
+    if (hasRegisteredThemeSnapshot(row.themeSnapshot)) {
+      const u = parseAssignmentSnapshotForUi(row.themeSnapshot!)
+      setInlineFormSeed({
+        theme: u.theme || '',
+        title: u.displayTitle || '',
+        prompt: (u.prompt || u.legacyInstruction || '').trim(),
+        modelAnswer: u.modelAnswer?.trim() ?? '',
+        requirements: padAssignmentRequirementsToSlotCount(u.requirements),
+      })
+      setInlineLegacyHint(u.kind === 'legacy' && u.requirements.length === 0)
+    } else {
+      setInlineFormSeed(emptyAssignmentSnapshotSeed())
+      setInlineLegacyHint(false)
+    }
+    setInlineSeedVersion((v) => v + 1)
+    setInlineEditing(true)
+  }, [selectedIndex, courseId, displaySessions])
+
+  const handleSelectSession = useCallback(
+    (idx: number) => {
+      if (idx === selectedIndex) return
+      if (inlineEditing && inlineDirtyRef.current) {
+        if (!window.confirm('未保存の変更があります。このまま回次を切り替えますか？')) return
+      }
+      if (inlineEditing) {
+        setInlineEditing(false)
+        inlineDirtyRef.current = false
+      }
+      setSelectedIndex(idx)
+    },
+    [selectedIndex, inlineEditing]
+  )
+
+  const previewDetailPanel = useMemo(() => {
+    if (selectedIndex == null || !selectedRow) return null
+    return (
       <div className="space-y-4">
         <div>
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
@@ -272,12 +330,21 @@ export default function AdminAssignmentsPage() {
               </span>
               <span className="text-sm font-semibold text-[#2c2f32]">第{selectedIndex}回</span>
             </div>
-            <Link
-              to={`/writing/admin/assignments/new?courseId=${encodeURIComponent(courseId)}&sessionIndex=${selectedIndex}`}
-              className="inline-block shrink-0 rounded bg-[#4052b6] px-4 py-2 text-sm font-semibold !text-white no-underline hover:opacity-90"
-            >
-              {hasRegisteredThemeSnapshot(selectedRow.themeSnapshot) ? '編集/再登録' : '新規登録'}
-            </Link>
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-x-3 gap-y-2">
+              <button
+                type="button"
+                onClick={beginInlineEdit}
+                className="inline-block shrink-0 rounded bg-[#4052b6] px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+              >
+                {hasRegisteredThemeSnapshot(selectedRow.themeSnapshot) ? '編集/再登録' : '新規登録'}
+              </button>
+              <Link
+                to={`/writing/admin/assignments/new?courseId=${encodeURIComponent(courseId)}&sessionIndex=${selectedIndex}`}
+                className="text-xs font-semibold text-[#4052b6] underline"
+              >
+                フルページで開く
+              </Link>
+            </div>
           </div>
           {!detailUi ? (
             <p className="mt-3 text-sm text-[#595c5e]">この回には課題が登録されていません。</p>
@@ -358,7 +425,8 @@ export default function AdminAssignmentsPage() {
           </>
         ) : null}
       </div>
-    ) : null
+    )
+  }, [selectedIndex, selectedRow, detailUi, courseId, beginInlineEdit])
 
   return (
     <div className="min-h-screen bg-[#f5f7fa] px-4 py-8 font-['Be_Vietnam_Pro',sans-serif] text-[#2c2f32]">
@@ -366,7 +434,7 @@ export default function AdminAssignmentsPage() {
         <p className="text-xs font-bold uppercase tracking-widest text-[#595c5e]">Admin</p>
         <h1 className="font-['Plus_Jakarta_Sans'] text-2xl font-extrabold text-[#2c2f32]">課題管理（一覧）</h1>
         <p className="mt-2 text-sm text-[#595c5e]">
-          コースを選び、右の回次一覧で回を選ぶと左に登録内容が表示されます。編集・新規登録はプレビュー内のボタンから行います。
+          コースを選び、右の回次一覧で回を選ぶと左に登録内容が表示されます。「編集/再登録」「新規登録」でこの画面から直接編集できます（必要なら「フルページで開く」から登録ページへ移動できます）。
         </p>
 
         {coursesLoading ? (
@@ -438,8 +506,44 @@ export default function AdminAssignmentsPage() {
                   <div className="rounded border border-dashed border-[#c5c8cc] bg-white/60 px-4 py-3 text-sm text-[#595c5e]">
                     回次をリストから選ぶと、ここに登録内容が表示されます。
                   </div>
+                ) : inlineEditing && selectedIndex != null && selectedRow && courseId.trim() ? (
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+                        <span className="text-xs font-bold uppercase tracking-widest text-[#595c5e]">
+                          課題を編集中
+                        </span>
+                        <span className="text-sm font-semibold text-[#2c2f32]">第{selectedIndex}回</span>
+                      </div>
+                      <Link
+                        to={`/writing/admin/assignments/new?courseId=${encodeURIComponent(courseId)}&sessionIndex=${selectedIndex}`}
+                        className="text-xs font-semibold text-[#4052b6] underline"
+                      >
+                        フルページで開く
+                      </Link>
+                    </div>
+                    <AdminAssignmentSnapshotFieldsForm
+                      courseId={courseId.trim()}
+                      sessionIndex={selectedIndex}
+                      seed={inlineFormSeed}
+                      seedVersion={inlineSeedVersion}
+                      legacyMigrationHint={inlineLegacyHint}
+                      disabled={coursesLoading || ensuringCourse || listLoading || !courseId.trim()}
+                      actionsVariant="inline"
+                      onSaved={async () => {
+                        await loadList(courseId.trim())
+                        setInlineEditing(false)
+                        inlineDirtyRef.current = false
+                      }}
+                      onCancel={() => {
+                        setInlineEditing(false)
+                        inlineDirtyRef.current = false
+                      }}
+                      onDirtyChange={onInlineDirtyChange}
+                    />
+                  </div>
                 ) : (
-                  detailPanel
+                  previewDetailPanel
                 )
               ) : null}
             </section>
@@ -450,7 +554,7 @@ export default function AdminAssignmentsPage() {
                 courseId={courseId}
                 displaySessions={displaySessions}
                 selectedIndex={selectedIndex}
-                onSelectSession={setSelectedIndex}
+                onSelectSession={handleSelectSession}
                 listLoading={listLoading}
                 listError={listError}
               />

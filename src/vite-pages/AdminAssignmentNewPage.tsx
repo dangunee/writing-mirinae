@@ -1,6 +1,10 @@
-import { useState, useEffect, useCallback, useRef, useMemo, type FormEvent } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import AdminAssignmentsList from '../components/admin/AdminAssignmentsList'
+import AdminAssignmentSnapshotFieldsForm, {
+  emptyAssignmentSnapshotSeed,
+  type AssignmentSnapshotFormSeed,
+} from '../components/admin/AdminAssignmentSnapshotFieldsForm'
 import AdminCourseEmptyBootstrap from '../components/admin/AdminCourseEmptyBootstrap'
 import type { ListSessionRow } from '../lib/adminAssignmentsCourseCompletion'
 import { apiUrl } from '../lib/apiUrl'
@@ -11,33 +15,7 @@ import {
   parseAdminCourseSelectValue,
   pickDefaultCourseId,
 } from '../lib/adminCourseTermSelect'
-import {
-  ADMIN_ASSIGNMENT_REQUIRED_SLOT_COUNT,
-  isRequirementSlotDuplicateOfPrevious,
-  normalizeAdminAssignmentRequirementsPayload,
-  requirementSlotHasAnyContent,
-} from '../lib/adminAssignmentRequirements'
-import { KOREAN_GRAMMAR_LEVELS_JA } from '../lib/koreanGrammarLevel'
-import {
-  ASSIGNMENT_REQUIREMENT_SLOT_COUNT,
-  emptyAssignmentRequirement,
-  padAssignmentRequirementsToSlotCount,
-  parseAssignmentSnapshotForUi,
-  type AssignmentRequirement,
-} from '../lib/writingThemeSnapshot'
-
-const REQ_SLOT_INDICES = Array.from(
-  { length: ASSIGNMENT_REQUIREMENT_SLOT_COUNT },
-  (_, i) => i
-) as readonly number[]
-
-type ReqTuple = [
-  AssignmentRequirement,
-  AssignmentRequirement,
-  AssignmentRequirement,
-  AssignmentRequirement,
-  AssignmentRequirement,
-]
+import { padAssignmentRequirementsToSlotCount, parseAssignmentSnapshotForUi } from '../lib/writingThemeSnapshot'
 
 type AdminCourseOption = {
   courseId: string
@@ -49,9 +27,6 @@ type AdminCourseOption = {
 
 const SESSION_OPTIONS = Array.from({ length: 10 }, (_, i) => i + 1)
 
-const emptyReqTuple = (): ReqTuple =>
-  Array.from({ length: ASSIGNMENT_REQUIREMENT_SLOT_COUNT }, () => emptyAssignmentRequirement()) as ReqTuple
-
 export default function AdminAssignmentNewPage() {
   const [searchParams] = useSearchParams()
   const [courses, setCourses] = useState<AdminCourseOption[]>([])
@@ -62,14 +37,8 @@ export default function AdminAssignmentNewPage() {
   const [ensuringCourse, setEnsuringCourse] = useState(false)
   const [courseId, setCourseId] = useState('')
   const [sessionIndex, setSessionIndex] = useState('1')
-  const [theme, setTheme] = useState('')
-  const [title, setTitle] = useState('')
-  const [prompt, setPrompt] = useState('')
-  const [modelAnswer, setModelAnswer] = useState('')
-  const [req, setReq] = useState<ReqTuple>(emptyReqTuple())
-  const [submitting, setSubmitting] = useState(false)
-  const [message, setMessage] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [formSeed, setFormSeed] = useState<AssignmentSnapshotFormSeed>(() => emptyAssignmentSnapshotSeed())
+  const [seedVersion, setSeedVersion] = useState(0)
   /** Avoid re-applying list snapshot when courses refetch after user edits (same URL params). */
   const snapshotPrefillAppliedKey = useRef<string | null>(null)
   const [snapshotPrefillLoading, setSnapshotPrefillLoading] = useState(false)
@@ -281,14 +250,19 @@ export default function AdminAssignmentNewPage() {
         const raw = row?.themeSnapshot
         if (!raw || !String(raw).trim()) {
           setSnapshotPrefilled(false)
+          setFormSeed(emptyAssignmentSnapshotSeed())
+          setSeedVersion((v) => v + 1)
           return
         }
         const u = parseAssignmentSnapshotForUi(raw)
-        setTheme(u.theme || '')
-        setTitle(u.displayTitle || '')
-        setPrompt((u.prompt || u.legacyInstruction || '').trim())
-        setModelAnswer(u.modelAnswer?.trim() ?? '')
-        setReq(padAssignmentRequirementsToSlotCount(u.requirements) as ReqTuple)
+        setFormSeed({
+          theme: u.theme || '',
+          title: u.displayTitle || '',
+          prompt: (u.prompt || u.legacyInstruction || '').trim(),
+          modelAnswer: u.modelAnswer?.trim() ?? '',
+          requirements: padAssignmentRequirementsToSlotCount(u.requirements),
+        })
+        setSeedVersion((v) => v + 1)
         setSnapshotPrefilled(true)
         setLegacyMigrationHint(u.kind === 'legacy' && u.requirements.length === 0)
       } catch {
@@ -306,69 +280,10 @@ export default function AdminAssignmentNewPage() {
     }
   }, [searchParams, coursesLoading, courses, termTargets, orphanCourses])
 
-  function patchReq(i: number, field: keyof AssignmentRequirement, value: string) {
-    setReq((prev) => {
-      const next = [...prev] as AssignmentRequirement[]
-      next[i] = { ...next[i], [field]: value }
-      return next as ReqTuple
-    })
-  }
-
-  function clearReqSlot(slotIndex: number) {
-    setReq((prev) => {
-      const next = [...prev] as AssignmentRequirement[]
-      next[slotIndex] = emptyAssignmentRequirement()
-      return next as ReqTuple
-    })
-  }
-
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault()
-    setSubmitting(true)
-    setMessage(null)
-    setError(null)
-    try {
-      const normalizedReq = normalizeAdminAssignmentRequirementsPayload(req)
-      if (!normalizedReq.ok) {
-        setError(
-          normalizedReq.code === 'invalid_requirements'
-            ? '必須文法・表現: スロット1・2はすべて必須です。スロット3〜5はすべて空か、すべての項目を入力してください。'
-            : normalizedReq.code === 'requirements_slot_count'
-              ? '要件スロット数が不正です。'
-              : normalizedReq.code
-        )
-        return
-      }
-
-      const idx = parseInt(sessionIndex, 10)
-      const res = await fetch(apiUrl('/api/writing/admin/assignments/create'), {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          courseId: courseId.trim(),
-          sessionIndex: Number.isFinite(idx) ? idx : 1,
-          theme: theme.trim(),
-          title: title.trim(),
-          prompt: prompt.trim(),
-          modelAnswer: modelAnswer.trim() || undefined,
-          requirements: normalizedReq.requirements,
-        }),
-      })
-      const data = (await res.json()) as { ok?: boolean; code?: string }
-      if (!res.ok || !data.ok) {
-        setError(data.code ?? `HTTP ${res.status}`)
-        return
-      }
-      const n = Number.isFinite(idx) ? idx : 1
-      setMessage(`第${n}回の課題を保存しました。`)
-      void loadSidebarSessions(courseId.trim())
-    } catch {
-      setError('request_failed')
-    } finally {
-      setSubmitting(false)
-    }
-  }
+  const sessionIndexNum = useMemo(() => {
+    const n = parseInt(sessionIndex, 10)
+    return Number.isFinite(n) && n >= 1 && n <= 10 ? n : 1
+  }, [sessionIndex])
 
   return (
     <div className="min-h-screen bg-[#f5f7fa] px-4 py-8 font-['Be_Vietnam_Pro',sans-serif] text-[#2c2f32]">
@@ -391,15 +306,10 @@ export default function AdminAssignmentNewPage() {
             既存の課題を読み込みました。変更後「保存」で更新されます。
           </p>
         ) : null}
-        {legacyMigrationHint ? (
-          <p className="mt-3 rounded border border-[#ffe082] bg-[#fff8e1] px-3 py-2 text-sm text-[#795548]">
-            レガシー形式の課題です。保存するにはスロット1・2を入力してください。スロット3〜5は任意です（空のまま保存できます）。
-          </p>
-        ) : null}
 
         <div className="mt-8 flex flex-col gap-6 lg:flex-row lg:items-start">
           <div className="min-w-0 w-full flex-1 lg:max-w-2xl">
-            <form className="space-y-4 text-sm" onSubmit={onSubmit}>
+            <div className="space-y-4 text-sm">
           {coursesLoading ? (
             <p className="text-sm text-[#595c5e]" role="status">
               コース一覧を読み込み中…
@@ -468,142 +378,20 @@ export default function AdminAssignmentNewPage() {
               ))}
             </select>
           </label>
-          <label className="block">
-            <span className="font-semibold text-[#2c2f32]">テーマ（theme）</span>
-            <input
-              className="mt-1 w-full rounded border border-[#c5c8cc] bg-white px-3 py-2 text-[#2c2f32]"
-              value={theme}
-              onChange={(e) => setTheme(e.target.value)}
-              required
-            />
-          </label>
-          <label className="block">
-            <span className="font-semibold text-[#2c2f32]">タイトル（title）</span>
-            <input
-              className="mt-1 w-full rounded border border-[#c5c8cc] bg-white px-3 py-2 text-[#2c2f32]"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-            />
-          </label>
-          <label className="block">
-            <span className="font-semibold text-[#2c2f32]">課題文・指示（prompt）</span>
-            <textarea
-              className="mt-1 min-h-[120px] w-full rounded border border-[#c5c8cc] bg-white px-3 py-2 text-[#2c2f32]"
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              required
-            />
-          </label>
 
-          <p className="pt-2 font-semibold text-[#2c2f32]">
-            必須文法・表現（スロット1〜2必須、スロット3〜5は任意・最大 {ASSIGNMENT_REQUIREMENT_SLOT_COUNT}件）
-          </p>
-          {REQ_SLOT_INDICES.map((slot) => {
-            const optionalSlot = slot >= ADMIN_ASSIGNMENT_REQUIRED_SLOT_COUNT
-            return (
-              <div key={slot} className="space-y-2 rounded border border-[#c5c8cc] bg-white/80 p-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-xs font-bold text-[#595c5e]">
-                    スロット {slot + 1}
-                    {optionalSlot ? (
-                      <span className="ml-1 font-normal text-[#595c5e]">（任意）</span>
-                    ) : null}
-                  </p>
-                  {optionalSlot && requirementSlotHasAnyContent(req[slot]) ? (
-                    <button
-                      type="button"
-                      className="shrink-0 rounded border border-[#c5c8cc] bg-[#f5f7fa] px-2 py-1 text-xs font-semibold text-[#4052b6] hover:bg-[#eef0fb]"
-                      onClick={() => clearReqSlot(slot)}
-                    >
-                      {isRequirementSlotDuplicateOfPrevious(slot, req)
-                        ? '重複スロットを空にする'
-                        : 'このスロットを空にする'}
-                    </button>
-                  ) : null}
-                </div>
-                <label className="block">
-                  <span className="text-xs font-semibold text-[#2c2f32]">韓国語文法レベル</span>
-                  <select
-                    className="mt-1 w-full rounded border border-[#c5c8cc] bg-white px-2 py-1.5 text-xs text-[#2c2f32]"
-                    value={req[slot].grammarLevel}
-                    onChange={(e) => patchReq(slot, 'grammarLevel', e.target.value)}
-                    required={!optionalSlot}
-                  >
-                    {KOREAN_GRAMMAR_LEVELS_JA.map((lv) => (
-                      <option key={lv} value={lv}>
-                        {lv}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <input
-                  className="w-full rounded border border-[#c5c8cc] bg-white px-2 py-1.5 text-xs"
-                  placeholder="expressionKey（集計用）"
-                  value={req[slot].expressionKey}
-                  onChange={(e) => patchReq(slot, 'expressionKey', e.target.value)}
-                  required={!optionalSlot}
-                />
-                <input
-                  className="w-full rounded border border-[#c5c8cc] bg-white px-2 py-1.5 text-xs"
-                  placeholder="expressionLabel（韓国語ラベル）"
-                  value={req[slot].expressionLabel}
-                  onChange={(e) => patchReq(slot, 'expressionLabel', e.target.value)}
-                  required={!optionalSlot}
-                />
-                <input
-                  className="w-full rounded border border-[#c5c8cc] bg-white px-2 py-1.5 text-xs"
-                  placeholder="pattern（本文照合用部分文字列）"
-                  value={req[slot].pattern}
-                  onChange={(e) => patchReq(slot, 'pattern', e.target.value)}
-                  required={!optionalSlot}
-                />
-                <input
-                  className="w-full rounded border border-[#c5c8cc] bg-white px-2 py-1.5 text-xs"
-                  placeholder="translationJa"
-                  value={req[slot].translationJa}
-                  onChange={(e) => patchReq(slot, 'translationJa', e.target.value)}
-                  required={!optionalSlot}
-                />
-                <textarea
-                  className="min-h-[48px] w-full rounded border border-[#c5c8cc] bg-white px-2 py-1.5 text-xs"
-                  placeholder="exampleKo"
-                  value={req[slot].exampleKo}
-                  onChange={(e) => patchReq(slot, 'exampleKo', e.target.value)}
-                  required={!optionalSlot}
-                />
-              </div>
-            )
-          })}
-
-          <label className="block">
-            <span className="font-semibold text-[#2c2f32]">模範解答（modelAnswer・任意）</span>
-            <textarea
-              className="mt-1 min-h-[80px] w-full rounded border border-[#c5c8cc] bg-white px-3 py-2 text-[#2c2f32]"
-              value={modelAnswer}
-              onChange={(e) => setModelAnswer(e.target.value)}
-            />
-          </label>
-
-          {error ? (
-            <p className="text-sm text-[#ba1a1a]" role="alert">
-              {error}
-            </p>
-          ) : null}
-          {message ? (
-            <p className="text-sm text-[#1b5e20]" role="status">
-              {message}
-            </p>
-          ) : null}
-
-          <button
-            type="submit"
-            disabled={submitting || coursesLoading || ensuringCourse || !courseId}
-            className="rounded bg-[#4052b6] px-4 py-2 font-semibold text-white disabled:opacity-50"
-          >
-            {submitting ? '保存中…' : '保存'}
-          </button>
-            </form>
+          <AdminAssignmentSnapshotFieldsForm
+            courseId={courseId.trim()}
+            sessionIndex={sessionIndexNum}
+            seed={formSeed}
+            seedVersion={seedVersion}
+            legacyMigrationHint={legacyMigrationHint}
+            disabled={coursesLoading || ensuringCourse || !courseId.trim()}
+            actionsVariant="standalone"
+            onSaved={async () => {
+              void loadSidebarSessions(courseId.trim())
+            }}
+          />
+            </div>
 
             <p className="mt-8">
               <Link to="/writing/admin/assignments" className="text-sm font-semibold text-[#4052b6] underline">
