@@ -21,6 +21,12 @@ const REQ_SLOT_INDICES = Array.from(
   (_, i) => i
 ) as readonly number[]
 
+const GRAMMAR_LEVEL_RADIO_GROUP = 'mt-1 flex flex-wrap gap-2'
+const grammarLevelRadioBase =
+  'inline-flex min-h-[2.25rem] shrink-0 items-center justify-center rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50'
+const grammarLevelRadioUnselected = `${grammarLevelRadioBase} border-[#c5c8cc] bg-white text-[#2c2f32] hover:bg-[#f5f7fa]`
+const grammarLevelRadioSelected = `${grammarLevelRadioBase} border-[#000666] bg-[#eceef8] text-[#000666] shadow-sm`
+
 export type AssignmentRequirementsTuple = [
   AssignmentRequirement,
   AssignmentRequirement,
@@ -312,22 +318,34 @@ export default function AdminAssignmentSnapshotFieldsForm({
                 </button>
               ) : null}
             </div>
-            <label className="block">
-              <span className="text-xs font-semibold text-[#2c2f32]">韓国語文法レベル</span>
-              <select
-                className="mt-1 w-full rounded border border-[#c5c8cc] bg-white px-2 py-1.5 text-xs text-[#2c2f32]"
-                value={req[slot].grammarLevel}
-                onChange={(e) => patchReq(slot, 'grammarLevel', e.target.value)}
-                required={!optionalSlot}
-                disabled={disabled}
+            <div>
+              <p id={`admin-assignment-grammar-level-slot-${slot}`} className="text-xs font-semibold text-[#2c2f32]">
+                韓国語文法レベル
+              </p>
+              <div
+                className={GRAMMAR_LEVEL_RADIO_GROUP}
+                role="radiogroup"
+                aria-labelledby={`admin-assignment-grammar-level-slot-${slot}`}
+                aria-required={!optionalSlot}
               >
-                {KOREAN_GRAMMAR_LEVELS_JA.map((lv) => (
-                  <option key={lv} value={lv}>
-                    {lv}
-                  </option>
-                ))}
-              </select>
-            </label>
+                {KOREAN_GRAMMAR_LEVELS_JA.map((lv) => {
+                  const selected = req[slot].grammarLevel === lv
+                  return (
+                    <button
+                      key={lv}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      disabled={disabled}
+                      onClick={() => patchReq(slot, 'grammarLevel', lv)}
+                      className={selected ? grammarLevelRadioSelected : grammarLevelRadioUnselected}
+                    >
+                      {lv}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
             <input
               className="w-full rounded border border-[#c5c8cc] bg-white px-2 py-1.5 text-xs"
               placeholder="expressionKey（集計用）"
