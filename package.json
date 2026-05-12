@@ -22,6 +22,7 @@
     "dompurify": "^3.4.2",
     "drizzle-orm": "^0.38.3",
     "next": "^14.2.24",
+    "papaparse": "^5.5.3",
     "postgres": "^3.4.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -32,6 +33,7 @@
   "devDependencies": {
     "@types/dompurify": "^3.0.5",
     "@types/node": "^22.13.10",
+    "@types/papaparse": "^5.5.2",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.3",

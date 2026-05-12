@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import AdminAssignmentsCsvImport from '../components/admin/AdminAssignmentsCsvImport'
 import AdminCourseEmptyBootstrap from '../components/admin/AdminCourseEmptyBootstrap'
 import {
   adminCourseSelectValue,
@@ -325,6 +326,14 @@ export default function AdminAssignmentsPage() {
               )}
             </select>
           </label>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <AdminAssignmentsCsvImport
+              courseId={courseId}
+              disabled={coursesLoading || ensuringCourse || listLoading}
+              onImported={() => void loadList(courseId)}
+            />
+          </div>
 
           <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
             <div className="min-w-0 flex-1 space-y-4 order-1">
