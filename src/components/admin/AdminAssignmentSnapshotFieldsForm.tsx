@@ -294,101 +294,107 @@ export default function AdminAssignmentSnapshotFieldsForm({
       <p className="pt-2 font-semibold text-[#2c2f32]">
         必須文法・表現（スロット1〜2必須、スロット3〜5は任意・最大 {ASSIGNMENT_REQUIREMENT_SLOT_COUNT}件）
       </p>
-      {REQ_SLOT_INDICES.map((slot) => {
-        const optionalSlot = slot >= ADMIN_ASSIGNMENT_REQUIRED_SLOT_COUNT
-        return (
-          <div key={slot} className="space-y-2 rounded border border-[#c5c8cc] bg-white/80 p-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs font-bold text-[#595c5e]">
-                スロット {slot + 1}
-                {optionalSlot ? (
-                  <span className="ml-1 font-normal text-[#595c5e]">（任意）</span>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-3">
+        {REQ_SLOT_INDICES.map((slot) => {
+          const optionalSlot = slot >= ADMIN_ASSIGNMENT_REQUIRED_SLOT_COUNT
+          const isLastSlot = slot === ASSIGNMENT_REQUIREMENT_SLOT_COUNT - 1
+          return (
+            <div
+              key={slot}
+              className={`space-y-2 rounded border border-[#c5c8cc] bg-white/80 p-3 ${isLastSlot ? 'md:col-span-2' : ''}`}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-bold text-[#595c5e]">
+                  スロット {slot + 1}
+                  {optionalSlot ? (
+                    <span className="ml-1 font-normal text-[#595c5e]">（任意）</span>
+                  ) : null}
+                </p>
+                {optionalSlot && requirementSlotHasAnyContent(req[slot]) ? (
+                  <button
+                    type="button"
+                    className="shrink-0 rounded border border-[#c5c8cc] bg-[#f5f7fa] px-2 py-1 text-xs font-semibold text-[#4052b6] hover:bg-[#eef0fb]"
+                    disabled={disabled}
+                    onClick={() => clearReqSlot(slot)}
+                  >
+                    {isRequirementSlotDuplicateOfPrevious(slot, req)
+                      ? '重複スロットを空にする'
+                      : 'このスロットを空にする'}
+                  </button>
                 ) : null}
-              </p>
-              {optionalSlot && requirementSlotHasAnyContent(req[slot]) ? (
-                <button
-                  type="button"
-                  className="shrink-0 rounded border border-[#c5c8cc] bg-[#f5f7fa] px-2 py-1 text-xs font-semibold text-[#4052b6] hover:bg-[#eef0fb]"
-                  disabled={disabled}
-                  onClick={() => clearReqSlot(slot)}
-                >
-                  {isRequirementSlotDuplicateOfPrevious(slot, req)
-                    ? '重複スロットを空にする'
-                    : 'このスロットを空にする'}
-                </button>
-              ) : null}
-            </div>
-            <div>
-              <p id={`admin-assignment-grammar-level-slot-${slot}`} className="text-xs font-semibold text-[#2c2f32]">
-                韓国語文法レベル
-              </p>
-              <div
-                className={GRAMMAR_LEVEL_RADIO_GROUP}
-                role="radiogroup"
-                aria-labelledby={`admin-assignment-grammar-level-slot-${slot}`}
-                aria-required={!optionalSlot}
-              >
-                {KOREAN_GRAMMAR_LEVELS_JA.map((lv) => {
-                  const selected = req[slot].grammarLevel === lv
-                  return (
-                    <button
-                      key={lv}
-                      type="button"
-                      role="radio"
-                      aria-checked={selected}
-                      disabled={disabled}
-                      onClick={() => patchReq(slot, 'grammarLevel', lv)}
-                      className={selected ? grammarLevelRadioSelected : grammarLevelRadioUnselected}
-                    >
-                      {lv}
-                    </button>
-                  )
-                })}
               </div>
+              <div>
+                <p id={`admin-assignment-grammar-level-slot-${slot}`} className="text-xs font-semibold text-[#2c2f32]">
+                  韓国語文法レベル
+                </p>
+                <div
+                  className={GRAMMAR_LEVEL_RADIO_GROUP}
+                  role="radiogroup"
+                  aria-labelledby={`admin-assignment-grammar-level-slot-${slot}`}
+                  aria-required={!optionalSlot}
+                >
+                  {KOREAN_GRAMMAR_LEVELS_JA.map((lv) => {
+                    const selected = req[slot].grammarLevel === lv
+                    return (
+                      <button
+                        key={lv}
+                        type="button"
+                        role="radio"
+                        aria-checked={selected}
+                        disabled={disabled}
+                        onClick={() => patchReq(slot, 'grammarLevel', lv)}
+                        className={selected ? grammarLevelRadioSelected : grammarLevelRadioUnselected}
+                      >
+                        {lv}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+              <input
+                className="w-full rounded border border-[#c5c8cc] bg-white px-2 py-1.5 text-xs"
+                placeholder="expressionKey（集計用）"
+                value={req[slot].expressionKey}
+                onChange={(e) => patchReq(slot, 'expressionKey', e.target.value)}
+                required={!optionalSlot}
+                disabled={disabled}
+              />
+              <input
+                className="w-full rounded border border-[#c5c8cc] bg-white px-2 py-1.5 text-xs"
+                placeholder="expressionLabel（韓国語ラベル）"
+                value={req[slot].expressionLabel}
+                onChange={(e) => patchReq(slot, 'expressionLabel', e.target.value)}
+                required={!optionalSlot}
+                disabled={disabled}
+              />
+              <input
+                className="w-full rounded border border-[#c5c8cc] bg-white px-2 py-1.5 text-xs"
+                placeholder="pattern（本文照合用部分文字列）"
+                value={req[slot].pattern}
+                onChange={(e) => patchReq(slot, 'pattern', e.target.value)}
+                required={!optionalSlot}
+                disabled={disabled}
+              />
+              <input
+                className="w-full rounded border border-[#c5c8cc] bg-white px-2 py-1.5 text-xs"
+                placeholder="translationJa"
+                value={req[slot].translationJa}
+                onChange={(e) => patchReq(slot, 'translationJa', e.target.value)}
+                required={!optionalSlot}
+                disabled={disabled}
+              />
+              <textarea
+                className="min-h-[48px] w-full rounded border border-[#c5c8cc] bg-white px-2 py-1.5 text-xs"
+                placeholder="exampleKo"
+                value={req[slot].exampleKo}
+                onChange={(e) => patchReq(slot, 'exampleKo', e.target.value)}
+                required={!optionalSlot}
+                disabled={disabled}
+              />
             </div>
-            <input
-              className="w-full rounded border border-[#c5c8cc] bg-white px-2 py-1.5 text-xs"
-              placeholder="expressionKey（集計用）"
-              value={req[slot].expressionKey}
-              onChange={(e) => patchReq(slot, 'expressionKey', e.target.value)}
-              required={!optionalSlot}
-              disabled={disabled}
-            />
-            <input
-              className="w-full rounded border border-[#c5c8cc] bg-white px-2 py-1.5 text-xs"
-              placeholder="expressionLabel（韓国語ラベル）"
-              value={req[slot].expressionLabel}
-              onChange={(e) => patchReq(slot, 'expressionLabel', e.target.value)}
-              required={!optionalSlot}
-              disabled={disabled}
-            />
-            <input
-              className="w-full rounded border border-[#c5c8cc] bg-white px-2 py-1.5 text-xs"
-              placeholder="pattern（本文照合用部分文字列）"
-              value={req[slot].pattern}
-              onChange={(e) => patchReq(slot, 'pattern', e.target.value)}
-              required={!optionalSlot}
-              disabled={disabled}
-            />
-            <input
-              className="w-full rounded border border-[#c5c8cc] bg-white px-2 py-1.5 text-xs"
-              placeholder="translationJa"
-              value={req[slot].translationJa}
-              onChange={(e) => patchReq(slot, 'translationJa', e.target.value)}
-              required={!optionalSlot}
-              disabled={disabled}
-            />
-            <textarea
-              className="min-h-[48px] w-full rounded border border-[#c5c8cc] bg-white px-2 py-1.5 text-xs"
-              placeholder="exampleKo"
-              value={req[slot].exampleKo}
-              onChange={(e) => patchReq(slot, 'exampleKo', e.target.value)}
-              required={!optionalSlot}
-              disabled={disabled}
-            />
-          </div>
-        )
-      })}
+          )
+        })}
+      </div>
 
       <label className="block">
         <span className="font-semibold text-[#2c2f32]">模範解答</span>
