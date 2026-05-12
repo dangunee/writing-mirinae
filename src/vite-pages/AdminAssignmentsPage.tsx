@@ -265,18 +265,22 @@ export default function AdminAssignmentsPage() {
     selectedIndex != null && selectedRow ? (
       <div className="space-y-4">
         <div>
-          <p className="text-xs font-bold uppercase tracking-widest text-[#595c5e]">登録内容</p>
-          <p className="mt-1 text-sm font-semibold text-[#2c2f32]">第{selectedIndex}回</p>
-          <div className="mt-3 flex flex-wrap gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="text-xs font-bold uppercase tracking-widest text-[#595c5e]">
+                登録内容
+              </span>
+              <span className="text-sm font-semibold text-[#2c2f32]">第{selectedIndex}回</span>
+            </div>
             <Link
               to={`/writing/admin/assignments/new?courseId=${encodeURIComponent(courseId)}&sessionIndex=${selectedIndex}`}
-              className="inline-block rounded bg-[#4052b6] px-4 py-2 text-sm font-semibold !text-white no-underline hover:opacity-90"
+              className="inline-block shrink-0 rounded bg-[#4052b6] px-4 py-2 text-sm font-semibold !text-white no-underline hover:opacity-90"
             >
               {hasRegisteredThemeSnapshot(selectedRow.themeSnapshot) ? '編集/再登録' : '新規登録'}
             </Link>
           </div>
           {!detailUi ? (
-            <p className="mt-4 text-sm text-[#595c5e]">この回には課題が登録されていません。</p>
+            <p className="mt-3 text-sm text-[#595c5e]">この回には課題が登録されていません。</p>
           ) : null}
         </div>
 
