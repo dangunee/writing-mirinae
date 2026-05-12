@@ -209,11 +209,17 @@ export function parseAdminAssignmentsCsvText(csvText: string): AdminAssignmentCs
     }
 
     const r1 = buildRequirementSlot(cell(row.requirement_1), cell(row.example_1), sessionIndex, 1)
-    const r2 = buildRequirementSlot(cell(row.requirement_2), cell(row.example_2), sessionIndex, 2)
-    if (!r1 || !r2) {
+    if (!r1) {
       return {
         ok: false,
-        error: `${i + 1} 行目: requirement_1・example_1 と requirement_2・example_2 はそれぞれ必須です。requirement_3 / example_3 は省略可能です（片方でも空ならスロット 3 は空のまま、スロット 4〜5 はその内容を複製します）。`,
+        error: `${i + 1} 行目（session_index=${sessionIndex}）: スロット 1 が不正です。requirement_1 と example_1 は両方必須です。requirement は「〜」（全角）または「 ~ 」で韓国語ラベルと日本語訳を分けてください（区切りがない場合はセル全体がラベル・訳の両方として使われます）。`,
+      }
+    }
+    const r2 = buildRequirementSlot(cell(row.requirement_2), cell(row.example_2), sessionIndex, 2)
+    if (!r2) {
+      return {
+        ok: false,
+        error: `${i + 1} 行目（session_index=${sessionIndex}）: スロット 2 が不正です。requirement_2 と example_2 は両方必須です（ルールはスロット 1 と同じ）。requirement_3 / example_3 が空でもインポートできます。`,
       }
     }
 
