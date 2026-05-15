@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 
 const TRIAL_APPLY_PATH = '/writing/trial-payment'
-const COURSE_DETAIL_HREF = '#learning-system'
+const COURSE_INTRO_PATH = '/writing/intro'
 
 function withBaseUrl(path: string): string {
   const base = import.meta.env.BASE_URL.endsWith('/')
@@ -96,12 +96,12 @@ export default function LandingHero() {
               >
                 体験申込（1,800円）
               </Link>
-              <a
-                href={COURSE_DETAIL_HREF}
+              <Link
+                to={COURSE_INTRO_PATH}
                 className="landing-hero-cta-secondary inline-flex items-center justify-center rounded-xl border-2 border-white/70 bg-white/5 px-6 py-3.5 text-center font-['Manrope'] text-sm font-bold tracking-wide text-white backdrop-blur-[2px] transition hover:bg-white/15 sm:min-w-[12rem] sm:px-8 sm:py-4"
               >
                 講座詳細を見る
-              </a>
+              </Link>
             </div>
           </div>
 
