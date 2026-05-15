@@ -34,6 +34,23 @@
   color: #ffffff !important;
 }
 
+/* /writing hero — primary (white pill) / secondary (outline) */
+.landing-stitch-root a.landing-hero-cta-primary {
+  background: #ffffff;
+  color: #000666 !important;
+  text-decoration: none;
+}
+.landing-stitch-root a.landing-hero-cta-primary:hover {
+  color: #000666 !important;
+}
+.landing-stitch-root a.landing-hero-cta-secondary {
+  color: #ffffff !important;
+  text-decoration: none;
+}
+.landing-stitch-root a.landing-hero-cta-secondary:hover {
+  color: #ffffff !important;
+}
+
 .landing-stitch-root .correction-red {
   color: #d32f2f;
   text-decoration: line-through;

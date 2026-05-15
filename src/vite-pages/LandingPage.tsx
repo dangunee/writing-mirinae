@@ -4,7 +4,6 @@ import '../landing.css'
 import LandingNav from '../components/landing/LandingNav'
 import LandingHero from '../components/landing/LandingHero'
 import LandingCorrection from '../components/landing/LandingCorrection'
-import LandingCurriculum from '../components/landing/LandingCurriculum'
 import LandingProcess from '../components/landing/LandingProcess'
 import LandingDashboard from '../components/landing/LandingDashboard'
 import LandingTestimonials from '../components/landing/LandingTestimonials'
@@ -28,7 +27,6 @@ export default function LandingPage() {
       <main>
         <LandingHero />
         <LandingCorrection />
-        <LandingCurriculum />
         <LandingProcess />
         <LandingDashboard />
         <LandingTestimonials />

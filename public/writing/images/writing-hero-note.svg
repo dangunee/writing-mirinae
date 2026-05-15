@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 520" fill="none" aria-hidden="true">
+  <defs>
+    <linearGradient id="paper" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f8fafc" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#e2e8f0" stop-opacity="0.85"/>
+    </linearGradient>
+    <linearGradient id="pen" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#000666"/>
+    </linearGradient>
+  </defs>
+  <!-- notebook -->
+  <rect x="48" y="64" width="280" height="380" rx="12" fill="url(#paper)" stroke="rgba(0,6,102,0.35)" stroke-width="3"/>
+  <line x1="140" y1="64" x2="140" y2="444" stroke="rgba(0,6,102,0.2)" stroke-width="2"/>
+  <line x1="72" y1="120" x2="120" y2="120" stroke="rgba(15,118,110,0.45)" stroke-width="4" stroke-linecap="round"/>
+  <line x1="160" y1="120" x2="300" y2="120" stroke="rgba(0,6,102,0.12)" stroke-width="3" stroke-linecap="round"/>
+  <line x1="160" y1="156" x2="280" y2="156" stroke="rgba(0,6,102,0.1)" stroke-width="3" stroke-linecap="round"/>
+  <line x1="160" y1="192" x2="260" y2="192" stroke="rgba(0,6,102,0.1)" stroke-width="3" stroke-linecap="round"/>
+  <line x1="160" y1="228" x2="300" y2="228" stroke="rgba(0,6,102,0.1)" stroke-width="3" stroke-linecap="round"/>
+  <!-- pen -->
+  <path d="M320 96 L420 380 L380 400 L280 120 Z" fill="url(#pen)" opacity="0.92"/>
+  <path d="M300 88 L340 72 L360 100 L320 116 Z" fill="#b45309" opacity="0.9"/>
+  <ellipse cx="400" cy="392" rx="28" ry="14" fill="#0f172a" opacity="0.35"/>
+</svg>

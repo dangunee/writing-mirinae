@@ -20,6 +20,7 @@ export default function Layout({ children }: LayoutProps) {
   const writingAppFullBleed = p === '/writing/app' || p.startsWith('/writing/app/view')
 
   if (
+    location.pathname === '/writing' ||
     location.pathname === '/writing/login' ||
     location.pathname === '/writing/signup' ||
     location.pathname === '/writing/forgot-password' ||
