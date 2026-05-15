@@ -3,15 +3,24 @@ import { Link } from 'react-router-dom'
 const TRIAL_APPLY_PATH = '/writing/trial-payment'
 const COURSE_DETAIL_HREF = '#learning-system'
 
-function heroNoteImageSrc(): string {
+function withBaseUrl(path: string): string {
   const base = import.meta.env.BASE_URL.endsWith('/')
     ? import.meta.env.BASE_URL
     : `${import.meta.env.BASE_URL}/`
-  return `${base}writing/images/writing-hero-note.svg`
+  return `${base}${path.replace(/^\//, '')}`
+}
+
+function heroNoteImageSrc(): string {
+  return withBaseUrl('writing/images/writing-hero-note.svg')
+}
+
+function heroSakubunImageSrc(): string {
+  return withBaseUrl('writing/images/mainsakubun.png')
 }
 
 export default function LandingHero() {
   const noteSrc = heroNoteImageSrc()
+  const sakubunSrc = heroSakubunImageSrc()
 
   return (
     <section className="pt-28 md:pt-32 pb-12 md:pb-16 px-6 md:px-8 max-w-7xl mx-auto">
@@ -43,13 +52,35 @@ export default function LandingHero() {
               メール添削コース ・ 10週間
             </span>
 
-            <h1 className="headline-font mt-5 text-3xl font-extrabold leading-[1.2] tracking-tight text-white sm:mt-6 sm:text-4xl md:text-5xl lg:text-[3.25rem] lg:leading-[1.15] xl:text-[3.5rem]">
-              書くたびに、
-              <br />
-              韓国語が
-              <span className="text-[#a7f3d0]">自分のもの</span>
-              になる。
-            </h1>
+            {/* Headline + mainsakubun: second line stays one line; image sits in the gap on md+ */}
+            <div className="mt-5 flex min-w-0 flex-col gap-4 overflow-x-auto pb-1 md:mt-6 md:flex-row md:items-end md:gap-5 lg:gap-8">
+              <h1 className="headline-font min-w-0 flex-1 text-3xl font-extrabold leading-[1.2] tracking-tight text-white sm:text-4xl md:text-[clamp(1.65rem,3.2vw+1rem,3.25rem)] md:leading-[1.15] lg:text-[clamp(1.85rem,2.8vw+1.1rem,3.35rem)]">
+                <span className="block">書くたびに、</span>
+                <span className="mt-0.5 inline-block max-w-full whitespace-nowrap sm:mt-1">
+                  韓国語が<span className="text-[#a7f3d0]">自分のもの</span>になる。
+                </span>
+              </h1>
+              <div className="relative -mx-1 h-[min(9.5rem,38vw)] w-full max-w-[min(100%,20rem)] shrink-0 self-start md:h-36 md:max-w-[min(46%,14rem)] md:self-end lg:h-44 lg:max-w-[min(48%,16.5rem)]">
+                <img
+                  src={sakubunSrc}
+                  alt=""
+                  className="h-full w-full object-contain object-right"
+                  width={640}
+                  height={360}
+                  loading="eager"
+                  decoding="async"
+                />
+                {/* Blend into hero teal / navy */}
+                <div
+                  className="pointer-events-none absolute inset-y-0 left-0 w-[55%] bg-gradient-to-r from-[#0f766e] from-20% via-[#0f766e]/65 via-45% to-transparent to-100% md:w-[50%] md:from-[#0f766e]/95 md:via-[#0a5560]/35 md:to-transparent"
+                  aria-hidden
+                />
+                <div
+                  className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#000666]/25 via-transparent to-[#0f766e]/20 md:to-transparent"
+                  aria-hidden
+                />
+              </div>
+            </div>
 
             <p className="mt-5 max-w-xl text-sm leading-relaxed text-white/90 sm:text-base md:mt-6">
               300〜500字作文＋添削＋ネイティブ比較文＋模範文まで届く。
@@ -74,11 +105,9 @@ export default function LandingHero() {
             </div>
           </div>
 
-          {/* Desktop: reserves space so text column does not overlap the visual */}
           <div className="order-3 hidden min-h-[200px] lg:order-2 lg:block" aria-hidden />
         </div>
 
-        {/* Info strip */}
         <div className="relative z-10 border-t border-white/15 bg-black/10 px-4 py-5 backdrop-blur-[2px] sm:px-6 md:px-10 lg:px-12">
           <div className="mx-auto grid max-w-6xl grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
             {[

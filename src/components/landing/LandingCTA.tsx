@@ -5,7 +5,7 @@ export default function LandingCTA() {
     <section id="cta-apply" className="py-24 bg-[#000666] text-white">
       <div className="max-w-4xl mx-auto px-6 md:px-8 text-center">
         <h2 className="headline-font text-3xl md:text-5xl font-extrabold mb-6 md:mb-8 tracking-tight">
-          アトリエであなたの旅を始めましょう
+          ミリネであなたの旅を始めましょう
         </h2>
 
         <p className="opacity-70 text-sm md:text-lg mb-10 md:mb-12 leading-relaxed">
