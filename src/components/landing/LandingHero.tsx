@@ -10,52 +10,35 @@ function withBaseUrl(path: string): string {
   return `${base}${path.replace(/^\//, '')}`
 }
 
-function heroRightBackgroundSrc(): string {
+function heroNoteImageSrc(): string {
   return withBaseUrl('writing/images/writing-hero-note.jpg')
 }
 
 export default function LandingHero() {
-  const rightBgSrc = heroRightBackgroundSrc()
+  const bgSrc = heroNoteImageSrc()
 
   return (
     <section className="pt-28 md:pt-32 pb-12 md:pb-16 px-6 md:px-8 max-w-7xl mx-auto">
       <div className="relative flex min-h-[min(100vh-12rem,520px)] flex-col overflow-hidden rounded-[28px] shadow-[0_24px_60px_rgba(0,6,102,0.22)]">
-        {/* Full-card teal / navy base */}
-        <div
-          className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-br from-[#0f766e] via-[#0c4a6e] to-[#000666]"
-          aria-hidden
-        />
-        <div
-          className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-t from-[#000666]/45 via-transparent to-[#0f766e]/20"
-          aria-hidden
-        />
-
-        {/* Right half: full-height background image (desktop only) */}
-        <div
-          className="pointer-events-none absolute inset-y-0 right-0 z-0 hidden w-[46%] overflow-hidden rounded-r-[28px] lg:block xl:w-[48%]"
-          aria-hidden
-        >
+        {/* Full-bleed photo + seamless gradients (no right-side panel) */}
+        <div className="pointer-events-none absolute inset-0 z-0" aria-hidden>
           <img
-            src={rightBgSrc}
+            src={bgSrc}
             alt=""
-            className="h-full w-full object-cover object-center"
+            className="h-full w-full object-cover object-right opacity-[0.38] sm:opacity-[0.48] md:opacity-[0.62] lg:opacity-[0.78]"
             width={1200}
             height={900}
             loading="eager"
             decoding="async"
           />
-          {/* Blend image left edge into hero background */}
-          <div
-            className="absolute inset-0 bg-gradient-to-r from-[#0f766e]/95 from-[8%] via-[#0a6f86]/72 via-[42%] to-transparent to-[100%]"
-            aria-hidden
-          />
-          <div
-            className="absolute inset-0 bg-gradient-to-t from-[#000666]/35 via-transparent to-transparent"
-            aria-hidden
-          />
+          {/* Layered overlays: strong left for text, smooth handoff to photo on the right */}
+          <div className="absolute inset-0 bg-gradient-to-r from-[#075f5a]/96 from-0% via-[#0b6474]/88 via-[38%] sm:via-[42%] to-transparent to-[76%]" />
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent from-[50%] via-[#022c22]/18 to-[#000666]/34 to-100%" />
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#000666]/48" />
+          <div className="absolute inset-0 bg-gradient-to-br from-[#000666]/18 to-transparent to-[70%]" />
         </div>
 
-        <div className="relative z-10 flex flex-1 flex-col justify-center px-6 pb-8 pt-10 sm:px-8 sm:pb-10 sm:pt-12 md:px-10 md:pb-12 md:pt-14 lg:max-w-[54%] lg:pr-6 lg:pl-12">
+        <div className="relative z-10 flex flex-1 flex-col justify-center px-6 pb-8 pt-10 sm:px-8 sm:pb-10 sm:pt-12 md:px-10 md:pb-12 md:pt-14 lg:max-w-[720px] lg:pl-12 lg:pr-8">
           <span className="inline-flex max-w-full flex-wrap items-center gap-x-2 gap-y-1 rounded-full border border-white/35 bg-white/10 px-3 py-1.5 font-['Manrope'] text-[10px] font-bold uppercase tracking-[0.12em] text-white/95 sm:text-[11px]">
             メール添削コース ・ 10週間
           </span>
