@@ -25,17 +25,20 @@ export default function LandingHero() {
           <img
             src={bgSrc}
             alt=""
-            className="h-full w-full object-cover object-right opacity-[0.38] sm:opacity-[0.48] md:opacity-[0.62] lg:opacity-[0.78]"
+            className="h-full w-full object-cover object-right opacity-[0.52] sm:opacity-[0.58] md:opacity-[0.68] lg:opacity-[0.75]"
             width={1200}
             height={900}
             loading="eager"
             decoding="async"
           />
-          {/* Layered overlays: strong left for text, smooth handoff to photo on the right */}
-          <div className="absolute inset-0 bg-gradient-to-r from-[#075f5a]/96 from-0% via-[#0b6474]/88 via-[38%] sm:via-[42%] to-transparent to-[76%]" />
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent from-[50%] via-[#022c22]/18 to-[#000666]/34 to-100%" />
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#000666]/48" />
-          <div className="absolute inset-0 bg-gradient-to-br from-[#000666]/18 to-transparent to-[70%]" />
+          {/* Uniform wash — no left/right split */}
+          <div className="absolute inset-0 bg-[#073f5f]/40 sm:bg-[#073f5f]/38" />
+          {/* Single soft horizontal blend (default even stops — no hard midpoint) */}
+          <div className="absolute inset-0 bg-gradient-to-r from-[#075f5a]/90 via-[#0b6474]/68 to-[#000666]/28" />
+          {/* Bottom depth */}
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#000666]/10 to-[#000666]/52" />
+          {/* Gentle radial for text side — fades smoothly, no vertical edge */}
+          <div className="absolute inset-0 [background:radial-gradient(ellipse_120%_100%_at_18%_50%,rgba(7,95,90,0.48),transparent_68%)]" />
         </div>
 
         <div className="relative z-10 flex flex-1 flex-col justify-center px-6 pb-8 pt-10 sm:px-8 sm:pb-10 sm:pt-12 md:px-10 md:pb-12 md:pt-14 lg:max-w-[720px] lg:pl-12 lg:pr-8">
