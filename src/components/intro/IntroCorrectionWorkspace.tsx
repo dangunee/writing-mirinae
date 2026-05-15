@@ -1,10 +1,12 @@
 import './intro-workspace.css'
+import { introCorrectionMarketingSample } from '../../lib/introCorrectionMarketingSample'
 
 /**
  * Stitch「講師専用ワークスペース」HTML をベースにしたプレビュー。
  * UI 文言は日本語、本文例は韓国語作文。
  */
 export default function IntroCorrectionWorkspace() {
+  const { finalDraftText, modelAnswerText, teacherMessageText } = introCorrectionMarketingSample
   return (
     <section className="intro-workspace atelier-koto-root bg-[#F5F5F5] pb-6 pt-24 font-[family-name:var(--font-body)] text-on-surface md:pb-8 md:pt-28">
       <div className="mx-auto max-w-7xl px-6 md:px-8">
@@ -177,9 +179,7 @@ export default function IntroCorrectionWorkspace() {
               </div>
               <div className="relative">
                 <div className="min-h-[160px] rounded-2xl border border-outline-variant/20 bg-surface-container-low p-6 text-base leading-relaxed text-on-surface shadow-sm hangul">
-                  도시 계획에서 인공지능이 맡는 역할은 본래부터 복잡한 과제였습니다. 그러나 최근 AI 기술의 도입은 그 전망을 크게 바꾸고 있습니다. 기존의 방식은 실시간 데이터 변화를 충분히
-                  반영하지 못하는 경우가 많습니다. 예를 들어 교통 흐름을 시뮬레이션할 때, 정적인 모델은 통근자의 갑작스러운 이동 패턴의 변화를 예측하기 어렵습니다. 그 결과 도시의 자원
-                  배분의 효율이 높아지고, 이는 밀집 지역에 사는 시민의 삶의 질 향상에 기여합니다.
+                  {finalDraftText}
                 </div>
                 <div className="absolute bottom-3 right-3 rounded bg-surface-container px-2 py-1 text-[10px] font-bold text-outline">
                   単語数: 82
@@ -203,8 +203,7 @@ export default function IntroCorrectionWorkspace() {
                     <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] text-on-primary">プレミアムコンテンツ</span>
                   </p>
                   <p className="mb-6 text-lg italic leading-relaxed text-on-surface-variant hangul">
-                    &quot;도시 행정에서 인공지능의 전략적 통합은 실시간 데이터의 역동성을 반영하지 못하는 전통적 방법론의 한계를 극복하며, 궁극적으로 대도시 환경에서 거주민의 삶의 질을
-                    제고하는 데 기여할 수 있습니다.&quot;
+                    &quot;{modelAnswerText}&quot;
                   </p>
                   <div className="flex justify-end">
                     <span className="flex items-center gap-2 rounded-lg bg-primary/10 px-4 py-2 text-xs font-bold text-primary">
@@ -228,7 +227,7 @@ export default function IntroCorrectionWorkspace() {
                 readOnly
                 className="min-h-[120px] w-full resize-none rounded-2xl border border-outline-variant/20 bg-surface-container-low p-5 text-sm text-on-surface shadow-sm"
                 placeholder="学生へのパーソナライズされたフィードバックを入力..."
-                defaultValue="語彙の選択と文のリズムが一段と洗練されました。次回は接続詞の多様化にも挑戦してみましょう。"
+                defaultValue={teacherMessageText}
               />
             </div>
           </div>
