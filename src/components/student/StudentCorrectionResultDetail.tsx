@@ -78,7 +78,7 @@ export default function StudentCorrectionResultDetail({ result }: { result: Stud
 
         {textNonEmpty(snapText) ? (
           <ResultSection title="模範文">
-            <div className="corrected-content whitespace-pre-wrap">{snapText}</div>
+            <div className="corrected-content corrected-content--model-answer whitespace-pre-wrap">{snapText}</div>
           </ResultSection>
         ) : null}
 
@@ -139,7 +139,9 @@ export default function StudentCorrectionResultDetail({ result }: { result: Stud
 
       {correction != null && textNonEmpty(correction.modelAnswer) ? (
         <ResultSection title="模範文">
-          <div className="corrected-content whitespace-pre-wrap">{correction.modelAnswer}</div>
+          <div className="corrected-content corrected-content--model-answer whitespace-pre-wrap">
+            {correction.modelAnswer}
+          </div>
         </ResultSection>
       ) : null}
 

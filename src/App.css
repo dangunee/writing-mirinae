@@ -1187,6 +1187,10 @@ a.status-badge.status.corrected {
   color: var(--color-primary);
 }
 
+.learner-correction-result-card__body .corrected-content--model-answer {
+  color: #000000;
+}
+
 .view-section .pending {
   color: var(--color-text-muted);
   font-style: italic;
