@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import StudentAccountPanel from '../components/student/StudentAccountPanel'
 import AdminSandboxPanel from '../components/writing/AdminSandboxPanel'
 import StudentCorrectionResultInline from '../components/student/StudentCorrectionResultInline'
+import WritingCurriculumPreview from '../components/writing/WritingCurriculumPreview'
 import AssignmentSubmitScreen, { type AssignmentTabKind } from '../components/writing/AssignmentSubmitScreen'
 import WritingPageAdminPreview, {
   type WritingAdminPreviewPayload,
@@ -445,7 +446,10 @@ export default function WritingPage() {
   const correctionTabDetailSlot = useMemo(() => {
     if (!submission?.id || !showLearnerCorrectionTab) return undefined
     return (
-      <StudentCorrectionResultInline submissionId={submission.id} fallbackBodyText={submission.bodyText} />
+      <>
+        <StudentCorrectionResultInline submissionId={submission.id} fallbackBodyText={submission.bodyText} />
+        <WritingCurriculumPreview />
+      </>
     )
   }, [submission?.id, submission?.bodyText, showLearnerCorrectionTab])
 

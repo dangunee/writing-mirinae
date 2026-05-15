@@ -5,10 +5,7 @@ import '../components/atelier-detail/atelier-detail.css'
 import LandingNav from '../components/landing/LandingNav'
 import { useAuthMe } from '../hooks/useAuthMe'
 import IntroCorrectionWorkspace from '../components/intro/IntroCorrectionWorkspace'
-import AtelierCurriculumMobile from '../components/atelier-detail/AtelierCurriculumMobile'
-import AtelierCurriculumDesktop from '../components/atelier-detail/AtelierCurriculumDesktop'
 import AtelierTrialFlow from '../components/atelier-detail/AtelierTrialFlow'
-import AtelierFinalCta from '../components/atelier-detail/AtelierFinalCta'
 import AtelierFooter from '../components/atelier-detail/AtelierFooter'
 
 /**
@@ -52,14 +49,8 @@ export default function TrialLandingPage() {
       ) : null}
       <main>
         <IntroCorrectionWorkspace />
-        <div
-          id="curriculum"
-          className="atelier-koto-root scroll-mt-20 min-h-0 bg-background font-[family-name:var(--font-body)] text-on-surface selection:bg-primary-fixed-dim selection:text-primary md:scroll-mt-24"
-        >
-          <AtelierCurriculumMobile />
-          <AtelierCurriculumDesktop />
+        <div className="atelier-koto-root scroll-mt-20 min-h-0 bg-background font-[family-name:var(--font-body)] text-on-surface selection:bg-primary-fixed-dim selection:text-primary md:scroll-mt-24">
           <AtelierTrialFlow />
-          <AtelierFinalCta />
         </div>
       </main>
       <div className="atelier-koto-root">
